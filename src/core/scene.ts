@@ -75,6 +75,14 @@ function disposeMaterial(material: Material): void {
 /**
  * Releases every geometry, material and material texture under `root`.
  * It does not remove `root` from its parent; detach it yourself if needed.
+ *
+ * The disposal contract for a visualization's sub-objects: a sub-object that
+ * disposes its own geometries and materials must also detach itself from the
+ * scene (removeFromParent or clear) inside its dispose(), so the closing
+ * disposeObject(scene) does not walk it a second time. Anything a sub-object
+ * leaves attached is disposed exactly once, by that final sweep. A geometry or
+ * material shared between several objects belongs to neither of them: dispose
+ * it once, explicitly, and keep it out of the attached subtree.
  */
 export function disposeObject(root: Object3D): void {
   root.traverse((object) => {

@@ -33,6 +33,20 @@ function headings(el: HTMLElement): (string | null)[] {
 }
 
 describe("renderHome", () => {
+  it("names the page with a visually hidden heading", () => {
+    const el = renderHome([ready("a", "machine-learning", "A")]);
+    const h1 = el.querySelector("h1");
+    expect(h1?.textContent).toBe("AI Lab");
+    expect(h1?.className).toBe("visually-hidden");
+  });
+
+  it("announces a roadmap card's state in text, not only in aria-disabled", () => {
+    const el = renderHome([soon("b", "calculus", "B")]);
+    const card = el.querySelector<HTMLElement>(".card")!;
+    expect(card.getAttribute("aria-disabled")).toBe("true");
+    expect(card.querySelector(".visually-hidden")?.textContent).toBe("Coming soon");
+  });
+
   it("renders one section per topic, in TOPICS order", () => {
     const el = renderHome([ready("a", "machine-learning", "A"), soon("b", "calculus", "B")]);
     expect(headings(el)).toEqual(["Calculus", "Linear Algebra", "Machine Learning"]);

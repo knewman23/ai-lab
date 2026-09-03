@@ -57,21 +57,25 @@ export interface VizInstance {
 }
 ```
 
-A minimal example that mounts a spinning cube:
+A minimal example, a spinning cube in its own folder:
 
 ```ts
 import { BoxGeometry, Mesh, MeshStandardMaterial } from "three";
-import { createSceneKit, disposeObject } from "../../core/scene";
-import type { VizHost, VizInstance } from "../types";
+import { createSceneKit, disposeObject, prefersReducedMotion } from "../../core/scene";
+import type { Visualization, VizHost, VizInstance } from "../types";
 
-export function mount(host: VizHost): VizInstance {
-  const kit = createSceneKit(host.renderer, host.theme, { reducedMotion: false });
+function mount(host: VizHost): VizInstance {
+  const kit = createSceneKit(host.renderer, host.theme, {
+    reducedMotion: prefersReducedMotion(),
+  });
   const cube = new Mesh(new BoxGeometry(1, 1, 1), new MeshStandardMaterial());
   kit.scene.add(cube);
   return {
+    // A spinning cube always animates, so it always renders and always returns
+    // true; a scene that can sit still must return false on the frames it skips.
     update(dt) {
       cube.rotation.z += dt;
-      kit.controls.update();
+      kit.controls.update(dt);
       host.renderer.render(kit.scene, kit.camera);
       return true;
     },
@@ -79,12 +83,22 @@ export function mount(host: VizHost): VizInstance {
       kit.camera.aspect = w / h;
       kit.camera.updateProjectionMatrix();
     },
+    // The cube is still attached, so the scene sweep disposes it exactly once.
     dispose() {
-      disposeObject(cube);
+      disposeObject(kit.scene);
       kit.dispose();
     },
   };
 }
+
+export const spinningCube: Visualization = {
+  id: "spinning-cube",
+  topic: "machine-learning",
+  title: "Spinning cube",
+  summary: "A cube rotating on the Z axis, the smallest thing that fills a frame.",
+  status: "ready",
+  mount,
+};
 ```
 
 Then register it in `src/app/registry.ts`.

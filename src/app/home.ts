@@ -18,6 +18,8 @@ function renderCard(entry: RegistryEntry, index: number): HTMLElement {
     (card as HTMLAnchorElement).href = `#/${entry.topic}/${entry.id}`;
   } else {
     card.setAttribute("aria-disabled", "true");
+    // aria-disabled alone is not announced on a plain <div>, so say it in text.
+    card.append(el("span", "visually-hidden", "Coming soon"));
   }
 
   // Decoration: the card's accessible name is its title and summary.
@@ -43,6 +45,7 @@ function renderCard(entry: RegistryEntry, index: number): HTMLElement {
 /** The `#/` page: one section per topic, each a grid of algorithm cards. */
 export function renderHome(entries: readonly RegistryEntry[]): HTMLElement {
   const page = el("div", "home-page wrap");
+  page.append(el("h1", "visually-hidden", "AI Lab"));
 
   for (const topic of TOPICS) {
     const section = el("section", "topic");

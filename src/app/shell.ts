@@ -15,7 +15,21 @@ import { createVizPage, type RendererResult } from "./viz-page";
 export function createShell(root: HTMLElement): void {
   const header = renderHeader();
   const main = document.createElement("main");
-  root.replaceChildren(header.el, main);
+  main.id = "main";
+  // Focusable only as the skip link's target, never in the tab order itself.
+  main.tabIndex = -1;
+
+  const skip = document.createElement("a");
+  skip.className = "skip";
+  skip.href = "#main";
+  skip.textContent = "Skip to content";
+  skip.addEventListener("click", (event) => {
+    // Routing reads the hash, so letting "#main" land would navigate home.
+    event.preventDefault();
+    main.focus();
+  });
+
+  root.replaceChildren(skip, header.el, main);
 
   const theme = createThemeColors();
   // The shell lives for the page lifetime, so this disposer is never called;

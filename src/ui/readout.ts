@@ -13,6 +13,8 @@ export interface Readout {
 export function createReadout(rows: readonly string[]): Readout {
   const el = document.createElement("dl");
   el.className = "readout";
+  // Values change as the visualization runs; announce them without interrupting.
+  el.setAttribute("aria-live", "polite");
 
   const values = new Map<string, HTMLElement>();
   for (const key of rows) {
