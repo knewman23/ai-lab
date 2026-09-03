@@ -258,7 +258,8 @@ src/app/registry.ts   chain-rule-graph → status "ready", load: () => import(".
                       summary rewritten: "Drag x along a composed function and watch a small Δx
                       become Δu on the front wall, then Δy on the side wall and the floor: the
                       three slopes multiply."
-README.md             roadmap item struck through with a one-line description; scene list
+README.md             a fourth "What's in it" paragraph (the roadmap never listed this scene), a
+                      one-line description and a screenshot line
 ```
 
 Testing beyond the unit tests above: the existing registry test covers the new entry; a
