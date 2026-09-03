@@ -3,7 +3,7 @@ import type { Composition } from "../../core/math/compositions";
 import type { ThemeColors } from "../types";
 import { disposeLayers, type Layer, lineLayer } from "../shared/layer";
 import { writeWorldSegments } from "../shared/layer-write";
-import { linkSegments, type LinkSegments } from "./links-geometry";
+import { type FacePoints, linkSegments, type LinkSegments } from "./links-geometry";
 import type { Derived, ShowKey } from "./state";
 
 type LinkKey = keyof LinkSegments;
@@ -12,8 +12,8 @@ export interface Links {
   readonly group: Group;
   /** The five world layers, keyed by what they draw; read by tests. */
   readonly layers: Readonly<Record<LinkKey, Layer>>;
-  /** Rewrites every layer for a state. */
-  set(c: Composition, x: number, d: Derived): void;
+  /** Rewrites every layer for a state; `fp` is the same `facePoints` the spheres were placed with. */
+  set(c: Composition, x: number, d: Derived, fp: FacePoints): void;
   /** Shows or hides layers by overlay toggle; "connectors" covers both connector layers. */
   setShow(show: Readonly<Record<ShowKey, boolean>>): void;
   dispose(): void;
@@ -68,8 +68,8 @@ export function createLinks(theme: ThemeColors): Links {
     group,
     layers,
 
-    set(c: Composition, x: number, d: Derived): void {
-      const segments = linkSegments(c, x, d);
+    set(c: Composition, x: number, d: Derived, fp: FacePoints): void {
+      const segments = linkSegments(c, x, d, fp);
       for (const key of KEYS) writeWorldSegments(layers[key], segments[key]);
     },
 

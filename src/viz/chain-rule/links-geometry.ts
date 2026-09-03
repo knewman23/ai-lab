@@ -132,11 +132,17 @@ function legsOf(
  * and vertical-then-depth on the side wall, so the Δu leg is shared between
  * the walls and the Δy leg between the side wall and the floor. Secants and
  * tangents are extended and clipped to their face; the side-wall secant needs
- * Δu ≠ 0 and the side-wall tangent a finite `sideSlope`.
+ * Δu ≠ 0 and the side-wall tangent a finite `sideSlope`. Pass `pts` when
+ * `facePoints` has already been computed for this state, so the drawn spheres
+ * and the lines that meet them come from the same numbers.
  */
-export function linkSegments(c: Composition, x: number, d: Derived): LinkSegments {
+export function linkSegments(
+  c: Composition,
+  x: number,
+  d: Derived,
+  pts: FacePoints = facePoints(c, x, d),
+): LinkSegments {
   const { u, y } = d;
-  const pts = facePoints(c, x, d);
   const step = stepOf(x, d);
   const atP = frontLocal(c, x, u);
   const atQ = sideLocal(c, u, y);

@@ -70,6 +70,21 @@ describe("chainRuleGraph.mount", () => {
     viz.dispose();
   });
 
+  it("detaches its pointer listeners and empties the panel on dispose", () => {
+    const { host: h } = host();
+    const remove = vi.spyOn(h.renderer.domElement, "removeEventListener");
+    const viz = chainRuleGraph.mount(h);
+    expect(h.panel.childElementCount).toBeGreaterThan(0);
+
+    viz.dispose();
+
+    const removed = remove.mock.calls.map((call) => call[0]);
+    for (const type of ["pointerdown", "pointermove", "pointerup", "pointercancel"]) {
+      expect(removed).toContain(type);
+    }
+    expect(h.panel.childElementCount).toBe(0);
+  });
+
   it("drops its theme listener on dispose", () => {
     const { host: h, theme } = host();
     const remove = vi.spyOn(theme, "removeEventListener");

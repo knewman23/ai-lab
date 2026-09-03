@@ -1,5 +1,5 @@
 import { Vector3 } from "three";
-import { DOMAIN, type CompKey } from "../../core/math/compositions";
+import type { CompKey } from "../../core/math/compositions";
 import type { Vec2 } from "../../core/math/numeric";
 import { createSceneKit, disposeObject, prefersReducedMotion } from "../../core/scene";
 import { attachDrag } from "../shared/drag";
@@ -39,12 +39,6 @@ const HINT = {
 const WALL_NORMAL = new Vector3(0, 1, 0);
 /** R lives on the floor, the plane z = 0. */
 const FLOOR_NORMAL = new Vector3(0, 0, 1);
-/** Index of R in the drag's hit targets; P is 0. */
-const R_INDEX = 1;
-
-function clamp(v: number, lo: number, hi: number): number {
-  return Math.min(hi, Math.max(lo, v));
-}
 
 /**
  * Builds the scene-side objects. If any one of them throws, the ones already
@@ -118,11 +112,11 @@ function mount(host: VizHost): VizInstance {
     state = next;
     const d = derived(state);
 
-    // Resamples only when the composition itself changes.
+    // Curves memoises by composition, so this is a no-op unless it changed.
     curves.setComposition(d.comp);
     const fp = facePoints(d.comp, state.x, d);
     points.set(fp, d.showPrimed ? fp.primed : null);
-    links.set(d.comp, state.x, d);
+    links.set(d.comp, state.x, d, fp);
     // The layers start visible and tangents default to off, so this is not optional.
     links.setShow(state.show);
 
@@ -132,6 +126,9 @@ function mount(host: VizHost): VizInstance {
 
   let detachDrag: (() => void) | undefined;
   let hint: UsageHint | undefined;
+
+  const hitTargets = [points.hitP, points.hitR];
+  const rIndex = hitTargets.indexOf(points.hitR);
 
   try {
     panel = createChainPanel(host.panel, {
@@ -151,14 +148,13 @@ function mount(host: VizHost): VizInstance {
       canvas: host.renderer.domElement,
       camera: kit.camera,
       controls: kit.controls,
-      hitTargets: [points.hitP, points.hitR],
+      hitTargets,
       // P drags on the front wall, R on the floor; both planes pass through the origin.
       plane: {
-        normal: (index: number) => (index === R_INDEX ? FLOOR_NORMAL : WALL_NORMAL),
+        normal: (index: number) => (index === rIndex ? FLOOR_NORMAL : WALL_NORMAL),
         getOffset: () => 0,
       },
-      // Only x is read back; the second component rides along untouched.
-      clamp: (p: Vec2): Vec2 => [clamp(p[0], DOMAIN[0], DOMAIN[1]), p[1]],
+      // No clamp here: only x is read back, and setX clamps it to the domain.
       surfaceTarget: faces.front,
       onDrag: (_index: number, p: Vec2) => {
         // The first move of the point is proof the hint has been read.

@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { COMPOSITIONS } from "../../../src/core/math/compositions";
 import { createThemeColors } from "../../../src/core/theme";
 import { createLinks } from "../../../src/viz/chain-rule/links";
+import { facePoints } from "../../../src/viz/chain-rule/links-geometry";
 import { derived, initialState, setX } from "../../../src/viz/chain-rule/state";
 
 function make() {
@@ -13,7 +14,8 @@ describe("createLinks", () => {
   it("writes six connectors, six primed, six legs, three secants and three tangents at the initial state", () => {
     const { links } = make();
     const s = initialState();
-    links.set(COMPOSITIONS.sin3x, s.x, derived(s));
+    const d = derived(s);
+    links.set(COMPOSITIONS.sin3x, s.x, d, facePoints(COMPOSITIONS.sin3x, s.x, d));
     const { layers } = links;
     expect(layers.connectors.geometry.drawRange.count).toBe(12);
     expect(layers.primed.geometry.drawRange.count).toBe(12);
@@ -26,7 +28,8 @@ describe("createLinks", () => {
   it("empties the primed, leg and secant layers at the right edge", () => {
     const { links } = make();
     const s = setX(initialState(), 3);
-    links.set(COMPOSITIONS.sin3x, s.x, derived(s));
+    const d = derived(s);
+    links.set(COMPOSITIONS.sin3x, s.x, d, facePoints(COMPOSITIONS.sin3x, s.x, d));
     expect(links.layers.primed.geometry.drawRange.count).toBe(0);
     expect(links.layers.legs.geometry.drawRange.count).toBe(0);
     expect(links.layers.secants.geometry.drawRange.count).toBe(0);
