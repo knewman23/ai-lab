@@ -111,6 +111,7 @@ input[type="range"]::-moz-range-track {
 
 /* toggle switch */
 .switch {
+  position: relative;
   display: inline-flex;
   align-items: center;
   gap: 10px;
@@ -201,4 +202,12 @@ input[type="range"]::-moz-range-track {
   font-size: 12px;
   color: var(--ink-2);
   font-variant-numeric: tabular-nums;
+}
+
+/* KaTeX equation output */
+.equation {
+  display: block;
+  margin: 8px 0;
+  overflow-x: auto;
+  color: var(--ink);
 }
