@@ -31,6 +31,8 @@ const ARROW_SCALE = 0.15;
 const MIN_LENGTH = 0.2;
 const MAX_LENGTH = 1.5;
 const FLAT = 1e-9;
+const BALL_ORDER = 9;
+const ARROW_ORDER = 10;
 
 /** Runs `apply` over whatever material(s) a helper part carries. */
 function eachMaterial(material: Material | Material[], apply: (m: Material) => void): void {
@@ -42,6 +44,24 @@ function fade(material: Material | Material[], opacity: number): void {
     m.transparent = true;
     m.opacity = opacity;
   });
+}
+
+/**
+ * Draws an arrow over the surface instead of inside it. The arrows lie in the
+ * tangent plane, so at the default camera the mesh buries most of their length.
+ *
+ * `renderOrder` goes on the line and cone rather than the ArrowHelper: three
+ * sorts renderable objects individually and a Group's own order is not
+ * inherited by its children.
+ */
+function overlay(arrow: ArrowHelper): void {
+  for (const part of [arrow.line, arrow.cone]) {
+    part.renderOrder = ARROW_ORDER;
+    eachMaterial(part.material, (m) => {
+      m.depthTest = false;
+      m.depthWrite = false;
+    });
+  }
 }
 
 /**
@@ -67,6 +87,9 @@ export function createMarker(theme: ThemeColors): Marker {
   const ballMaterial = new MeshStandardMaterial({ roughness: 0.5 });
   ballMaterial.color.copy(theme.ink);
   const ball = new Mesh(ballGeometry, ballMaterial);
+  // Above the surface in the draw order, but still depth-tested: the ball is a
+  // solid body and should be occluded when it really is behind something.
+  ball.renderOrder = BALL_ORDER;
 
   const hitGeometry = new SphereGeometry(HIT_RADIUS, 12, 8);
   const hitMaterial = new MeshBasicMaterial({ visible: false });
@@ -77,6 +100,8 @@ export function createMarker(theme: ThemeColors): Marker {
   const descentArrow = new ArrowHelper(up, new Vector3(), 1);
   fade(descentArrow.line.material, 0.45);
   fade(descentArrow.cone.material, 0.45);
+  overlay(gradArrow);
+  overlay(descentArrow);
 
   const planeGeometry = new PlaneGeometry(PLANE_SIDE, PLANE_SIDE);
   const planeMaterial = new MeshBasicMaterial({
