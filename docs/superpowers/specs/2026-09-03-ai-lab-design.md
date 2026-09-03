@@ -225,8 +225,9 @@ drag), never per frame.
 - The gradient: `∇f(x,y) = (∂f/∂x, ∂f/∂y)` rendered by KaTeX, followed by the current numeric
   gradient and its magnitude in a monospace readout.
 - The update rule for the selected optimizer, with the current learning rate substituted,
-  and one sentence on what to look for (e.g. for `elongated`: "raise the learning rate
-  until the path overshoots the narrow axis"; for `saddle`: "the ball slides off along y
+  and one sentence on what to look for (e.g. for `elongated`: "at a learning rate of 0.1
+  the narrow axis neither settles nor blows up: nudge the rate below 0.1 to converge, above it
+  to diverge"; for `saddle`: "the ball slides off along y
   until it leaves the domain: that's the optimizer escaping a saddle").
 
 ### Readouts

@@ -43,7 +43,7 @@ export const SURFACES: Readonly<Record<SurfaceKey, Surface>> = {
     domain: { x: [-3, 3], y: [-3, 3] },
     scale: 1 / 30,
     start: [2.5, 1.5],
-    hint: "Raise the learning rate until the path overshoots the narrow axis.",
+    hint: "At a learning rate of 0.1 the narrow axis neither settles nor blows up: y flips sign every step. Nudge the rate below 0.1 to converge, above it to diverge.",
   },
   saddle: {
     key: "saddle",
