@@ -1,7 +1,7 @@
 # Backprop graph — the notebook-01 autograd DAG with stepped forward and backward passes
 
 Date: 2026-09-03
-Status: draft (revision 1)
+Status: draft (revision 2, after spec review round 1)
 Parent: [AI Lab design](2026-09-03-ai-lab-design.md); siblings: [Chain rule graph](2026-09-03-chain-rule-graph-design.md), [Gradient descent](2026-09-03-ai-lab-design.md)
 Registry: replaces the `machine-learning` roadmap entry `backprop-graph`
 Source material: `ai-frontier/notebooks/01-derivatives-and-the-numerical-gradient.ipynb` (the `Value`
@@ -18,8 +18,8 @@ so "what happens to the gradients if w1 is bigger" is a drag, not a rerun.
 
 Success criteria: two clicks from the home page; 60 fps while orbiting or dragging; the neuron
 preset reproduces the notebook's numbers (o = 0.7071, x1.grad = −1.5, w1.grad = 1.0, x2.grad =
-0.5, w2.grad = 0, b.grad = 0.5) to display precision; the `shared-node` preset shows a gradient
-accumulating from two paths; a full forward + backward pass on the neuron takes 10 steps; labels stay
+0.5, w2.grad = 0, b.grad = 0.5) to display precision; the `shared-node` preset shows e.grad
+grow from 1 to 11 across two distinct backward steps; a full forward + backward pass on the neuron takes 10 steps; labels stay
 attached to their nodes while orbiting.
 
 Out of scope: user-built graphs, training or optimizer steps (the neural network scene), operations
@@ -40,26 +40,26 @@ beyond `+`, `×`, `tanh`, more than one output node, graph editing.
 ```ts
 export type Op = "leaf" | "add" | "mul" | "tanh";
 export interface GraphNode { readonly id: string; readonly label: string; readonly op: Op; readonly inputs: readonly string[] }
-export interface Graph { readonly key: GraphKey; readonly title: string; readonly nodes: readonly GraphNode[]; readonly output: string;
+export interface Graph { readonly key: string; // narrowed to GraphKey by graphs.ts readonly title: string; readonly nodes: readonly GraphNode[]; readonly output: string;
   readonly leaves: readonly { id: string; start: number; range: readonly [number, number] }[]; readonly hint: string }
 export type Values = Readonly<Record<string, number>>;
 export function topoOrder(g: Graph): readonly string[];            // leaves first, output last; deterministic (input order, then declaration order)
 export function forward(g: Graph, leaves: Values): Values;         // every node's value
 export function localGrad(g: Graph, node: string, inputIndex: number, values: Values): number; // add → 1; mul → the other input's value; tanh → 1 − out²
-export function backward(g: Graph, values: Values): Values;        // output.grad = 1; reverse topo; grads accumulate (+=) across consumers
+export function gradsAfter(g: Graph, values: Values, k: number): Values; // replays the first k backward steps (k counts backward steps only); a node appears once it has received any contribution; grads accumulate (+=) across consumers
+export function backward(g: Graph, values: Values): Values;        // = gradsAfter with every backward step run
 export function passSteps(g: Graph): readonly PassStep[];          // forward: one per non-leaf node in topo order; backward: one per non-leaf node in reverse topo order (the output's step sets its grad to 1 and distributes it)
 export type PassStep = { kind: "forward"; node: string } | { kind: "backward"; node: string };
-export function revealed(g: Graph, stepIndex: number): { values: ReadonlySet<string>; grads: ReadonlySet<string> };
+export function revealed(g: Graph, stepIndex: number): { values: ReadonlySet<string>; backwardSteps: number }; // values known after the first stepIndex steps; how many backward steps have run (grads revealed = keys of gradsAfter)
 ```
 
 `revealed(g, k)`: after the first k steps, which nodes have a known value (leaves always; a
-non-leaf once its forward step has run) and which have a known gradient (a node once its own
-backward step has run; its inputs' gradients become known as they receive contributions, i.e. an
-input's grad is revealed when the first consumer's backward step runs). `k = 0` is before anything
-runs; `k = passSteps(g).length` is a complete pass.
-
-`mul` with the same node as both inputs (`e·e`) is allowed: `localGrad` for each input index uses
-the other index's value (equal), and `backward` accumulates both contributions, giving 2e·grad.
+non-leaf once its forward step has run) and how many backward steps have run. Gradients are never
+taken from the final `backward`: the scene shows `gradsAfter(g, values, backwardSteps)`, so a node
+with two consumers shows its partial sum until the second consumer's step runs, and a node is
+"revealed" for gradient purposes exactly when it has a key in that record (the output's own step
+puts `output: 1` there and distributes it). `k = 0` is before anything runs; `k = passSteps(g).length`
+is a complete pass.
 
 ### Presets (`core/math/graphs.ts`)
 
@@ -67,22 +67,22 @@ the other index's value (equal), and `backward` accumulates both contributions, 
 |---|---|---|---|
 | `neuron` (default) | o = tanh(x1·w1 + x2·w2 + b) | x1 2, x2 0, w1 −3, w2 1 (all [−4, 4]); b 6.8813735870195432 ([−8, 8]) | the notebook's neuron; 10 nodes, 10 steps |
 | `product-sum` | d = a·b + c | a 2, b −3, c 10 (all [−10, 10]) | the smallest graph with both rules |
-| `shared-node` | L = e·e where e = a·b + c | a 2, b −3, c 10 | e has two consumers: its gradient accumulates from two paths |
+| `shared-node` | L = f + e where e = a·b + c and f = e·c | a 2, b −3, c 10 | e has two consumer nodes (L and f), so e.grad = 1 after L's step and 11 after f's: accumulation you can watch |
 
 Node ids and labels for `neuron`: `x1, w1, x2, w2, b` (leaves), `x1w1` ("x1·w1"), `x2w2` ("x2·w2"),
-`sum` ("x1·w1 + x2·w2"), `n` ("n"), `o` ("o"). Ops are labelled by their symbol on the sphere:
-`+`, `×`, `tanh`; leaves and the output by their name.
+`sum` ("x1·w1 + x2·w2"), `n` ("n"), `o` ("o"). Every node gets its label above the sphere; op
+nodes additionally get their symbol (`+`, `×`, `tanh`) as an `op` label centred on the sphere.
 
 Tests: `topoOrder(neuron)` puts every input before its consumer and ends with `o`;
 `forward(neuron, starts)` gives n = 0.8814, o = 0.7071 (4 d.p.); `backward` gives the six notebook
 gradients (x1 −1.5, w1 1.0, x2 0.5, w2 0, b 0.5, n 0.5); `product-sum` d = 4 with a.grad = −3,
-b.grad = 2, c.grad = 1; `shared-node` L = 16, e.grad = 8, a.grad = −24; `localGrad(tanh)` matches a
+b.grad = 2, c.grad = 1; `shared-node` e = 4, f = 40, L = 44; after L's backward step `gradsAfter` has L 1, f 1, e 1 (and no a, b, c); after f's step e 11, c 4; after e's step a −33, b 22, c 15; `localGrad(tanh)` matches a
 central difference; `passSteps(neuron).length` = 10 (see the step count below); `revealed`
 at k = 0, mid-pass and full pass.
 
 Step count: forward steps = non-leaf nodes (neuron: 5); backward steps = non-leaf nodes in reverse
 topo order (a leaf has no `_backward` of its own; its gradient is complete once its last consumer
-has run). Neuron: 5 + 5 = 10 steps; `product-sum`: 2 + 2 = 4; `shared-node`: 3 + 3 = 6.
+has run). Neuron: 5 + 5 = 10 steps; `product-sum`: 2 + 2 = 4; `shared-node`: 3 + 3 = 6 (backward order L, f, e).
 
 ## 4. Layout (`viz/backprop/layout.ts`, pure, unit-tested)
 
@@ -90,7 +90,7 @@ Columns by depth (longest path from a leaf): X = −W/2 + (depth + 0.5)·W/cols 
 W = 10; rows within a column spread evenly over Z ∈ [0.8, 5.2], ordered by the mean Z of a node's
 inputs (leaves keep declaration order) so edges do not cross unnecessarily. Returns
 `Readonly<Record<string, readonly [number, number]>>` (X, Z). Neuron: 5 columns; the leaf column
-holds x1, w1, x2, w2, b top to bottom; `o` alone in the last column at Z = 3.
+holds x1, w1, x2, w2, b in declaration order mapped to decreasing Z (x1 at 5.2, b at 0.8); `o` alone in the last column at Z = 3.
 
 Tests: neuron column count and leaf order; every edge goes to a strictly greater X; two nodes never
 share a position.
@@ -123,18 +123,23 @@ At most 20 boxes, so plain meshes sharing one geometry.
 
 **Labels** (`viz/shared/labels.ts`, new, tested): `createLabelLayer(host: HTMLElement)` appends an
 absolutely positioned, `pointer-events: none` `<div class="viz-labels">` over the canvas and
-returns `{ set(id, text, world: Vec3, kind: "node" | "value" | "grad" | "edge"), remove(id),
-update(camera, w, h) (projects every label with `Vector3.project`, hides those behind the camera or
-outside the canvas, positions with `transform: translate(-50%, -100%) translate(xpx, ypx)`),
-clear(), dispose() }`. Labels per node: the label text above the sphere (`kind: "node"`); the
+returns `{ set(id, text, world: Vec3, kind: "node" | "op" | "value" | "grad" | "edge"), remove(id),
+update(camera, w, h) (w, h in CSS pixels, the `clientWidth/Height` the shell passes to `resize`;
+projects every label with `Vector3.project`, hides those behind the camera or outside the canvas,
+positions with `transform: translate(-50%, -100%) translate(xpx, ypx)`; `op` labels use
+`translate(-50%, -50%)` so they sit on the sphere), clear(), dispose() }`. The div is appended
+before the usage hint is created so the hint stays on top without z-index games. Labels per node: the label text above the sphere (`kind: "node"`); the
 value as text at the value bar's tip (`"2"`, `"−6"`, `"0.7071"` via `fmt`); the gradient at the
 grad bar's tip prefixed `∂ ` (`"∂ −1.5"`), both only when revealed. During a backward step, each
 edge into the active node gets an `edge` label at its midpoint with the local derivative
 (`"× −3"` for a mul edge whose partner value is −3, `"× 1"` for add, `"× 0.5"` for tanh), removed
-when the step advances. CSS in `styles/shell.css`: `.viz-labels` absolute inset 0 overflow hidden;
+when the step advances. Every input pair in the shipped presets is distinct, so edge labels never
+coincide. CSS in `styles/panel.css` next to `.canvas-hint`: `.viz-labels` absolute inset 0 overflow hidden
+`pointer-events: none` `user-select: none`;
 spans `font: 12px var(--mono)`, `color: var(--ink)`; `.value` and `.grad` use `--soft` and
-`--accent`; `.edge` has a `--bg` pill background. `update` runs only when the camera moved or the
-labels changed (the assembler already knows both).
+`--accent`; `.edge` has a `--bg` pill background. `update` runs when the camera moved, the labels changed, or the canvas was resized (the projection
+matrix changes on resize while nothing else does; the assembler's `resize` marks labels dirty).
+A leaf edit during a backward step rewrites the active edge labels too, since they carry values.
 
 **Camera.** `frame-wall.ts`: target (0, 0, 3); position target + 12·(0.55, −1.05, 0.5) ≈ (6.6,
 −12.6, 9); the wall nearly face-on from slightly right and above, so both bar directions read.
@@ -149,10 +154,11 @@ interface BpState { readonly graph: GraphKey; readonly leaves: Values; readonly 
 `initialState()`: `neuron`, leaves at their starts, step 0, not playing, all shown. Reducers:
 `setGraph(s, key)` (leaves → starts, step 0, playing false), `setLeaf(s, id, v)` (clamped to the
 leaf's range; step unchanged), `stepForward(s)` (step + 1, capped at the pass length; at the cap
-playing → false), `resetPass(s)` (step 0, playing false), `setPlaying(s, on)`, `setShow`,
+playing → false), `resetPass(s)` (step 0, playing false), `setPlaying(s, on)` (a no-op when `done`), `setShow`,
 `reset(s)` (leaves → starts, step 0, playing false, show kept). `derived(s)`: `graph`, `values =
-forward(...)`, `grads = backward(...)`, `steps = passSteps(graph)`, `current: PassStep | null`
-(the step just taken, `steps[step − 1]`), `revealed = revealed(graph, step)`, `done: boolean`,
+forward(...)`, `revealed = revealed(graph, step)`, `grads = gradsAfter(graph, values, revealed.backwardSteps)`
+(partial sums, keys = revealed gradients), `steps = passSteps(graph)`, `current: PassStep | null`
+(the step just taken, `steps[step − 1]`), `done: boolean`,
 `phase: "idle" | "forward" | "backward" | "done"`.
 
 Playing is driven by the assembler's `update(dt)`: it accumulates dt and dispatches `stepForward`
@@ -162,8 +168,12 @@ every 0.7 s while `playing` (reduced motion: same cadence; steps are discrete an
 
 1. Graph select (`neuron`, `product-sum`, `shared-node`).
 2. Pass: buttons Step, Play/Pause (label toggles), Reset pass; a live line "Step k of N: <text>"
-   where text is "forward: n = x1w1x2w2 + b = 0.8814" or "backward: n.grad = 0.5 · 1 = 0.5 → into
-   sum, b" (built by `explanation.ts` from the current `PassStep`), "Leaves are given; press Step to
+   where text follows the step semantics of §3: a forward step reads "forward: <label> = <op applied
+   to input values> = <result>" ("forward: n = −6 + 6.881 = 0.8814", "forward: o = tanh(0.8814) =
+   0.7071"); a backward step reads "backward at <label>: <label>.grad = <g> → <input>.grad += <local>
+   × <g>" for each input ("backward at o: o.grad = 1 → n.grad += 0.5 × 1"; "backward at n: n.grad =
+   0.5 → sum.grad += 1 × 0.5, b.grad += 1 × 0.5") (built by `explanation.ts` from the current
+   `PassStep`), "Leaves are given; press Step to
    run the forward pass." at k = 0, "Pass complete." when done.
 3. Leaves: one linear slider per leaf (label = leaf id, range from the graph, step 0.01, readout
    the value). Rewritten when the graph changes (the section is rebuilt).
@@ -178,21 +188,25 @@ Explanation (KaTeX via `createEquation`): the chain rule as backprop uses it,
 the three local rules `\partial(a+b)/\partial a = 1`, `\partial(ab)/\partial a = b`,
 `\partial\tanh(x)/\partial x = 1 - \tanh^2 x`; the graph's expression (`o = \tanh(x_1 w_1 + x_2 w_2 +
 b)`). Text: the current step sentence (same as the pass line, longer form), and the graph's hint.
-For `shared-node` the hint says: "e feeds L twice, so e.grad is the sum of both contributions:
-that is why `backward` uses +=."
+For `shared-node` the hint says: "e feeds both f and L, so e.grad is the sum of two contributions,
+1 from L and 10 from f: that is why `backward` uses +=."
 
 ## 8. Interaction details
 
-- Drag a leaf's value bar: one `attachDrag` with the leaf bars as hit targets (the bars themselves,
-  r 0.16 boxes are big enough; add an invisible hit box 0.4 wide around each), `plane: { normal:
-  (1, 0, 0), getOffset: (i) => X_i }` (the vertical plane through the bar), `onDrag(i, p)` →
-  `setLeaf(id_i, clamp(−p[1] / s_value, range))` (p[1] is the world y of the hit; −y is positive).
+- Drag a leaf's value bar: one `attachDrag` whose hit targets are invisible boxes, one per leaf,
+  0.4 × 6.4 × 0.4 centred on the bar's axis (X_i − 0.12, Z_i) and spanning y ∈ [−3.2, 3.2], so a
+  zero-valued leaf (x2 in the neuron) is still grabbable. The drag plane contains the bar's axis and
+  faces the camera: `plane: { normal: (i) => normalize(camera.x − X_i, 0, camera.z − Z_i), getOffset:
+  (i) => normal · (X_i, 0, Z_i) }` (the normal function runs at pointerdown, so it follows the orbit;
+  a plane with normal +x would amplify pointer motion 2–3× from the home camera). `onDrag(i, p)` →
+  `setLeaf(id_i, −p[1] / s_value)` (`setLeaf` clamps; p[1] is the world y of the hit; −y is positive).
   Grab cursor over a leaf bar. No click-to-place.
 - Editing a leaf never changes the step: revealed values and gradients recompute in place.
 - Play stops at the end of the pass; Step at the end does nothing; Reset pass returns to k = 0.
 - Hint (`ai-lab.hint.backprop`): "Press Step to run the forward pass, then keep stepping through
   the backward pass."; "Drag a leaf's bar or move its slider; every revealed number updates.";
-  "Orbit to read the bars: value on the left of each node, gradient on the right."
+  "Orbit to read the bars: value on the left of each node, gradient on the right; a bar
+  pointing at you is positive."
 - Reset view restores the home framing.
 
 ## 9. Files and shared changes
@@ -200,7 +214,7 @@ that is why `backward` uses +=."
 ```
 src/core/math/autograd.ts, graphs.ts                    + tests
 src/viz/shared/labels.ts                                + tests (projection with a known camera; hide when behind)
-styles/shell.css                                        .viz-labels rules
+styles/panel.css                                        .viz-labels rules (next to .canvas-hint)
 src/viz/backprop/
   index.ts        Visualization (buildScene/unwind, apply, update with the play timer and label update)
   state.ts        reducers and derived                  + tests
@@ -227,5 +241,8 @@ themes, labels tracking during orbit, console clean).
   If the browser check shows overlap, value/grad text moves to the bar tips only when revealed and
   node labels shrink to 11px.
 - **Bar sign convention.** Positive toward the camera (−y) matches "the bar comes out at you"; the
-  panel states it once in the hint.
-- **Large gradients** in `shared-node` are clamped visually; the label carries the true number.
+  third hint line says so.
+- **Foreshortening.** Bars along ±y are seen near end-on from a face-on camera; the home framing is
+  35° off axis. If the browser check finds bars hard to read, the fallback is a more oblique octant,
+  not a different bar axis.
+- **Large gradients** in `shared-node` (a.grad = −33) are clamped visually at 3 units; the label carries the true number.
