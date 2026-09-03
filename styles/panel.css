@@ -112,10 +112,14 @@ input[type="range"]::-moz-range-track {
 /* toggle switch */
 .switch {
   position: relative;
-  display: inline-flex;
+  display: flex;
   align-items: center;
   gap: 10px;
   cursor: pointer;
+  padding: 4px 0;
+}
+.switch + .switch {
+  margin-top: 4px;
 }
 .switch input[type="checkbox"] {
   position: absolute;
@@ -127,7 +131,7 @@ input[type="range"]::-moz-range-track {
   position: relative;
   width: 32px;
   height: 18px;
-  border-radius: 2px;
+  border-radius: 9px;
   background: var(--line-2);
   border: 1px solid var(--line-2);
   transition: background-color 0.14s ease;
@@ -140,7 +144,7 @@ input[type="range"]::-moz-range-track {
   left: 2px;
   width: 12px;
   height: 12px;
-  border-radius: 1px;
+  border-radius: 50%;
   background: var(--card);
   transition: transform 0.14s ease;
 }
