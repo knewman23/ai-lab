@@ -2,7 +2,6 @@ export interface RunTimer {
   /** Accumulates `dt` and returns how many steps are due: 0 or 1. */
   advance(dt: number): number;
   reset(): void;
-  setHz(hz: number): void;
 }
 
 /**
@@ -14,7 +13,7 @@ export interface RunTimer {
  * single period so the backlog cannot grow without bound either.
  */
 export function createRunTimer(hz: number): RunTimer {
-  let period = 1 / hz;
+  const period = 1 / hz;
   let accumulator = 0;
 
   return {
@@ -27,11 +26,6 @@ export function createRunTimer(hz: number): RunTimer {
     },
 
     reset(): void {
-      accumulator = 0;
-    },
-
-    setHz(next: number): void {
-      period = 1 / next;
       accumulator = 0;
     },
   };

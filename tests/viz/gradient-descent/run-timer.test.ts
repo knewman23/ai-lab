@@ -35,14 +35,6 @@ describe("createRunTimer", () => {
     expect(timer.advance(0.05)).toBe(1);
   });
 
-  it("changes rate with setHz and clears the accumulator", () => {
-    const timer = createRunTimer(10);
-    timer.advance(0.09);
-    timer.setHz(2);
-    expect(timer.advance(0.4)).toBe(0);
-    expect(timer.advance(0.2)).toBe(1);
-  });
-
   it("ignores non-finite or negative deltas", () => {
     const timer = createRunTimer(10);
     expect(timer.advance(Number.NaN)).toBe(0);

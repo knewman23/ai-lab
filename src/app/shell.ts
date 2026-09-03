@@ -18,7 +18,10 @@ export function createShell(root: HTMLElement): void {
   root.replaceChildren(header.el, main);
 
   const theme = createThemeColors();
-  watchTheme(theme);
+  // The shell lives for the page lifetime, so this disposer is never called;
+  // it is kept in a local so the ownership is explicit rather than dropped.
+  const stopWatchingTheme = watchTheme(theme);
+  void stopWatchingTheme;
   const loop = createLoop();
   theme.addEventListener("change", () => {
     loop.poke();

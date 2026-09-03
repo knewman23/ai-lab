@@ -8,7 +8,7 @@ import { createContourLines } from "./contour-lines";
 import { attachDrag } from "./drag";
 import { frameFor, type Framing } from "./framing";
 import { createMarker } from "./marker";
-import { createGdPanel } from "./panel";
+import { createGdPanel, type GdPanel } from "./panel";
 import { createPathLine } from "./path-line";
 import { createRunTimer } from "./run-timer";
 import { createSurfaceMesh } from "./surface-mesh";
@@ -32,15 +32,57 @@ import {
 const RUN_HZ = 10;
 const REDUCED_RUN_HZ = 2;
 
+/**
+ * Builds the scene-side objects. If any one of them throws, the ones already
+ * built are disposed in reverse order before the error is rethrown, so a
+ * half-finished mount never leaks GPU resources. The returned `unwind` lets
+ * the caller do the same for a failure later in the mount.
+ */
+function buildScene(host: VizHost, reducedMotion: boolean) {
+  const built: Array<() => void> = [];
+  const unwind = (): void => {
+    for (let i = built.length - 1; i >= 0; i -= 1) built[i]?.();
+  };
+
+  try {
+    const kit = createSceneKit(host.renderer, host.theme, { reducedMotion });
+    built.push(() => {
+      disposeObject(kit.scene);
+      kit.dispose();
+    });
+
+    const surfaceMesh = createSurfaceMesh(host.theme);
+    built.push(() => {
+      surfaceMesh.dispose();
+    });
+
+    const contours = createContourLines(host.theme);
+    built.push(() => {
+      contours.dispose();
+    });
+
+    const marker = createMarker(host.theme);
+    built.push(() => {
+      marker.dispose();
+    });
+
+    const path = createPathLine(host.theme, PATH_CAPACITY);
+    built.push(() => {
+      path.dispose();
+    });
+
+    kit.scene.add(surfaceMesh.group, contours.object, marker.group, path.group);
+
+    return { kit, surfaceMesh, contours, marker, path, unwind };
+  } catch (error) {
+    unwind();
+    throw error;
+  }
+}
+
 function mount(host: VizHost): VizInstance {
   const reducedMotion = prefersReducedMotion();
-  const kit = createSceneKit(host.renderer, host.theme, { reducedMotion });
-
-  const surfaceMesh = createSurfaceMesh(host.theme);
-  const contours = createContourLines(host.theme);
-  const marker = createMarker(host.theme);
-  const path = createPathLine(host.theme, PATH_CAPACITY);
-  kit.scene.add(surfaceMesh.group, contours.object, marker.group, path.group);
+  const { kit, surfaceMesh, contours, marker, path, unwind } = buildScene(host, reducedMotion);
 
   const runTimer = createRunTimer(reducedMotion ? REDUCED_RUN_HZ : RUN_HZ);
 
@@ -48,6 +90,9 @@ function mount(host: VizHost): VizInstance {
   let dirty = true;
   let prevSurface: SurfaceKey | undefined;
   let home: Framing | undefined;
+  // Declared before `apply` because the panel's handlers can call `apply`
+  // while the panel is still being constructed.
+  let panel: GdPanel | undefined;
 
   function goHome(): void {
     if (!home) return;
@@ -77,40 +122,48 @@ function mount(host: VizHost): VizInstance {
     contours.setVisible(state.show.contours);
     path.setVisible(state.show.path);
 
-    panel.render(state, derived(state));
+    panel?.render(state, derived(state));
     dirty = true;
   }
 
-  const panel = createGdPanel(
-    host.panel,
-    {
-      onSurface: (key: SurfaceKey) => apply(setSurface(state, key)),
-      onOptimizer: (key: OptimizerKey) => apply(setOptimizer(state, key)),
-      onLr: (lr: number) => apply(setLr(state, lr)),
-      onStep: () => apply(step(state)),
-      onToggleRun: () => {
-        runTimer.reset();
-        apply(toggleRun(state));
-      },
-      onReset: () => apply(reset(state)),
-      onResetView: () => {
-        goHome();
-        dirty = true;
-      },
-      onShow: (key: ShowKey, on: boolean) => apply(setShow(state, key, on)),
-    },
-    { backend: backendName(host.renderer) },
-  );
+  let detachDrag: (() => void) | undefined;
 
-  const detachDrag = attachDrag({
-    canvas: host.renderer.domElement,
-    camera: kit.camera,
-    controls: kit.controls,
-    hitTarget: marker.hitTarget,
-    getSurface: () => SURFACES[state.surface],
-    getPosition: () => state.pos,
-    onDrag: (p) => apply(drag(state, p)),
-  });
+  try {
+    panel = createGdPanel(
+      host.panel,
+      {
+        onSurface: (key: SurfaceKey) => apply(setSurface(state, key)),
+        onOptimizer: (key: OptimizerKey) => apply(setOptimizer(state, key)),
+        onLr: (lr: number) => apply(setLr(state, lr)),
+        onStep: () => apply(step(state)),
+        onToggleRun: () => {
+          runTimer.reset();
+          apply(toggleRun(state));
+        },
+        onReset: () => apply(reset(state)),
+        onResetView: () => {
+          goHome();
+          dirty = true;
+        },
+        onShow: (key: ShowKey, on: boolean) => apply(setShow(state, key, on)),
+      },
+      { backend: backendName(host.renderer) },
+    );
+
+    detachDrag = attachDrag({
+      canvas: host.renderer.domElement,
+      camera: kit.camera,
+      controls: kit.controls,
+      hitTarget: marker.hitTarget,
+      getSurface: () => SURFACES[state.surface],
+      getPosition: () => state.pos,
+      onDrag: (p) => apply(drag(state, p)),
+    });
+  } catch (error) {
+    panel?.dispose();
+    unwind();
+    throw error;
+  }
 
   function onThemeChange(): void {
     dirty = true;
@@ -138,12 +191,12 @@ function mount(host: VizHost): VizInstance {
 
     dispose(): void {
       host.theme.removeEventListener("change", onThemeChange);
-      detachDrag();
+      detachDrag?.();
       path.dispose();
       marker.dispose();
       contours.dispose();
       surfaceMesh.dispose();
-      panel.dispose();
+      panel?.dispose();
       disposeObject(kit.scene);
       kit.dispose();
     },
