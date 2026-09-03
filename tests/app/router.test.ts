@@ -6,7 +6,7 @@ import {
   type Route,
   type RouterDeps,
 } from "../../src/app/router";
-import type { RegistryEntry, Visualization } from "../../src/viz/types";
+import type { LazyVisualization, RegistryEntry } from "../../src/viz/types";
 
 describe("parseHash", () => {
   it.each<[string, Route]>([
@@ -41,17 +41,25 @@ describe("parseHash", () => {
 });
 
 describe("resolveRoute", () => {
-  const readyEntry: Visualization = {
+  const readyEntry: LazyVisualization = {
     id: "gradient-descent",
     topic: "machine-learning",
     title: "Gradient descent",
     summary: "A visualization.",
     status: "ready",
-    mount: () => ({
-      update: () => false,
-      resize: () => {},
-      dispose: () => {},
-    }),
+    load: () =>
+      Promise.resolve({
+        id: "gradient-descent",
+        topic: "machine-learning",
+        title: "Gradient descent",
+        summary: "A visualization.",
+        status: "ready",
+        mount: () => ({
+          update: () => false,
+          resize: () => {},
+          dispose: () => {},
+        }),
+      }),
   };
 
   const soonEntry: RegistryEntry = {
@@ -90,17 +98,25 @@ describe("resolveRoute", () => {
 });
 
 describe("createRouter", () => {
-  const readyEntry: Visualization = {
+  const readyEntry: LazyVisualization = {
     id: "gradient-descent",
     topic: "machine-learning",
     title: "Gradient descent",
     summary: "A visualization.",
     status: "ready",
-    mount: () => ({
-      update: () => false,
-      resize: () => {},
-      dispose: () => {},
-    }),
+    load: () =>
+      Promise.resolve({
+        id: "gradient-descent",
+        topic: "machine-learning",
+        title: "Gradient descent",
+        summary: "A visualization.",
+        status: "ready",
+        mount: () => ({
+          update: () => false,
+          resize: () => {},
+          dispose: () => {},
+        }),
+      }),
   };
 
   function makeStubDeps(initialHash: string): RouterDeps & {

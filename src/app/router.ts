@@ -1,4 +1,4 @@
-import { TOPICS, type RegistryEntry, type TopicSlug, type Visualization } from "../viz/types";
+import { TOPICS, type LazyVisualization, type RegistryEntry, type TopicSlug } from "../viz/types";
 import { findEntry } from "./registry";
 
 export type Route =
@@ -7,7 +7,7 @@ export type Route =
 
 export type ResolvedRoute =
   | { readonly kind: "home"; readonly topic?: TopicSlug }
-  | { readonly kind: "viz"; readonly entry: Visualization }
+  | { readonly kind: "viz"; readonly entry: LazyVisualization }
   | { readonly kind: "redirect" };
 
 function decodeSegment(segment: string): string | undefined {

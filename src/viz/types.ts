@@ -15,7 +15,16 @@ export interface Visualization extends Omit<RoadmapEntry, "status"> {
   mount(host: VizHost): VizInstance;
 }
 
-export type RegistryEntry = Visualization | RoadmapEntry;
+/**
+ * How the registry holds a ready visualization: card metadata plus a loader for
+ * the chunk that owns the scene, so the home page never downloads Three.js.
+ */
+export interface LazyVisualization extends Omit<RoadmapEntry, "status"> {
+  readonly status: "ready";
+  readonly load: () => Promise<Visualization>;
+}
+
+export type RegistryEntry = LazyVisualization | RoadmapEntry;
 
 /** The WebGPURenderer class from "three/webgpu"; it also backs the WebGL 2 fallback. */
 export type Renderer = import("three/webgpu").WebGPURenderer;

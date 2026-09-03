@@ -1,5 +1,4 @@
 import { createLoop } from "../core/loop";
-import { createRenderer } from "../core/renderer";
 import { createThemeColors, watchTheme } from "../core/theme";
 import { renderHeader } from "./header";
 import { renderHome } from "./home";
@@ -10,7 +9,7 @@ import { createVizPage, type RendererResult } from "./viz-page";
 /**
  * Composes the page. The header, theme and router come up first and never
  * depend on the renderer, so the home page works even where WebGPU and
- * WebGL 2 are both missing.
+ * WebGL 2 are both missing, and never downloads Three.js.
  */
 export function createShell(root: HTMLElement): void {
   const header = renderHeader();
@@ -42,14 +41,24 @@ export function createShell(root: HTMLElement): void {
   });
 
   // The canvas is born in a detached holder and moves into whichever frame
-  // needs it, so boot can start before the first route is known.
+  // needs it, so it survives navigation between scenes.
   const holder = document.createElement("div");
-  const rendererReady: Promise<RendererResult> = createRenderer(holder).then(
-    (renderer) => ({ ok: true, renderer }) as const,
-    (error: unknown) => ({ ok: false, error }) as const,
-  );
+  // Both the renderer module and the renderer itself are created on the first
+  // viz route and then reused: three/webgpu is ~650 kB the home page never needs.
+  let rendererReady: Promise<RendererResult> | null = null;
+  const getRenderer = (): Promise<RendererResult> => {
+    rendererReady ??= (async (): Promise<RendererResult> => {
+      try {
+        const { applySize, createRenderer } = await import("../core/renderer");
+        return { ok: true, renderer: await createRenderer(holder), applySize };
+      } catch (error) {
+        return { ok: false, error };
+      }
+    })();
+    return rendererReady;
+  };
 
-  const vizPage = createVizPage({ main, header, theme, loop, rendererReady });
+  const vizPage = createVizPage({ main, header, theme, loop, getRenderer });
 
   let token = 0;
   let homePage: HTMLElement | null = null;

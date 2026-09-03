@@ -1,12 +1,25 @@
 import type { Loop } from "../core/loop";
-import { applySize } from "../core/renderer";
-import { topicTitle, type Renderer, type ThemeColors, type Visualization } from "../viz/types";
+import {
+  topicTitle,
+  type LazyVisualization,
+  type Renderer,
+  type ThemeColors,
+  type Visualization,
+} from "../viz/types";
 import type { Header } from "./header";
 import { createVizFrame, type VizFrame } from "./viz-frame";
 
-/** The boot result; `rendererReady` never rejects, so a viz route can explain itself. */
+/**
+ * The renderer boot result; `getRenderer()` never rejects, so a viz route can
+ * explain itself. `applySize` rides along because it lives in the same module as
+ * the `three/webgpu` import, which must stay out of the shell's static graph.
+ */
 export type RendererResult =
-  | { readonly ok: true; readonly renderer: Renderer }
+  | {
+      readonly ok: true;
+      readonly renderer: Renderer;
+      readonly applySize: (renderer: Renderer, w: number, h: number) => void;
+    }
   | { readonly ok: false; readonly error: unknown };
 
 export interface VizPageDeps {
@@ -14,11 +27,12 @@ export interface VizPageDeps {
   readonly header: Pick<Header, "setBreadcrumb">;
   readonly theme: ThemeColors;
   readonly loop: Loop;
-  readonly rendererReady: Promise<RendererResult>;
+  /** Memoised: creates the renderer on the first viz route, once per page load. */
+  readonly getRenderer: () => Promise<RendererResult>;
 }
 
 export interface VizPage {
-  enter(entry: Visualization, token: number): Promise<void>;
+  enter(entry: LazyVisualization, token: number): Promise<void>;
   leave(): void;
 }
 
@@ -99,7 +113,7 @@ export function createVizPage(deps: VizPageDeps): VizPage {
     frame = null;
   }
 
-  async function enter(entry: Visualization, token: number): Promise<void> {
+  async function enter(entry: LazyVisualization, token: number): Promise<void> {
     // Self-contained: an enter() without a leave() still leaves one frame behind.
     leave();
     current = token;
@@ -112,8 +126,21 @@ export function createVizPage(deps: VizPageDeps): VizPage {
     own.showLoading();
     deps.main.append(own.el);
 
-    const result = await deps.rendererReady;
-    // A leave() or a newer enter() happened while the renderer was booting.
+    // The renderer boots while the visualization's chunk downloads.
+    let result: RendererResult;
+    let viz: Visualization;
+    try {
+      [result, viz] = await Promise.all([deps.getRenderer(), entry.load()]);
+    } catch (error) {
+      // Only load() can reject here; getRenderer() reports failure in its result.
+      if (current !== token) return;
+      own.showNotice(
+        notice("This visualization failed to start", "This visualization could not be loaded."),
+      );
+      if (import.meta.env.DEV) console.error("visualization chunk failed to load", error);
+      return;
+    }
+    // A leave() or a newer enter() happened while those were in flight.
     if (current !== token) return;
 
     if (!result.ok) {
@@ -132,7 +159,7 @@ export function createVizPage(deps: VizPageDeps): VizPage {
       own.canvasContainer.replaceChildren(renderer.domElement);
       currentId = entry.id;
 
-      const mounted = entry.mount({
+      const mounted = viz.mount({
         canvasContainer: own.canvasContainer,
         panel: own.panel,
         renderer,
@@ -144,7 +171,7 @@ export function createVizPage(deps: VizPageDeps): VizPage {
         const w = own.canvasContainer.clientWidth;
         const h = own.canvasContainer.clientHeight;
         if (w === 0 || h === 0) return;
-        applySize(result.renderer, w, h);
+        result.applySize(result.renderer, w, h);
         mounted.resize(w, h);
         deps.loop.poke();
       };

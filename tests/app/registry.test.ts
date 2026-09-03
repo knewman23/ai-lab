@@ -1,5 +1,23 @@
 import { describe, expect, it } from "vitest";
 import { findEntry, REGISTRY } from "../../src/app/registry";
+import type { LazyVisualization } from "../../src/viz/types";
+
+/** Loads a ready entry's chunk and checks the module matches the card metadata. */
+async function loadReady(topic: string, id: string): Promise<void> {
+  const entry = findEntry(topic, id);
+  expect(entry).toBeDefined();
+  expect(entry?.status).toBe("ready");
+  const load = (entry as LazyVisualization).load;
+  expect(typeof load).toBe("function");
+  const module = await load();
+  expect(module.status).toBe("ready");
+  expect(typeof module.mount).toBe("function");
+  expect(module.id).toBe(id);
+  expect(module.topic).toBe(topic);
+  // The card metadata is duplicated in the registry; drift would ship a wrong card.
+  expect(module.title).toBe(entry?.title);
+  expect(module.summary).toBe(entry?.summary);
+}
 
 describe("registry", () => {
   it("has unique ids", () => {
@@ -27,28 +45,20 @@ describe("registry", () => {
     },
   );
 
-  it("has the gradient descent visualization ready to mount", () => {
-    const entry = findEntry("machine-learning", "gradient-descent");
-    expect(entry).toBeDefined();
-    expect(entry?.status).toBe("ready");
-    expect(typeof (entry as { mount?: unknown } | undefined)?.mount).toBe("function");
+  it("loads the gradient descent visualization from its own chunk", async () => {
+    await loadReady("machine-learning", "gradient-descent");
   });
 
-  it("has the matrix transformation visualization ready to mount", () => {
-    const entry = findEntry("linear-algebra", "matrix-transformation");
-    expect(entry).toBeDefined();
-    expect(entry?.status).toBe("ready");
-    expect(typeof (entry as { mount?: unknown } | undefined)?.mount).toBe("function");
-    expect(entry?.summary).not.toContain("cube");
+  it("loads the matrix transformation visualization from its own chunk", async () => {
+    await loadReady("linear-algebra", "matrix-transformation");
+    expect(findEntry("linear-algebra", "matrix-transformation")?.summary).not.toContain("cube");
   });
 
-  it("has the derivative explorer ready to mount", () => {
-    const entry = findEntry("calculus", "derivative-tangent");
-    expect(entry).toBeDefined();
-    expect(entry?.status).toBe("ready");
-    expect(typeof (entry as { mount?: unknown } | undefined)?.mount).toBe("function");
-    expect(entry?.summary).not.toContain("roadmap");
-    expect(entry?.summary).not.toContain("soon");
+  it("loads the derivative explorer from its own chunk", async () => {
+    await loadReady("calculus", "derivative-tangent");
+    const summary = findEntry("calculus", "derivative-tangent")?.summary;
+    expect(summary).not.toContain("roadmap");
+    expect(summary).not.toContain("soon");
   });
 
   it("lists the derivative explorer first among the calculus entries", () => {

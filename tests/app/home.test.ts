@@ -2,7 +2,7 @@
 import { TOPICS } from "../../src/viz/types";
 import { describe, expect, it } from "vitest";
 import { renderHome } from "../../src/app/home";
-import type { RegistryEntry, VizInstance } from "../../src/viz/types";
+import type { RegistryEntry, VizInstance, Visualization } from "../../src/viz/types";
 
 const noopInstance: VizInstance = {
   update: () => false,
@@ -11,14 +11,9 @@ const noopInstance: VizInstance = {
 };
 
 function ready(id: string, topic: RegistryEntry["topic"], title: string): RegistryEntry {
-  return {
-    id,
-    topic,
-    title,
-    summary: `Summary of ${title}.`,
-    status: "ready",
-    mount: () => noopInstance,
-  };
+  const meta = { id, topic, title, summary: `Summary of ${title}.` };
+  const loaded: Visualization = { ...meta, status: "ready", mount: () => noopInstance };
+  return { ...meta, status: "ready", load: () => Promise.resolve(loaded) };
 }
 
 function soon(id: string, topic: RegistryEntry["topic"], title: string): RegistryEntry {
