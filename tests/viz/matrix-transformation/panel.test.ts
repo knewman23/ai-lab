@@ -77,6 +77,19 @@ describe("createMtPanel", () => {
     expect(readoutText(panel.el, "Orientation")).toBe("collapsed");
   });
 
+  it("describes the zero eigenvalue without naming a basis vector", () => {
+    const panel = mount();
+    renderState(panel, setPreset(initialState(), "projection"));
+
+    const paragraphs = [...panel.el.querySelectorAll(".explain p")];
+    const sentence = paragraphs[paragraphs.length - 1]?.textContent ?? "";
+
+    expect(sentence).toContain("One eigenvalue is 0");
+    expect(sentence).toContain("sent to the origin");
+    expect(sentence).not.toContain("ĵ");
+    expect(sentence).not.toContain("î");
+  });
+
   it("dispatches onPreset when the preset select changes", () => {
     const onPreset = vi.fn();
     const panel = mount({ ...handlers(), onPreset });

@@ -42,7 +42,7 @@ function eigenSentence(e: Eigen): string {
   }
   const collapsed = e.pairs.some((p) => Math.abs(p.value) < ZERO_EIGENVALUE);
   if (collapsed) {
-    return "Two directions are only stretched, not turned. One of them has eigenvalue zero, so ĵ is sent to the origin.";
+    return "One eigenvalue is 0: every vector along that eigenvector is sent to the origin, so the plane collapses onto the other eigen line.";
   }
   return "Two directions are only stretched, not turned; each is drawn as a line through the origin.";
 }
