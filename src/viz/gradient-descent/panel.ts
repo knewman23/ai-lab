@@ -134,7 +134,11 @@ export function createGdPanel(
     readout.set("Steps", String(state.steps));
     readout.set(
       "Status",
-      state.status === "left-domain" ? "left the domain" : state.status === "diverged" ? "diverged" : "",
+      state.status === "left-domain"
+        ? "left the domain"
+        : state.status === "diverged"
+          ? "diverged"
+          : "",
     );
 
     explanation.render(state, d);
