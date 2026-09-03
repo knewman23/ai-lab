@@ -31,7 +31,7 @@ differentiable at zero: |x| shows the corner, √|x| the vertical tangent. Zoom 
 see any smooth curve become its tangent.
 
 **Chain rule graph.** Three graphs meet in a corner: u = g(x) on the front wall, y = f(u) on the
-side wall and the composite y = f(g(x)) on the floor. Drag x along the floor and set a Δx with the
+side wall and the composite y = f(g(x)) on the floor. Drag x on the front wall or the floor and set a Δx with the
 slider; the Δu leg is shared by both walls and the Δy leg by the side wall and the floor, so
 Δy/Δx = (Δy/Δu)(Δu/Δx) is there to be read off the picture. Shrink Δx and the three secants become
 tangents while the readouts converge on the product of the derivatives. Five presets of f and g.

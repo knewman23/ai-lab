@@ -12,8 +12,7 @@ const SCALE = 6.5;
  * out to the left of the shared vertical edge and the front wall (y = 0) to the
  * right, so the two walls never overlap on screen, x still increases to the
  * right on the front wall, and the floor is seen from about 30 degrees above
- * between them. Both walls are seen through their translucent faces. (A camera
- * on the +x side, tried first, stacked the side wall behind the front wall.)
+ * between them. Both walls are seen through their translucent faces.
  */
 export function frameCorner(): Framing {
   return {
