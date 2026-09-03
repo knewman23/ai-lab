@@ -132,8 +132,8 @@ that function's start, h unchanged, zoom → 0), `setX(s, x)` (clamp to [−3, 3
 to `singularAt` within 0.02; no-op when zoom > 0), `setH(s, h)` (clamp [1e-3, 2]), `zoomIn(s)`
 (zoom + 1, max 3), `resetZoom(s)`, `setShow`, `reset(s)` (x → start, h → 1, zoom 0, show
 unchanged). `derived(s)`: `fx`, `d: Derivative`, `hEff: number | null`, `secant: number | null`,
-`gap: number | null` (secant − f′ when both numeric), `K = 4^zoom`, `window: [x − 3/K, x + 3/K]`
-(the full domain at zoom 0), `secantInWindow: boolean`.
+`gap: number | null` (secant − f′ when both numeric), `K = 4^zoom`, `window: zoom === 0 ? DOMAIN : [x − 3/K, x + 3/K]`,
+`secantInWindow: boolean` (always true at zoom 0).
 
 ## 6. Controls (side panel, in order)
 

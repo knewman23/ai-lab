@@ -31,7 +31,7 @@ README.md, docs/screenshots/derivative-light.png, -dark.png
 
 ### Task 1: Branch and `functions1d`
 
-**Files:** create `src/core/math/functions1d.ts`; test `tests/core/math/functions1d.test.ts`.
+**Files:** create `src/core/math/functions1d.ts`, `src/core/math/sampling1d.ts`; tests `tests/core/math/functions1d.test.ts`, `tests/core/math/sampling1d.test.ts`.
 
 - [ ] **Step 1:** `git checkout -b derivative-explorer main`.
 - [ ] **Step 2: Failing tests** (spec §4). `tests/core/math/functions1d.test.ts`: `FN_KEYS` order square, cubic, sine, exp, abs, sqrtabs; the table's `scale`, `primeScale`, `start`, `singularAt`; the six `title`/`tex`/`texPrime` strings; every `value` derivative vs a local 1D central difference `(f(x+h) − f(x−h))/2h`, h 1e-5 (rel 1e-4, abs floor 1e-6) at a fixed literal array of 25 x values in [−3, 3] with |x| > 0.05; `FNS.abs.d(0)` → `{ kind: "jump", left: −1, right: 1 }`, `FNS.abs.d(1e-12)` jump, `FNS.abs.d(1e-6)` value; `FNS.sqrtabs.d(0)` → `{ kind: "vertical" }`; `FNS.abs.d(±0.5)` → value ±1; `secantSlope(FNS.square, 1, h)` ≈ 2 + h (`toBeCloseTo(…, 9)`) for h ∈ {1, 0.1, 0.001}; `effectiveH(2.5, 1)` = 0.5, `effectiveH(3, 1)` = null, `effectiveH(0, 1)` = 1; band properties on a 601-point grid: max |s·f| ≤ 3 + 1e-9 for all six, max |s′·f′| ≤ 2.5 + 1e-9 for all but sqrtabs.
