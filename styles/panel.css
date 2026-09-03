@@ -217,6 +217,30 @@ input[type="range"]::-moz-range-track {
 .hint {
   font-style: italic;
 }
+.note {
+  margin: 16px 0 0;
+  color: var(--soft);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.explain .legend {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.swatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  vertical-align: baseline;
+}
+.swatch.accent {
+  background: var(--accent);
+}
+.swatch.ink {
+  background: var(--ink);
+}
 .readout-inline {
   display: block;
   margin: 0 0 10px;
