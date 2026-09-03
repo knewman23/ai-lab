@@ -13,8 +13,12 @@ export interface MatrixInput {
   set: (m: Mat2) => void;
 }
 
+let nextId = 0;
+
 /** A 2x2 grid of number inputs editing a `Mat2`, in [[a, b], [c, d]] order. */
 export function createMatrixInput(opts: MatrixInputOptions): MatrixInput {
+  const id = `matrix-input-${++nextId}`;
+
   const el = document.createElement("div");
   el.className = "matrix-input";
 
@@ -28,6 +32,8 @@ export function createMatrixInput(opts: MatrixInputOptions): MatrixInput {
     field.step = "any";
     field.min = "-3";
     field.max = "3";
+    field.id = `${id}-${label}`;
+    field.name = label;
     field.setAttribute("aria-label", label);
     field.value = fmt(opts.value[index], 3);
 

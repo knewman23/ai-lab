@@ -26,6 +26,20 @@ describe("createMatrixInput", () => {
     }
   });
 
+  it("gives each input a unique id and a matching name, unique across instances", () => {
+    const value: Mat2 = [1, 0, 0, 1];
+    const { el: el1 } = createMatrixInput({ value, onEntry: () => {} });
+    const { el: el2 } = createMatrixInput({ value, onEntry: () => {} });
+
+    const ids1 = inputs(el1).map((i) => i.id);
+    const ids2 = inputs(el2).map((i) => i.id);
+    const names1 = inputs(el1).map((i) => i.name);
+
+    expect(ids1.every((id) => id.length > 0)).toBe(true);
+    expect(new Set([...ids1, ...ids2]).size).toBe(8);
+    expect(names1).toEqual(["a", "b", "c", "d"]);
+  });
+
   it("dispatches onEntry with the parsed index and value on input", () => {
     const onEntry = vi.fn();
     const value: Mat2 = [1, 0, 0, 1];
