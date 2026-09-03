@@ -1,7 +1,7 @@
 # Chain rule graph — a three-wall corner where slopes multiply
 
 Date: 2026-09-03
-Status: approved by spec review (revision 2)
+Status: approved by spec review (revision 3: camera octant changed after the browser check)
 Parent: [AI Lab design](2026-09-03-ai-lab-design.md); siblings: [Derivative explorer](2026-09-03-derivative-explorer-design.md), [Matrix transformation](2026-09-03-matrix-transformation-design.md)
 Registry: replaces the `calculus` roadmap entry `chain-rule-graph`
 
@@ -117,11 +117,14 @@ click-to-place. Orbit elsewhere.
 
 ### 3.3 Camera
 
-`frame-corner.ts`: target (0, 3, 3); position (0, 3, 3) + 6.5·(1.35, −1.6, 0.9) ≈ (8.8, −7.4,
-8.85), up +Z. This looks at the corner from the +x, −y, +z octant: the front wall nearly face-on
-(seen through its translucent face from the −y side), the side wall's inner face at about 40°, the
-floor from about 35° above. The plan
-may tune the offset by up to 20% after a screenshot; the spec fixes the octant and the target.
+`frame-corner.ts`: target (0, 3, 3); position (0, 3, 3) + 6.5·(−1.5, −1.6, 1.3) ≈ (−9.75, −7.4,
+11.45), up +Z. This looks at the corner from the −x, −y, +z octant, outside the vertex: the side
+wall fans out to the left of the shared vertical edge and the front wall to the right, so the two
+walls never overlap on screen; x still increases to the right on the front wall; the floor is seen
+from about 30° above between them; both walls are seen through their translucent faces. (Revision
+3: the original +x, −y, +z camera stacked the side wall behind the front wall in the browser check,
+which read as a single cluttered pane.) The plan may tune the offset by up to 20% after a
+screenshot; the spec fixes the octant and the target.
 Reset view restores it instantly.
 
 ## 4. Math (`core/math/compositions.ts`, pure, unit-tested)

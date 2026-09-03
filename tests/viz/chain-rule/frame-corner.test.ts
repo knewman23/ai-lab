@@ -7,16 +7,16 @@ describe("frameCorner", () => {
     expect(target).toEqual([0, 3, 3]);
   });
 
-  it("stands at target + 6.5 * (1.35, -1.6, 0.9)", () => {
+  it("stands at target + 6.5 * (-1.5, -1.6, 1.3)", () => {
     const { position } = frameCorner();
-    expect(position[0]).toBeCloseTo(8.775, 6);
+    expect(position[0]).toBeCloseTo(-9.75, 6);
     expect(position[1]).toBeCloseTo(-7.4, 6);
-    expect(position[2]).toBeCloseTo(8.85, 6);
+    expect(position[2]).toBeCloseTo(11.45, 6);
   });
 
-  it("looks in from the +x, -y, +z octant", () => {
+  it("looks at the corner from the -x, -y, +z octant", () => {
     const { position, target } = frameCorner();
-    expect(position[0]).toBeGreaterThan(0);
+    expect(position[0]).toBeLessThan(-3);
     expect(position[1]).toBeLessThan(0);
     expect(position[2]).toBeGreaterThan(target[2]);
   });
