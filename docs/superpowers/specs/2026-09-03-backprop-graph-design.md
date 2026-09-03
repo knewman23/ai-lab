@@ -87,8 +87,8 @@ has run). Neuron: 5 + 5 = 10 steps; `product-sum`: 2 + 2 = 4; `shared-node`: 3 +
 ## 4. Layout (`viz/backprop/layout.ts`, pure, unit-tested)
 
 Columns by depth (longest path from a leaf): X = −W/2 + (depth + 0.5)·W/cols with the wall width
-W = 10; rows within a column spread evenly over Z ∈ [0.8, 5.2], ordered by the mean Z of a node's
-inputs (leaves keep declaration order) so edges do not cross unnecessarily. Returns
+W = 10; rows within a column at Z = 5.2 − i·4.4/(n − 1) for n > 1 rows (a single row sits at Z = 3),
+ordered by the mean Z of a node's inputs (leaves keep declaration order) so edges do not cross unnecessarily. Returns
 `Readonly<Record<string, readonly [number, number]>>` (X, Z). Neuron: 5 columns; the leaf column
 holds x1, w1, x2, w2, b in declaration order mapped to decreasing Z (x1 at 5.2, b at 0.8); `o` alone in the last column at Z = 3.
 
@@ -125,7 +125,8 @@ At most 20 boxes, so plain meshes sharing one geometry.
 absolutely positioned, `pointer-events: none` `<div class="viz-labels">` over the canvas and
 returns `{ set(id, text, world: Vec3, kind: "node" | "op" | "value" | "grad" | "edge"), remove(id),
 update(camera, w, h) (w, h in CSS pixels, the `clientWidth/Height` the shell passes to `resize`;
-projects every label with `Vector3.project`, hides those behind the camera or outside the canvas,
+calls `camera.updateMatrixWorld()`, projects every label with `Vector3.project`, hides those
+with NDC |z| > 1 (behind the camera) or |x|, |y| > 1 (outside the canvas),
 positions with `transform: translate(-50%, -100%) translate(xpx, ypx)`; `op` labels use
 `translate(-50%, -50%)` so they sit on the sphere), clear(), dispose() }`. The div is appended
 before the usage hint is created so the hint stays on top without z-index games. Labels per node: the label text above the sphere (`kind: "node"`); the
