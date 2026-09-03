@@ -1,0 +1,150 @@
+import { FNS, FN_KEYS, type FnKey } from "../../core/math/functions1d";
+import { createButton } from "../../ui/button";
+import { createPanel } from "../../ui/panel";
+import { createReadout, fmt } from "../../ui/readout";
+import { createSelect } from "../../ui/select";
+import { createLogSlider } from "../../ui/slider";
+import { createToggle } from "../../ui/toggle";
+import { createExplanation, derivativeText } from "./explanation";
+import { H_RANGE, MAX_ZOOM, type DxState, type ShowKey, type derived } from "./state";
+
+export interface DxPanelHandlers {
+  onFn(key: FnKey): void;
+  onH(h: number): void;
+  onZoomIn(): void;
+  onResetZoom(): void;
+  onReset(): void;
+  onResetView(): void;
+  onShow(key: ShowKey, on: boolean): void;
+}
+
+const SHOW_KEYS: readonly { key: ShowKey; label: string }[] = [
+  { key: "tangent", label: "Tangent" },
+  { key: "secant", label: "Secant" },
+  { key: "derivative", label: "Derivative curve" },
+];
+
+export interface DxPanel {
+  el: HTMLElement;
+  render(state: DxState, d: ReturnType<typeof derived>): void;
+  dispose(): void;
+}
+
+/** The derivative explorer side panel: controls, readouts and the live explanation. */
+export function createDxPanel(host: HTMLElement, handlers: DxPanelHandlers): DxPanel {
+  const panel = createPanel();
+  host.append(panel.el);
+
+  // One "Setup" section: each widget carries its own label, so per-widget headings would repeat them.
+  const setup = panel.section("Setup");
+
+  const fnSelect = createSelect({
+    label: "Function",
+    options: FN_KEYS.map((key) => ({ value: key, title: FNS[key].title })),
+    value: FN_KEYS[0],
+    onChange: (v) => handlers.onFn(v as FnKey),
+  });
+  setup.append(fnSelect.el);
+
+  const hSlider = createLogSlider({
+    label: "h",
+    min: H_RANGE[0],
+    max: H_RANGE[1],
+    value: 1,
+    onChange: (v) => handlers.onH(v),
+    format: (v) => fmt(v),
+  });
+  setup.append(hSlider.el);
+
+  // A slider's own readout only refreshes on input, so the state-dependent clipping text lives here.
+  const hNote = document.createElement("p");
+  hNote.className = "hint h-note";
+  hNote.hidden = true;
+  setup.append(hNote);
+
+  const runSection = panel.section("Run");
+  const runRow = document.createElement("div");
+  runRow.className = "btn-row";
+  runRow.setAttribute("role", "group");
+  runRow.setAttribute("aria-label", "Run controls");
+  const zoomInBtn = createButton({ label: "Zoom in", onClick: () => handlers.onZoomIn() });
+  const resetZoomBtn = createButton({ label: "Reset zoom", onClick: () => handlers.onResetZoom() });
+  const resetBtn = createButton({ label: "Reset", onClick: () => handlers.onReset() });
+  const resetViewBtn = createButton({ label: "Reset view", onClick: () => handlers.onResetView() });
+  runRow.append(zoomInBtn.el, resetZoomBtn.el, resetBtn.el, resetViewBtn.el);
+  runSection.append(runRow);
+
+  const showSection = panel.section("Show");
+  const toggles = new Map<ShowKey, ReturnType<typeof createToggle>>();
+  for (const { key, label } of SHOW_KEYS) {
+    const toggle = createToggle({
+      label,
+      checked: true,
+      onChange: (on) => handlers.onShow(key, on),
+    });
+    toggles.set(key, toggle);
+    showSection.append(toggle.el);
+  }
+
+  const readoutSection = panel.section("Readouts");
+  const readout = createReadout(["x", "f(x)", "f′(x)", "Secant slope", "Secant − f′"]);
+  readoutSection.append(readout.el);
+
+  const windowNote = document.createElement("p");
+  windowNote.className = "note window";
+  windowNote.hidden = true;
+
+  const zoomNote = document.createElement("p");
+  zoomNote.className = "note";
+  zoomNote.textContent = "Reset zoom to move the point";
+  zoomNote.hidden = true;
+
+  panel.el.append(windowNote, zoomNote);
+
+  const explanation = createExplanation();
+  panel.el.append(explanation.el);
+
+  function render(state: DxState, d: ReturnType<typeof derived>): void {
+    if (fnSelect.value !== state.fn) fnSelect.value = state.fn;
+    if (hSlider.value !== state.h) hSlider.value = state.h;
+
+    for (const { key } of SHOW_KEYS) {
+      const toggle = toggles.get(key);
+      if (toggle && toggle.checked !== state.show[key]) toggle.checked = state.show[key];
+    }
+
+    if (d.hEff === null) {
+      hNote.textContent = "x is at the right edge; no secant";
+      hNote.hidden = false;
+    } else if (d.hEff !== state.h) {
+      hNote.textContent = `clipped to ${fmt(d.hEff)} so x + h stays in the domain`;
+      hNote.hidden = false;
+    } else {
+      hNote.textContent = "";
+      hNote.hidden = true;
+    }
+
+    zoomInBtn.setDisabled(state.zoom >= MAX_ZOOM);
+    resetZoomBtn.setDisabled(state.zoom === 0);
+
+    readout.set("x", fmt(state.x));
+    readout.set("f(x)", fmt(d.fx));
+    readout.set("f′(x)", derivativeText(d.d));
+    readout.set("Secant slope", d.secant === null ? "—" : fmt(d.secant));
+    readout.set("Secant − f′", d.gap === null ? "—" : fmt(d.gap));
+
+    windowNote.textContent = `Window: [${fmt(d.window[0])}, ${fmt(d.window[1])}]`;
+    windowNote.hidden = state.zoom === 0;
+    zoomNote.hidden = state.zoom === 0;
+
+    explanation.render(state, d);
+  }
+
+  return {
+    el: panel.el,
+    render,
+    dispose(): void {
+      host.replaceChildren();
+    },
+  };
+}

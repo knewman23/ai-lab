@@ -223,6 +223,12 @@ input[type="range"]::-moz-range-track {
   font-size: 13px;
   line-height: 1.5;
 }
+.h-note {
+  margin: 6px 0 0;
+  color: var(--soft);
+  font-size: 13px;
+  line-height: 1.5;
+}
 .explain .legend {
   display: flex;
   align-items: center;
