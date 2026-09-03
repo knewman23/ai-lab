@@ -61,7 +61,9 @@ export function createPathLine(theme: ThemeColors, capacity = 2000): PathLine {
   let lastPath: RingBuffer<Vec2> | undefined;
 
   function recolour(surface: Surface, path: RingBuffer<Vec2>): void {
+    const n = Math.min(path.size, capacity);
     path.forEach((p, age, i) => {
+      if (i >= n) return;
       const [x, y] = p;
       const z = surface.scale * surface.f(x, y) + 0.01;
       scratchColor.lerpColors(theme.faint, theme.accent, age);
@@ -80,7 +82,6 @@ export function createPathLine(theme: ThemeColors, capacity = 2000): PathLine {
       steps.setColorAt(i, scratchColor);
     });
 
-    const n = path.size;
     positionAttr.needsUpdate = true;
     colorAttr.needsUpdate = true;
     steps.instanceMatrix.needsUpdate = true;
@@ -111,6 +112,7 @@ export function createPathLine(theme: ThemeColors, capacity = 2000): PathLine {
     dispose(): void {
       theme.removeEventListener("change", onThemeChange);
       disposeObject(group);
+      steps.dispose();
       group.clear();
     },
   };
