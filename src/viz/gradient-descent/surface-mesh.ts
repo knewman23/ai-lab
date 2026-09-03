@@ -8,7 +8,6 @@ import {
   MeshStandardMaterial,
   PlaneGeometry,
 } from "three";
-import { disposeObject } from "../../core/scene";
 import type { Surface } from "../../core/math/surfaces";
 import type { ThemeColors } from "../types";
 
@@ -140,7 +139,12 @@ export function createSurfaceMesh(theme: ThemeColors): SurfaceMesh {
 
     dispose(): void {
       theme.removeEventListener("change", onThemeChange);
-      disposeObject(group);
+      // Not disposeObject: it walks both meshes, and they share one geometry,
+      // so the traversal would dispose that geometry twice.
+      solid.dispose();
+      wireMaterial.dispose();
+      geometry.dispose();
+      group.removeFromParent();
       group.clear();
     },
   };

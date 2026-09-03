@@ -11,8 +11,15 @@ export interface ContourLines {
   dispose(): void;
 }
 
-/** Floats in the preallocated position buffer (66,666 vertices). */
-const CAPACITY = 200_000;
+/** Vertices in the preallocated position buffer. */
+const VERTEX_CAPACITY = 66_666;
+/**
+ * Floats in that buffer. It must stay a whole number of vertices: a
+ * BufferAttribute's `count` is `array.length / itemSize` unrounded, so a
+ * length that is not a multiple of 3 makes three read one float past the end
+ * (undefined, hence NaN) in computeBoundingSphere.
+ */
+const CAPACITY = VERTEX_CAPACITY * 3;
 const LEVEL_COUNT = 12;
 /** How far below the lowest point of the surface the contours are drawn. */
 const DEPTH_BELOW = 0.35;
@@ -89,6 +96,10 @@ export function createContourLines(theme: ThemeColors): ContourLines {
 
     dispose(): void {
       theme.removeEventListener("change", onThemeChange);
+      // Detach first: the assembler disposes the scene afterwards, and a
+      // still-attached object would have its geometry and material disposed a
+      // second time by that traversal.
+      object.removeFromParent();
       geometry.dispose();
       material.dispose();
     },
