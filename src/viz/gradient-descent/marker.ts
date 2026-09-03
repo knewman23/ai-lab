@@ -32,12 +32,26 @@ const MIN_LENGTH = 0.2;
 const MAX_LENGTH = 1.5;
 const FLAT = 1e-9;
 
-/** Sets `transparent`/`opacity` on whatever material(s) a helper part carries. */
+/** Runs `apply` over whatever material(s) a helper part carries. */
+function eachMaterial(material: Material | Material[], apply: (m: Material) => void): void {
+  for (const m of Array.isArray(material) ? material : [material]) apply(m);
+}
+
 function fade(material: Material | Material[], opacity: number): void {
-  for (const m of Array.isArray(material) ? material : [material]) {
+  eachMaterial(material, (m) => {
     m.transparent = true;
     m.opacity = opacity;
-  }
+  });
+}
+
+/**
+ * Releases an arrow's own materials. Not `ArrowHelper.dispose()`: that also
+ * disposes the line and cone geometries, which three shares across every
+ * ArrowHelper in the app, so one disposal would break all the others.
+ */
+function disposeArrow(arrow: ArrowHelper): void {
+  eachMaterial(arrow.line.material, (m) => m.dispose());
+  eachMaterial(arrow.cone.material, (m) => m.dispose());
 }
 
 /**
@@ -133,8 +147,8 @@ export function createMarker(theme: ThemeColors): Marker {
 
     dispose(): void {
       theme.removeEventListener("change", applyTheme);
-      gradArrow.dispose();
-      descentArrow.dispose();
+      disposeArrow(gradArrow);
+      disposeArrow(descentArrow);
       ballGeometry.dispose();
       ballMaterial.dispose();
       hitGeometry.dispose();

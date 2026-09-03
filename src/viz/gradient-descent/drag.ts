@@ -23,6 +23,8 @@ export interface DragOptions {
  */
 export function attachDrag(opts: DragOptions): () => void {
   const { canvas, camera, controls, hitTarget } = opts;
+  // Restored rather than forced to true, so a viz that keeps orbit off keeps it off.
+  const orbitWasEnabled = controls.enabled;
 
   const raycaster = new Raycaster();
   const ndc = new Vector2();
@@ -46,7 +48,7 @@ export function attachDrag(opts: DragOptions): () => void {
 
     const surface = opts.getSurface();
     const [x, y] = opts.getPosition();
-    // Plane through the marker's height: constant is -z for normal +Z.
+    // Plane through the marker's height at drag start: constant is -z for normal +Z.
     dragPlane.constant = -surface.scale * surface.f(x, y);
 
     activePointer = event.pointerId;
@@ -64,17 +66,19 @@ export function attachDrag(opts: DragOptions): () => void {
   function endDrag(event: PointerEvent): void {
     if (activePointer !== event.pointerId) return;
     activePointer = null;
-    controls.enabled = true;
+    controls.enabled = orbitWasEnabled;
     if (canvas.hasPointerCapture(event.pointerId)) canvas.releasePointerCapture(event.pointerId);
   }
 
-  canvas.addEventListener("pointerdown", onPointerDown);
+  // Capture phase: the hit test must run before OrbitControls' own pointerdown
+  // handler, whatever order the two listeners were registered in.
+  canvas.addEventListener("pointerdown", onPointerDown, true);
   canvas.addEventListener("pointermove", onPointerMove);
   canvas.addEventListener("pointerup", endDrag);
   canvas.addEventListener("pointercancel", endDrag);
 
   return () => {
-    canvas.removeEventListener("pointerdown", onPointerDown);
+    canvas.removeEventListener("pointerdown", onPointerDown, true);
     canvas.removeEventListener("pointermove", onPointerMove);
     canvas.removeEventListener("pointerup", endDrag);
     canvas.removeEventListener("pointercancel", endDrag);
@@ -87,6 +91,6 @@ export function attachDrag(opts: DragOptions): () => void {
       }
     }
     activePointer = null;
-    controls.enabled = true;
+    controls.enabled = orbitWasEnabled;
   };
 }
