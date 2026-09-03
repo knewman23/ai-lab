@@ -177,7 +177,8 @@ Explanation (three paragraphs; KaTeX structure re-rendered only when the matrix 
   the readout shows det M(t), the partially applied matrix.
 - Eigenvectors are the directions M only stretches: `M\mathbf v = \lambda \mathbf v`, then one
   sentence for the current kind (two lines; one line for a shear; none for a rotation; every
-  direction for a uniform scale; "ĵ is sent to the origin" for the projection).
+  direction for a uniform scale; for a zero eigenvalue, a direction-neutral sentence that one
+  eigen direction is sent to the origin so the plane collapses onto the other eigen line).
 
 ## 7. Interaction details
 
