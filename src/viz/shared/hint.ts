@@ -5,26 +5,27 @@ export interface UsageHint {
   dispose(): void;
 }
 
-const STORAGE_KEY = "ai-lab.hint.gradient-descent";
+export interface UsageHintSpec {
+  /** localStorage key the dismissal is remembered under; one per visualization. */
+  readonly storageKey: string;
+  readonly heading?: string;
+  readonly lines: readonly string[];
+}
 
-const LINES = [
-  "Drag the ball to move it, or click anywhere on the surface to place it.",
-  "Drag the background to orbit; scroll to zoom; right-drag (or two fingers) to pan.",
-  "Step or Run in the panel; Reset view re-frames the camera.",
-];
+const DEFAULT_HEADING = "How to explore";
 
 /** Storage is unavailable in private modes and some embeddings; showing the hint is the safe default. */
-function dismissed(): boolean {
+function dismissed(key: string): boolean {
   try {
-    return localStorage.getItem(STORAGE_KEY) === "1";
+    return localStorage.getItem(key) === "1";
   } catch {
     return false;
   }
 }
 
-function remember(): void {
+function remember(key: string): void {
   try {
-    localStorage.setItem(STORAGE_KEY, "1");
+    localStorage.setItem(key, "1");
   } catch {
     // Nothing to remember it with; the hint just returns next visit.
   }
@@ -38,17 +39,17 @@ function remember(): void {
  * Already dismissed on a previous visit? The element is still returned, but it
  * is never attached, so callers need no special case.
  */
-export function createUsageHint(container: HTMLElement): UsageHint {
+export function createUsageHint(container: HTMLElement, spec: UsageHintSpec): UsageHint {
   const el = document.createElement("div");
   el.className = "canvas-hint";
   el.setAttribute("role", "note");
 
   const heading = document.createElement("h3");
   heading.className = "lbl";
-  heading.textContent = "How to explore";
+  heading.textContent = spec.heading ?? DEFAULT_HEADING;
 
   const list = document.createElement("ul");
-  for (const line of LINES) {
+  for (const line of spec.lines) {
     const item = document.createElement("li");
     item.textContent = line;
     list.append(item);
@@ -60,13 +61,13 @@ export function createUsageHint(container: HTMLElement): UsageHint {
 
   el.append(heading, list, button);
 
-  let hidden = dismissed();
+  let hidden = dismissed(spec.storageKey);
 
   function hide(): void {
     if (hidden) return;
     hidden = true;
     el.remove();
-    remember();
+    remember(spec.storageKey);
   }
 
   button.addEventListener("click", hide);

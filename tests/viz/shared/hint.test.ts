@@ -3,6 +3,8 @@ import { afterEach, describe, expect, it } from "vitest";
 import { createUsageHint } from "../../../src/viz/shared/hint";
 
 const KEY = "ai-lab.hint.gradient-descent";
+const LINES = ["Drag the ball.", "Orbit the scene.", "Step in the panel."];
+const HINT = { storageKey: KEY, lines: LINES };
 
 afterEach(() => {
   localStorage.clear();
@@ -11,7 +13,7 @@ afterEach(() => {
 describe("createUsageHint", () => {
   it("attaches a note with the three usage lines", () => {
     const container = document.createElement("div");
-    const hint = createUsageHint(container);
+    const hint = createUsageHint(container, HINT);
 
     const el = container.querySelector(".canvas-hint");
     expect(el).not.toBeNull();
@@ -23,7 +25,7 @@ describe("createUsageHint", () => {
 
   it("removes itself and remembers the dismissal when the button is clicked", () => {
     const container = document.createElement("div");
-    const hint = createUsageHint(container);
+    const hint = createUsageHint(container, HINT);
 
     container.querySelector<HTMLButtonElement>(".canvas-hint button")?.click();
 
@@ -35,7 +37,7 @@ describe("createUsageHint", () => {
 
   it("hides on the first interaction, without needing the button", () => {
     const container = document.createElement("div");
-    const hint = createUsageHint(container);
+    const hint = createUsageHint(container, HINT);
 
     hint.hide();
     hint.hide();
@@ -49,9 +51,30 @@ describe("createUsageHint", () => {
   it("stays away once dismissed on an earlier visit", () => {
     localStorage.setItem(KEY, "1");
     const container = document.createElement("div");
-    const hint = createUsageHint(container);
+    const hint = createUsageHint(container, HINT);
 
     expect(container.querySelector(".canvas-hint")).toBeNull();
+
+    hint.dispose();
+  });
+
+  it("keys the dismissal per visualization", () => {
+    localStorage.setItem(KEY, "1");
+    const container = document.createElement("div");
+    const other = createUsageHint(container, { storageKey: "ai-lab.hint.other", lines: LINES });
+
+    expect(container.querySelector(".canvas-hint")).not.toBeNull();
+    other.hide();
+
+    expect(localStorage.getItem("ai-lab.hint.other")).toBe("1");
+    other.dispose();
+  });
+
+  it("uses the heading it is given", () => {
+    const container = document.createElement("div");
+    const hint = createUsageHint(container, { ...HINT, heading: "How to play" });
+
+    expect(container.querySelector(".canvas-hint h3")?.textContent).toBe("How to play");
 
     hint.dispose();
   });
@@ -67,7 +90,7 @@ describe("createUsageHint", () => {
 
     const container = document.createElement("div");
     try {
-      const hint = createUsageHint(container);
+      const hint = createUsageHint(container, HINT);
       expect(container.querySelector(".canvas-hint")).not.toBeNull();
       expect(() => {
         hint.hide();

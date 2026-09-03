@@ -1,10 +1,16 @@
 // @vitest-environment jsdom
-import { Group, Mesh, PerspectiveCamera, PlaneGeometry, SphereGeometry } from "three";
+import {
+  Group,
+  Mesh,
+  type Object3D,
+  PerspectiveCamera,
+  PlaneGeometry,
+  SphereGeometry,
+} from "three";
 import type { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { describe, expect, it, vi } from "vitest";
 import type { Vec2 } from "../../../src/core/math/numeric";
-import type { Surface } from "../../../src/core/math/surfaces";
-import { attachDrag } from "../../../src/viz/shared/drag";
+import { attachDrag, type DragOptions } from "../../../src/viz/shared/drag";
 
 /**
  * A 200x200 canvas viewed by a 90-degree camera one unit in front of the z = 0
@@ -14,22 +20,15 @@ import { attachDrag } from "../../../src/viz/shared/drag";
  */
 const SIZE = 200;
 const BALL_X = 0.5;
-/** Screen point over the ball, and one over bare surface well away from it. */
+/** Screen point over the first ball, one over the second, one over bare surface. */
 const ON_BALL: readonly [number, number] = [150, 100];
-const OFF_BALL: readonly [number, number] = [50, 100];
+const ON_BALL_2: readonly [number, number] = [50, 100];
+const OFF_BALL: readonly [number, number] = [50, 180];
 
-/** Flat and centred, with a deliberately short y range so clamping is visible. */
-const surface: Surface = {
-  key: "bowl",
-  title: "Test",
-  f: () => 0,
-  grad: () => [0, 0],
-  domain: { x: [-1, 1], y: [-0.2, 0.2] },
-  scale: 1,
-  start: [0, 0],
-  defaultLr: 0.1,
-  hint: "",
-};
+/** The short y range the gradient scene's domain clamp stands in for here. */
+function clampY(p: Vec2): Vec2 {
+  return [p[0], Math.min(Math.max(p[1], -0.2), 0.2)];
+}
 
 function pointer(type: string, x: number, y: number, pointerId = 1): PointerEvent {
   // MouseEvent rather than PointerEvent: jsdom's PointerEvent support varies,
@@ -39,7 +38,18 @@ function pointer(type: string, x: number, y: number, pointerId = 1): PointerEven
   return event as PointerEvent;
 }
 
-function harness() {
+function ball(x: number): Mesh {
+  const mesh = new Mesh(new SphereGeometry(0.2, 8, 8));
+  mesh.position.set(x, 0, 0);
+  mesh.updateMatrixWorld();
+  return mesh;
+}
+
+type Overrides = Partial<Pick<DragOptions, "hitTargets" | "getPlaneZ" | "enabled">> & {
+  surfaceTarget?: Object3D | null;
+};
+
+function harness(overrides: Overrides = {}) {
   const canvas = document.createElement("div");
   vi.spyOn(canvas, "getBoundingClientRect").mockReturnValue({
     left: 0,
@@ -55,60 +65,84 @@ function harness() {
   camera.position.set(0, 0, 1);
   camera.updateMatrixWorld();
 
-  const hitTarget = new Mesh(new SphereGeometry(0.2, 8, 8));
-  hitTarget.position.set(BALL_X, 0, 0);
-  hitTarget.updateMatrixWorld();
-
   const surfaceTarget = new Group();
   surfaceTarget.add(new Mesh(new PlaneGeometry(4, 4)));
   surfaceTarget.updateMatrixWorld(true);
 
   const controls = { enabled: true } as OrbitControls;
-  const onDrag = vi.fn<(pos: Vec2) => void>();
-  let position: Vec2 = [0, 0];
+  const onDrag = vi.fn<(index: number, pos: Vec2) => void>();
+  const getPlaneZ = vi.fn<(index: number) => number>(() => 0);
 
   const detach = attachDrag({
     canvas,
     camera,
     controls,
-    hitTarget,
-    surfaceTarget,
-    getSurface: () => surface,
-    getPosition: () => position,
-    onDrag: (p) => {
-      position = p;
-      onDrag(p);
-    },
+    hitTargets: overrides.hitTargets ?? [ball(BALL_X)],
+    getPlaneZ: overrides.getPlaneZ ?? getPlaneZ,
+    clamp: clampY,
+    ...(overrides.enabled ? { enabled: overrides.enabled } : {}),
+    ...(overrides.surfaceTarget === null ? {} : { surfaceTarget }),
+    onDrag,
   });
 
   const send = (type: string, [x, y]: readonly [number, number], id = 1): void => {
     canvas.dispatchEvent(pointer(type, x, y, id));
   };
 
-  return { canvas, controls, onDrag, detach, send };
+  return { canvas, controls, onDrag, getPlaneZ, detach, send };
 }
 
-/** The single Vec2 a single onDrag call received. */
-function only(onDrag: ReturnType<typeof harness>["onDrag"]): Vec2 {
+/** The single (index, Vec2) pair a single onDrag call received. */
+function only(onDrag: ReturnType<typeof harness>["onDrag"]): [number, Vec2] {
   expect(onDrag).toHaveBeenCalledTimes(1);
-  return onDrag.mock.calls[0]![0];
+  const call = onDrag.mock.calls[0]!;
+  return [call[0], call[1]];
 }
 
 describe("attachDrag", () => {
-  it("drags the ball, clamping to the domain and suspending orbit", () => {
+  it("drags the ball, clamping the result and suspending orbit", () => {
     const { controls, onDrag, detach, send } = harness();
 
     send("pointerdown", ON_BALL);
     expect(controls.enabled).toBe(false);
 
-    // Screen y 20 is world y 0.8, which the short domain clamps back to 0.2.
+    // Screen y 20 is world y 0.8, which the clamp brings back to 0.2.
     send("pointermove", [100, 20]);
-    const [x, y] = only(onDrag);
+    const [index, [x, y]] = only(onDrag);
+    expect(index).toBe(0);
     expect(x).toBeCloseTo(0, 6);
     expect(y).toBeCloseTo(0.2, 6);
 
     send("pointerup", [100, 20]);
     expect(controls.enabled).toBe(true);
+
+    detach();
+  });
+
+  it("reports which of several hit targets was grabbed", () => {
+    const targets = [ball(BALL_X), ball(-BALL_X)];
+    const { onDrag, getPlaneZ, detach, send } = harness({ hitTargets: targets });
+
+    send("pointerdown", ON_BALL_2);
+    send("pointermove", [100, 100]);
+
+    expect(only(onDrag)[0]).toBe(1);
+    expect(getPlaneZ).toHaveBeenCalledWith(1);
+
+    detach();
+  });
+
+  it("drags on a plane at the height getPlaneZ reports", () => {
+    const getPlaneZ = vi.fn(() => 0.5);
+    const { onDrag, detach, send } = harness({ getPlaneZ });
+
+    send("pointerdown", ON_BALL);
+    // The camera sits at z = 1, so a plane at z = 0.5 is half as far away and
+    // the same screen point maps to half the world offset.
+    send("pointermove", [200, 100]);
+
+    expect(getPlaneZ).toHaveBeenCalledWith(0);
+    expect(only(onDrag)[1][0]).toBeCloseTo(0.5, 6);
 
     detach();
   });
@@ -121,10 +155,23 @@ describe("attachDrag", () => {
 
     // Released 3 px right and 2 px down of the press: still a click, and the
     // marker lands under the release rather than under the press.
-    send("pointerup", [53, 102]);
-    const [x, y] = only(onDrag);
+    send("pointerup", [53, 182]);
+    const [index, [x, y]] = only(onDrag);
+    expect(index).toBe(-1);
     expect(x).toBeCloseTo(-0.47, 6);
-    expect(y).toBeCloseTo(-0.02, 6);
+    // World y -0.82 under the release, clamped back into the short range.
+    expect(y).toBeCloseTo(-0.2, 6);
+
+    detach();
+  });
+
+  it("ignores a click when no surface target was given", () => {
+    const { onDrag, detach, send } = harness({ surfaceTarget: null });
+
+    send("pointerdown", OFF_BALL);
+    send("pointerup", OFF_BALL);
+
+    expect(onDrag).not.toHaveBeenCalled();
 
     detach();
   });
@@ -133,7 +180,7 @@ describe("attachDrag", () => {
     const { onDrag, detach, send } = harness();
 
     send("pointerdown", OFF_BALL);
-    send("pointerup", [70, 100]);
+    send("pointerup", [70, 180]);
 
     expect(onDrag).not.toHaveBeenCalled();
 
@@ -149,6 +196,24 @@ describe("attachDrag", () => {
     send("pointermove", OFF_BALL);
     expect(canvas.style.cursor).toBe("");
     expect(onDrag).not.toHaveBeenCalled();
+
+    detach();
+  });
+
+  it("starts no drag and clears a stale cursor while dragging is disabled", () => {
+    const { canvas, controls, onDrag, detach, send } = harness({ enabled: () => false });
+
+    // Left over from a moment when dragging was still allowed.
+    canvas.style.cursor = "grab";
+
+    send("pointerdown", ON_BALL);
+    expect(controls.enabled).toBe(true);
+
+    send("pointermove", [100, 20]);
+    expect(onDrag).not.toHaveBeenCalled();
+
+    send("pointermove", ON_BALL);
+    expect(canvas.style.cursor).toBe("");
 
     detach();
   });

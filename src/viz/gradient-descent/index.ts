@@ -1,6 +1,6 @@
 import { isFinitePoint } from "../../core/math/numeric";
 import type { OptimizerKey } from "../../core/math/optimizers";
-import { SURFACES, type SurfaceKey } from "../../core/math/surfaces";
+import { SURFACES, clampToDomain, type SurfaceKey } from "../../core/math/surfaces";
 import { backendName } from "../../core/renderer";
 import { createSceneKit, disposeObject, prefersReducedMotion } from "../../core/scene";
 import type { Visualization, VizHost, VizInstance } from "../types";
@@ -28,6 +28,16 @@ import {
   type GdState,
   type ShowKey,
 } from "./state";
+
+const HINT = {
+  storageKey: "ai-lab.hint.gradient-descent",
+  heading: "How to explore",
+  lines: [
+    "Drag the ball to move it, or click anywhere on the surface to place it.",
+    "Drag the background to orbit; scroll to zoom; right-drag (or two fingers) to pan.",
+    "Step or Run in the panel; Reset view re-frames the camera.",
+  ],
+};
 
 /** Steps per second while Run is on; slower when the visitor asked for less motion. */
 const RUN_HZ = 10;
@@ -109,7 +119,7 @@ function mount(host: VizHost): VizInstance {
     if (state.surface !== prevSurface) {
       const grid = surfaceMesh.setSurface(surface);
       contours.setSurface(surface, grid);
-      home = frameFor(surface, grid.heightRange);
+      home = frameFor(surface.domain, grid.heightRange);
       goHome();
       prevSurface = state.surface;
     }
@@ -152,17 +162,21 @@ function mount(host: VizHost): VizInstance {
       { backend: backendName(host.renderer) },
     );
 
-    hint = createUsageHint(host.canvasContainer);
+    hint = createUsageHint(host.canvasContainer, HINT);
 
     detachDrag = attachDrag({
       canvas: host.renderer.domElement,
       camera: kit.camera,
       controls: kit.controls,
-      hitTarget: marker.hitTarget,
+      hitTargets: [marker.hitTarget],
       surfaceTarget: surfaceMesh.group,
-      getSurface: () => SURFACES[state.surface],
-      getPosition: () => state.pos,
-      onDrag: (p) => {
+      // The marker's drawn height, which is where the drag plane sits.
+      getPlaneZ: () => {
+        const surface = SURFACES[state.surface];
+        return surface.scale * surface.f(state.pos[0], state.pos[1]);
+      },
+      clamp: (p) => clampToDomain(SURFACES[state.surface], p),
+      onDrag: (_index, p) => {
         // The first move of the ball is proof the hint has been read.
         hint?.hide();
         apply(drag(state, p));
