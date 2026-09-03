@@ -7,7 +7,8 @@ import { PRESETS } from "./presets";
 /** Overlay toggles shown alongside the visualization. */
 export type ShowKey = "grid" | "eigen" | "ghost";
 
-const ENTRY_BOUND = 3;
+/** Matrix entries and dragged column components are clamped to ±ENTRY_BOUND. */
+export const ENTRY_BOUND = 3;
 
 const DEFAULT_SHOW: Readonly<Record<ShowKey, boolean>> = {
   grid: true,

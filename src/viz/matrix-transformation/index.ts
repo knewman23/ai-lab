@@ -20,6 +20,7 @@ import {
   setT,
   type MtState,
   type ShowKey,
+  ENTRY_BOUND,
 } from "./state";
 
 const HINT = {
@@ -37,7 +38,6 @@ const DOMAIN = { x: [-5, 5], y: [-5, 5] } as const;
 const FLAT: readonly [number, number] = [0, 0];
 
 /** The bound the state reducer clamps matrix entries to; mirrored here so a drag never overshoots. */
-const ENTRY_BOUND = 3;
 
 function clamp3(v: number): number {
   return Math.min(ENTRY_BOUND, Math.max(-ENTRY_BOUND, v));
@@ -168,7 +168,7 @@ function mount(host: VizHost): VizInstance {
   }
   host.theme.addEventListener("change", onThemeChange);
 
-  apply(initialState());
+  apply(state);
 
   return {
     update(dt: number): boolean {
@@ -190,12 +190,14 @@ function mount(host: VizHost): VizInstance {
       host.theme.removeEventListener("change", onThemeChange);
       detachDrag?.();
       hint?.dispose();
-      panel?.dispose();
+      // Scene objects first, then the panel: DOM teardown is independent of GPU
+      // teardown, and this matches the gradient scene's order.
       eigen.dispose();
       basis.dispose();
       plane.dispose();
       disposeObject(kit.scene);
       kit.dispose();
+      panel?.dispose();
     },
   };
 }
