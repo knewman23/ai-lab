@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { SURFACES } from "../../../src/core/math/surfaces";
-import { frameFor } from "../../../src/viz/gradient-descent/framing";
+import { frameFor } from "../../../src/viz/shared/framing";
 
 describe("frameFor", () => {
   it("frames the bowl from its domain centre and height range", () => {

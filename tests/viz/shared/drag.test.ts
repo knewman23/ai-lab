@@ -4,7 +4,7 @@ import type { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { describe, expect, it, vi } from "vitest";
 import type { Vec2 } from "../../../src/core/math/numeric";
 import type { Surface } from "../../../src/core/math/surfaces";
-import { attachDrag } from "../../../src/viz/gradient-descent/drag";
+import { attachDrag } from "../../../src/viz/shared/drag";
 
 /**
  * A 200x200 canvas viewed by a 90-degree camera one unit in front of the z = 0

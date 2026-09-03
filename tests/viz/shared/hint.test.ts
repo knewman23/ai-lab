@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it } from "vitest";
-import { createUsageHint } from "../../../src/viz/gradient-descent/hint";
+import { createUsageHint } from "../../../src/viz/shared/hint";
 
 const KEY = "ai-lab.hint.gradient-descent";
 
