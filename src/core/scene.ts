@@ -42,8 +42,11 @@ export function createSceneKit(
   // Light colours are exempt from the no-hard-coded-colour rule: they shape the
   // shading, they are not part of the palette.
   const hemisphere = new HemisphereLight(0xffffff, 0x404040, 0.4);
+  // The constructor seeds position from Object3D.DEFAULT_UP (0, 1, 0), which would
+  // run the sky-to-ground gradient sideways in this Z-up scene.
+  hemisphere.position.set(0, 0, 1);
   const directional = new DirectionalLight(0xffffff, 1.0);
-  directional.position.set(3, 6, 4);
+  directional.position.set(3, -4, 6);
   scene.add(hemisphere, directional);
 
   return {
