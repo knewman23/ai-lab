@@ -39,7 +39,9 @@ lattice (the transformed grid already shows where points go).
 All geometry lies on the plane z = 0 in the shared Z-up scene. The camera is framed over the
 display bound D = [−5, 5]² at height 0 (using the shared framing helper) and orbits as in the
 gradient scene. Because every flat layer is coplanar, each flat material has `depthTest: false`,
-`depthWrite: false`, and a fixed `renderOrder` in this stacking order (low draws first):
+`depthWrite: false`, `transparent: true` (even at opacity 1, so all layers sit in three's single
+transparent sort group and `renderOrder` alone decides the order), and a fixed `renderOrder` in
+this stacking order (low draws first):
 
 | Order | Layer | Colour | Notes |
 |---|---|---|---|
@@ -48,30 +50,34 @@ gradient scene. Because every flat layer is coplanar, each flat material has `de
 | 3 | Eigen lines | `--line-2` | through the origin, spanning D |
 | 4 | Ghost square | `--faint` | outline of the untransformed unit square |
 | 5 | Unit square fill | see below | quad with corners (0,0),(1,0),(1,1),(0,1) mapped by M(t), opacity .35 |
-| 6 | Basis arrows, balls, eigen spheres | see below | 3D objects with depth testing on, `renderOrder` 10 |
+| 6 | Basis arrows, balls, eigen spheres | see below | 3D objects, depth testing on, `transparent: true` so they sort after the fill, `renderOrder` 10 |
 
 - **Transformed grid clipping**: a linear map sends lines to lines, so each grid line is one
-  segment: map its two endpoints by M(t), then clip the segment against D with Liang–Barsky and
-  drop it if fully outside. One `LineSegments` with a preallocated buffer (2 · 14 lines · 2
-  endpoints · 3 floats), draw range updated per change.
+  segment: map its two endpoints by M(t), then clip the segment against D with `clipSegment` and
+  drop it if fully outside. The grid has 7 vertical + 7 horizontal = 14 lines, so one
+  `LineSegments` with a preallocated buffer of 14 · 2 endpoints · 3 = 84 floats; surviving
+  segments are compacted to the front and the draw range set to their count. Eigen lines reuse
+  `clipSegment` on a long segment through the origin.
 - **Unit square fill colour**: when |det M(t)| < 1e-6 the square has collapsed to a segment (or a
-  point): draw the fill as a thick-looking `--warn` segment instead (a thin quad of width 0.04
-  along the collapsed direction; if the whole matrix is zero draw nothing and let the readout
-  speak). Otherwise `--accent` when det M(t) > 0, `--warn` when det M(t) < 0.
+  point): draw the fill as a thick-looking `--warn` segment instead: a quad of width 0.04 whose
+  long axis runs from the minimum to the maximum of the four mapped corners {0, c₁, c₁ + c₂, c₂}
+  along the collapsed direction (they are collinear in this case); if the whole matrix is zero
+  draw nothing and let the readout speak. Otherwise `--accent` when det M(t) > 0, `--warn` when det M(t) < 0.
 - **Basis vectors**: two `ArrowHelper`s from the origin to M(t)·e₁ (colour `--accent`) and
   M(t)·e₂ (colour `--ink`), lengths equal to the vectors, head size 0.18 of the length clamped to
   [0.08, 0.3]. When a column's length is below 1e-6 the arrow is hidden (`ArrowHelper` cannot
   represent a zero vector) and only the tip ball is drawn, at the origin. Each tip carries a
   draggable ball (radius 0.08, invisible hit sphere radius 0.2) in the arrow's colour. Balls are
-  shown and draggable only at t = 1; at t < 1 they are hidden and the panel shows "Set Animate to
+  shown and draggable only at t = 1; at t < 1 they are hidden by setting their materials
+  invisible AND dragging is gated by the drag handler's `enabled` predicate (raycasting ignores
+  `Object3D.visible`, so hiding alone would leave them hittable). The panel shows "Set Animate to
   1 to drag the vectors". The panel legend names the colours (î accent, ĵ ink); no 3D labels.
 - **Eigen lines**: M(t) = (1 − t)I + tM has the same eigenvectors as M for every t > 0, with
   eigenvalues λ(t) = 1 − t + tλ, so the lines are drawn for M and remain correct as t moves. For
   each real eigen pair: a line through the origin along the unit eigenvector v, spanning D, and a
   small `--ink` sphere (radius 0.06) at λ(t)·v, which is where M(t) sends the unit eigenvector.
   The sphere is hidden when |λ(t)| < 1e-6 (the readout says "sent to the origin"). Lines and
-  spheres are hidden when the eigen kind is `complex` or `uniform`, and at t = 0 for `uniform`.
-  Toggleable.
+  spheres are hidden when the eigen kind is `complex` or `uniform`. Toggleable.
 
 Colours come from `ThemeColors`; this scene needs `--warn` and `--line-2`, so `ThemeColors` gains
 `warn` and `line2` (6-digit hex in every theme block of `tokens.css`; the neighbouring `--warn-bg`
@@ -142,13 +148,19 @@ Presets (values exact):
 
 ## 6. Controls (side panel, in order)
 
-1. Preset select (the table above plus a disabled "Custom" option that is selected once edited).
-2. Matrix entries: a 2×2 block of `<input type="number" step="0.1" min="-3" max="3">` laid out as
-   a matrix (a b / c d), mono font, in `viz/matrix-transformation/matrix-input.ts`. Typing
+1. Preset select (the table above plus a disabled "Custom" option that is selected
+   programmatically once edited; `src/ui/select.ts` gains an additive `disabled?: boolean` on its
+   option type, and assigning `.value = "custom"` still selects it since only user choice is
+   blocked).
+2. Matrix entries: a 2×2 block of `<input type="number" step="any" min="-3" max="3">` (`step="any"`
+   so preset values like √½ are not flagged invalid; the real clamp lives in `setEntry`) laid out
+   as a matrix (a b / c d), mono font, in `viz/matrix-transformation/matrix-input.ts`. Typing
    dispatches on `input`; while the field is non-numeric the state is unchanged and the field
-   keeps the user's text until blur, when it is rewritten from state. Dragging updates the inputs.
-3. Animate slider: a new linear `createSlider({ min: 0, max: 1, step: 0.01, value, format })` in
-   `src/ui/slider.ts` alongside the existing log slider; readout "t = 1.00".
+   keeps the user's text until blur, when it is rewritten from state. Programmatic writes (from
+   dragging or presets) format with `fmt(v, 3)` from `src/ui/readout.ts` and do not dispatch.
+3. Animate slider: a new linear `createSlider({ label, min: 0, max: 1, step: 0.01, value,
+   onChange, format })` in `src/ui/slider.ts` alongside the existing log slider; readout
+   "t = 1.00".
 4. Buttons: Reset, Reset view.
 5. Toggles: Transformed grid, Eigenvectors, Ghost square.
 
@@ -161,7 +173,8 @@ Explanation (three paragraphs; KaTeX structure re-rendered only when the matrix 
 - The columns of M are where î and ĵ land: `M = \begin{pmatrix} a & b \\ c & d \end{pmatrix}`
   with live numbers, and the colour legend (î accent, ĵ ink).
 - The determinant is the area scale factor and its sign is orientation: `\det M = ad - bc` with
-  live numbers, then one sentence naming the current case.
+  live numbers, then one sentence naming the current case, and when t < 1 a clause noting that
+  the readout shows det M(t), the partially applied matrix.
 - Eigenvectors are the directions M only stretches: `M\mathbf v = \lambda \mathbf v`, then one
   sentence for the current kind (two lines; one line for a shear; none for a rotation; every
   direction for a uniform scale; "ĵ is sent to the origin" for the projection).
@@ -187,6 +200,7 @@ Explanation (three paragraphs; KaTeX structure re-rendered only when the matrix 
 src/core/math/matrix2.ts                        + tests/core/math/matrix2.test.ts
 src/core/theme.ts, src/viz/types.ts             add warn and line2 (additive)
 src/ui/slider.ts                                add createSlider (linear)   + test
+src/ui/select.ts                                add optional `disabled` on options
 src/viz/shared/drag.ts, framing.ts, hint.ts     moved from viz/gradient-descent (tests move too)
 src/viz/matrix-transformation/
   index.ts        Visualization: mount, apply, update, resize, dispose (mirrors gradient-descent)
@@ -207,11 +221,13 @@ Generalisations (each keeps the gradient scene working and its tests passing):
 - `frameFor(domain: { x: [lo, hi]; y: [lo, hi] }, heightRange)` takes a domain instead of a
   `Surface`; the gradient caller passes `surface.domain`.
 - `attachDrag` drops its `Surface` import. Options become `{ canvas, camera, controls, hitTargets:
-  readonly Object3D[], getPlaneZ(index): number, clamp?(pos): Vec2, surfaceTarget?: Object3D,
-  onDrag(index, pos) }`. Ball raycast uses `intersectObjects(hitTargets, false)` and reports the
-  hit index; click-to-place runs only when `surfaceTarget` is given; hover uses the same list.
-  The gradient scene passes one hit target, `getPlaneZ: () => s·f(pos)`, `clamp:
-  clampToDomain`, and its surface group.
+  readonly Object3D[], getPlaneZ(index): number, clamp?(pos): Vec2, enabled?(): boolean,
+  surfaceTarget?: Object3D, onDrag(index, pos) }`. Ball raycast uses
+  `intersectObjects(hitTargets, false)` and reports the hit index; click-to-place runs only when
+  `surfaceTarget` is given and calls `onDrag(-1, pos)`; hover uses the same list; when `enabled`
+  returns false no drag starts and the cursor stays default. The gradient scene passes one hit
+  target, `getPlaneZ: () => s·f(pos)`, `clamp: (p) => clampToDomain(SURFACES[state.surface], p)`,
+  and its surface group, and ignores the index.
 - `createUsageHint(container, { storageKey, heading?, lines })`; the gradient caller passes its
   key and lines.
 
