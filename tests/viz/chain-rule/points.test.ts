@@ -37,7 +37,7 @@ function at(m: Mesh, v: readonly [number, number, number]): boolean {
 describe("createPoints", () => {
   it("places P, Q, R and the hit spheres at the marked points", () => {
     const { pts, points } = make();
-    pts.set(points, true);
+    pts.set(points, points.primed);
     const main = byRadius(pts, 0.08);
     expect(main.some((m) => at(m, points.p))).toBe(true);
     expect(main.some((m) => at(m, points.r))).toBe(true);
@@ -52,14 +52,14 @@ describe("createPoints", () => {
     const primed = points.primed;
     expect(primed).not.toBeNull();
     if (primed === null) return;
-    pts.set(points, true);
+    pts.set(points, primed);
     const small = byRadius(pts, 0.05);
     expect(small).toHaveLength(3);
     for (const m of small) expect(m.visible).toBe(true);
     expect(small.some((m) => at(m, primed.p))).toBe(true);
     expect(small.some((m) => at(m, primed.q))).toBe(true);
     expect(small.some((m) => at(m, primed.r))).toBe(true);
-    pts.set(points, false);
+    pts.set(points, null);
     for (const m of small) expect(m.visible).toBe(false);
     pts.dispose();
   });
@@ -67,8 +67,20 @@ describe("createPoints", () => {
   it("hides the primed spheres when the state has no Δx step", () => {
     const { pts } = make();
     const s = setX(initialState(), 3);
-    pts.set(facePoints(COMPOSITIONS.sin3x, s.x, derived(s)), true);
+    const fp = facePoints(COMPOSITIONS.sin3x, s.x, derived(s));
+    expect(fp.primed).toBeNull();
+    pts.set(fp, fp.primed);
     for (const m of byRadius(pts, 0.05)) expect(m.visible).toBe(false);
+    pts.dispose();
+  });
+
+  it("follows the theme's ink colour on change", () => {
+    const { pts, theme } = make();
+    theme.ink.set("#123456");
+    theme.dispatchEvent(new Event("change"));
+    for (const m of byRadius(pts, 0.08)) {
+      expect((m.material as Material & { color: Color }).color.getHexString()).toBe("123456");
+    }
     pts.dispose();
   });
 

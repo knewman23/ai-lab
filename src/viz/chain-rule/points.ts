@@ -11,9 +11,9 @@ export interface Points {
   readonly hitR: Mesh;
   /**
    * Places P, Q, R (and the hit spheres with P and R). The primed spheres are
-   * shown at `points.primed` when `primed` is true and a step exists, else hidden.
+   * shown at `primed` when it is non-null, else hidden; the caller decides.
    */
-  set(points: MarkedPoints & { readonly primed: MarkedPoints | null }, primed: boolean): void;
+  set(points: MarkedPoints, primed: MarkedPoints | null): void;
   dispose(): void;
 }
 
@@ -41,6 +41,7 @@ export function createPoints(theme: ThemeColors): Points {
   const hitGeometry = new SphereGeometry(HIT_RADIUS, 12, 8);
 
   const inkMaterial = new MeshStandardMaterial({ roughness: 0.5, transparent: true });
+  // Shared by Q and the primed spheres; split it before styling one of them alone.
   const softMaterial = new MeshStandardMaterial({ roughness: 0.5, transparent: true });
   const hitMaterial = new MeshBasicMaterial({ visible: false });
 
@@ -86,12 +87,11 @@ export function createPoints(theme: ThemeColors): Points {
       hitP.position.copy(p.position);
       hitR.position.copy(r.position);
 
-      const show = primed && points.primed !== null;
-      for (const mesh of primedMeshes) mesh.visible = show;
-      if (points.primed !== null) {
-        place(primedMeshes[0], points.primed.p);
-        place(primedMeshes[1], points.primed.q);
-        place(primedMeshes[2], points.primed.r);
+      for (const mesh of primedMeshes) mesh.visible = primed !== null;
+      if (primed !== null) {
+        place(primedMeshes[0], primed.p);
+        place(primedMeshes[1], primed.q);
+        place(primedMeshes[2], primed.r);
       }
     },
 

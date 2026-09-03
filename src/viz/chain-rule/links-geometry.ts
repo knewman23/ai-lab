@@ -13,6 +13,11 @@ export interface MarkedPoints {
   readonly r: Vec3;
 }
 
+/** P, Q, R plus the same three at x + Δx; `primed` is null when there is no Δx step. */
+export interface FacePoints extends MarkedPoints {
+  readonly primed: MarkedPoints | null;
+}
+
 /** Everything `links.ts` draws, grouped by layer. */
 export interface LinkSegments {
   readonly connectors: Segment[];
@@ -60,11 +65,7 @@ function stepOf(x: number, d: Derived): Step | null {
  * R = (x, f(g(x))) on the floor, plus the same three at x + Δx when a step
  * exists. Placed with `faceToWorld`, so they sit exactly on the curves.
  */
-export function facePoints(
-  c: Composition,
-  x: number,
-  d: Derived,
-): MarkedPoints & { readonly primed: MarkedPoints | null } {
+export function facePoints(c: Composition, x: number, d: Derived): FacePoints {
   const step = stepOf(x, d);
   const primed = step === null ? null : points(c, step.x1, step.u1, step.y1);
   return { ...points(c, x, d.u, d.y), primed };
