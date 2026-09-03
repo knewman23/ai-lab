@@ -1,4 +1,5 @@
 import { formatLr } from "../core/math/optimizers";
+import { fmt } from "./readout";
 
 /** Native range steps, mapped log-uniformly onto [min, max]. */
 const STEPS = 1000;
@@ -26,7 +27,90 @@ export interface LogSlider {
   set value(v: number);
 }
 
+export interface SliderOptions {
+  label: string;
+  min: number;
+  max: number;
+  step: number;
+  value: number;
+  onChange: (value: number) => void;
+  format?: (value: number) => string;
+}
+
+export interface Slider {
+  el: HTMLElement;
+  get value(): number;
+  set value(v: number);
+}
+
 let nextId = 0;
+
+interface RangeConfig {
+  min: string;
+  max: string;
+  step: string;
+  /** Maps a slider value to the native range input's raw string value. */
+  toRange: (value: number) => string;
+  /** Maps the native range input's raw string value back to a slider value. */
+  fromRange: (raw: string) => number;
+}
+
+function buildSlider(
+  idPrefix: string,
+  label: string,
+  initialValue: number,
+  format: (value: number) => string,
+  onChange: (value: number) => void,
+  config: RangeConfig,
+): { el: HTMLElement; get: () => number; set: (v: number) => void } {
+  const id = `${idPrefix}-${++nextId}`;
+  let current = initialValue;
+
+  const wrap = document.createElement("div");
+  wrap.className = "field";
+
+  const labelEl = document.createElement("label");
+  labelEl.className = "lbl";
+  labelEl.htmlFor = id;
+  labelEl.textContent = label;
+
+  const row = document.createElement("div");
+  row.className = "field-row";
+
+  const range = document.createElement("input");
+  range.type = "range";
+  range.id = id;
+  range.min = config.min;
+  range.max = config.max;
+  range.step = config.step;
+
+  const out = document.createElement("output");
+  out.htmlFor = id;
+
+  row.append(range, out);
+  wrap.append(labelEl, row);
+
+  function render(): void {
+    range.value = config.toRange(current);
+    out.textContent = format(current);
+  }
+  render();
+
+  range.addEventListener("input", () => {
+    current = config.fromRange(range.value);
+    out.textContent = format(current);
+    onChange(current);
+  });
+
+  return {
+    el: wrap,
+    get: () => current,
+    set: (v: number) => {
+      current = v;
+      render();
+    },
+  };
+}
 
 /**
  * A `<input type="range">` mapped log-uniformly onto [min, max], with a
@@ -40,53 +124,49 @@ export function createLogSlider(opts: LogSliderOptions): LogSlider {
     throw new RangeError("createLogSlider: min and max must be > 0 (log scale)");
   }
   const format = opts.format ?? formatLr;
-  const id = `log-slider-${++nextId}`;
-  let current = opts.value;
 
-  const wrap = document.createElement("div");
-  wrap.className = "field";
-
-  const labelEl = document.createElement("label");
-  labelEl.className = "lbl";
-  labelEl.htmlFor = id;
-  labelEl.textContent = opts.label;
-
-  const row = document.createElement("div");
-  row.className = "field-row";
-
-  const range = document.createElement("input");
-  range.type = "range";
-  range.id = id;
-  range.min = "0";
-  range.max = String(STEPS);
-  range.step = "1";
-
-  const out = document.createElement("output");
-  out.htmlFor = id;
-
-  row.append(range, out);
-  wrap.append(labelEl, row);
-
-  function render(): void {
-    range.value = String(stepFor(current, min, max));
-    out.textContent = format(current);
-  }
-  render();
-
-  range.addEventListener("input", () => {
-    current = valueFor(Number(range.value), min, max);
-    out.textContent = format(current);
-    onChange(current);
+  const slider = buildSlider("log-slider", opts.label, opts.value, format, onChange, {
+    min: "0",
+    max: String(STEPS),
+    step: "1",
+    toRange: (value) => String(stepFor(value, min, max)),
+    fromRange: (raw) => valueFor(Number(raw), min, max),
   });
 
   return {
-    el: wrap,
+    el: slider.el,
     get value() {
-      return current;
+      return slider.get();
     },
     set value(v: number) {
-      current = v;
-      render();
+      slider.set(v);
+    },
+  };
+}
+
+/**
+ * A native `<input type="range">` on a linear scale, with a visible
+ * `<output>`. Interactive input fires `onChange`; setting `.value`
+ * programmatically updates the control without firing it.
+ */
+export function createSlider(opts: SliderOptions): Slider {
+  const format = opts.format ?? ((v: number) => fmt(v, 3));
+
+  const slider = buildSlider("slider", opts.label, opts.value, format, opts.onChange, {
+    min: String(opts.min),
+    max: String(opts.max),
+    step: String(opts.step),
+    toRange: (value) => String(value),
+    fromRange: (raw) => Number(raw),
+  });
+
+  return {
+    el: slider.el,
+    get value() {
+      return slider.get();
+    },
+    set value(v: number) {
+      slider.set(v);
     },
   };
 }

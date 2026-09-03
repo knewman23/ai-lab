@@ -1,6 +1,7 @@
 export interface SelectOption {
   value: string;
   title: string;
+  disabled?: boolean;
 }
 
 export interface SelectOptions {
@@ -36,6 +37,7 @@ export function createSelect(opts: SelectOptions): Select {
     const optionEl = document.createElement("option");
     optionEl.value = option.value;
     optionEl.textContent = option.title;
+    optionEl.disabled = option.disabled ?? false;
     select.append(optionEl);
   }
   select.value = opts.value;
