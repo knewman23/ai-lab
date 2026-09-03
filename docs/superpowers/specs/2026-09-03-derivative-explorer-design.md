@@ -191,7 +191,7 @@ src/viz/shared/drag.ts   make the drag-plane source a union so the compiler enfo
 src/viz/derivative/
   index.ts          Visualization (mount/apply/update/resize/dispose mirroring matrix-transformation:
                     buildScene with unwind, panel declared before apply, theme "change" → dirty,
-                    dispose order hint → panel → scene objects → disposeObject → kit, hit plane disposed)
+                    dispose order theme listener → drag → hint → scene objects (reverse build order) → disposeObject → kit → panel, hit plane disposed)
   state.ts          reducers above                              + tests
   frame-vertical.ts five-line local framing helper
   curves.ts         axes, separator, main curve, derivative curve (runs split at singularAt), guides
