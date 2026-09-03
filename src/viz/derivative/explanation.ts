@@ -17,6 +17,21 @@ export function derivativeText(d: Derived["d"]): string {
   return fmt(d.v);
 }
 
+/** Prose spells numbers with a typographic minus; the readouts keep `fmt`'s plain hyphen. */
+function prose(n: number): string {
+  return fmt(n).replace("-", "\u2212");
+}
+
+function tangentText(state: DxState, d: Derived["d"]): string {
+  if (d.kind === "jump") {
+    return `At x = ${fmt(state.x)} the left and right slopes differ (${prose(d.left)} and ${prose(d.right)}), so no tangent line is drawn.`;
+  }
+  if (d.kind === "vertical") {
+    return `At x = ${fmt(state.x)} the tangent is vertical, so f′(${fmt(state.x)}) is undefined.`;
+  }
+  return `At x = ${fmt(state.x)}, f′(x) = ${fmt(d.v)}, the slope of the blue line.`;
+}
+
 function secantSentence(d: Derived): string {
   if (d.d.kind === "jump") {
     return "Right-hand secants all have slope 1 while the curve to the left has slope −1, so no single line fits: |x| has no derivative at 0.";
@@ -52,7 +67,7 @@ export function createExplanation(): DxExplanation {
     const fn = FNS[state.fn];
 
     fnEquation.set(`f(x) = ${fn.tex}`);
-    tangentSentence.textContent = `At x = ${fmt(state.x)}, f′(x) = ${derivativeText(d.d)}, the slope of the blue line.`;
+    tangentSentence.textContent = tangentText(state, d.d);
 
     secantPara.textContent = secantSentence(d);
 

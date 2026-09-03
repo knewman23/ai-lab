@@ -58,6 +58,12 @@ function zoomNote(el: HTMLElement): HTMLElement {
   return note;
 }
 
+function tangentSentence(el: HTMLElement): string {
+  const p = el.querySelectorAll(".explain p")[0];
+  if (!p) throw new Error("tangent sentence not found");
+  return p.textContent ?? "";
+}
+
 function zoomedTo3(): DxState {
   return zoomIn(zoomIn(zoomIn(initialState())));
 }
@@ -137,6 +143,25 @@ describe("createDxPanel", () => {
 
     expect(button(panel.el, "Reset zoom").disabled).toBe(true);
     expect(button(panel.el, "Zoom in").disabled).toBe(false);
+  });
+
+  it("names the blue line only where a tangent is drawn", () => {
+    const panel = mount();
+
+    renderState(panel, initialState());
+    expect(tangentSentence(panel.el)).toBe("At x = 1.5, f′(x) = 3, the slope of the blue line.");
+
+    renderState(panel, setX(setFn(initialState(), "abs"), 0));
+    const jump = tangentSentence(panel.el);
+    expect(jump).not.toContain("blue line");
+    expect(jump).toBe(
+      "At x = 0 the left and right slopes differ (\u22121 and 1), so no tangent line is drawn.",
+    );
+
+    renderState(panel, setX(setFn(initialState(), "sqrtabs"), 0));
+    const vertical = tangentSentence(panel.el);
+    expect(vertical).not.toContain("blue line");
+    expect(vertical).toBe("At x = 0 the tangent is vertical, so f′(0) is undefined.");
   });
 
   it("dispatches onFn when the function select changes", () => {
