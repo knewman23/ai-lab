@@ -12,7 +12,10 @@ export interface DragOptions {
   getPlaneZ(index: number): number;
   /** Keeps a dragged or placed point inside the scene; identity by default. */
   clamp?: (pos: Vec2) => Vec2;
-  /** False turns dragging off without detaching; orbit and hover still work. */
+  /**
+   * False turns dragging off without detaching: no drag or click-to-place
+   * starts, orbit still works and the cursor stays default.
+   */
   enabled?(): boolean;
   /** The surface group, raycast for click-to-place when every hit target is missed. */
   surfaceTarget?: Object3D;
@@ -114,7 +117,7 @@ export function attachDrag(opts: DragOptions): () => void {
     // Checked ahead of the candidate guard so that turning dragging off clears
     // a "grab" cursor left over from when it was still on.
     if (!draggingAllowed()) {
-      setCursor("");
+      if (canvas.style.cursor) setCursor("");
       return;
     }
     if (activePointer !== null || candidate !== null) return;
@@ -146,7 +149,7 @@ export function attachDrag(opts: DragOptions): () => void {
 
   function placeAt(event: PointerEvent): void {
     const { surfaceTarget } = opts;
-    if (!surfaceTarget) return;
+    if (!surfaceTarget || !draggingAllowed()) return;
     castFrom(event);
     // Recursive: the group holds the solid mesh and its wireframe sibling.
     const point = raycaster.intersectObject(surfaceTarget, true)[0]?.point;

@@ -218,6 +218,17 @@ describe("attachDrag", () => {
     detach();
   });
 
+  it("places nothing on a click while dragging is disabled", () => {
+    const { onDrag, detach, send } = harness({ enabled: () => false });
+
+    send("pointerdown", OFF_BALL);
+    send("pointerup", OFF_BALL);
+
+    expect(onDrag).not.toHaveBeenCalled();
+
+    detach();
+  });
+
   it("stops listening and restores the cursor once detached", () => {
     const { canvas, controls, onDrag, detach, send } = harness();
 
