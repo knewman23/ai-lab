@@ -1,0 +1,78 @@
+/* Copied verbatim from knewman23.github.io/styles.css. Edit there first. */
+/* ============================================================
+   krysnewman.com / knewman23.github.io
+   Light-first Swiss index. Dark is an override, never a fork.
+   Every colour is a token on :root so the SVG schematics,
+   which use var(--…) and currentColor, invert with the page.
+   ============================================================ */
+
+:root {
+  color-scheme: light;
+  --bg:      #fbfbf9;
+  --card:    #ffffff;
+  --sunken:  #f5f5f2;
+  --ink:     #0e0f11;
+  --ink-2:   #2c2e33;
+  --soft:    #5c5f67;
+  --faint:   #71747c;
+  --line:    #e2e2df;
+  --line-2:  #cfcfcb;
+  --accent:  #1f4ed8;
+  --ok:      #0f7a4a;
+  --ok-bg:   #f0faf4;
+  --ok-line: #bfe3d0;
+  --warn:    #85670f;
+  --warn-bg: #fdf8ec;
+  --warn-line:#ecdcb4;
+  --dot-warn:#d9a020;
+  --band-bg: #0e0f11;
+  --band-ink:#ffffff;
+  --band-dim:#8b8f98;
+
+  --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --sans: "Space Grotesk", system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  --gut: 40px;
+  --max: 1120px;
+}
+
+/* Dark is a token swap. Roles stay identical: --card is still
+   "the surface above --bg", so no component needs a dark branch. */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg:      #0b0c0e;
+  --card:    #13151a;
+  --sunken:  #0f1116;
+  --ink:     #edeef1;
+  --ink-2:   #d2d4da;
+  --soft:    #9a9da6;
+  --faint:   #7b7e88;
+  --line:    #22252c;
+  --line-2:  #2e323b;
+  --accent:  #8b9bff;
+  --ok:      #55d4a0;
+  --ok-bg:   rgba(85,212,160,.09);
+  --ok-line: rgba(85,212,160,.24);
+  --warn:    #e2b357;
+  --warn-bg: rgba(226,179,87,.09);
+  --warn-line:rgba(226,179,87,.24);
+  --dot-warn:#e2b357;
+  --band-bg: #06070a;
+  --band-ink:#ffffff;
+  --band-dim:#7e828d;
+}
+
+/* Respect the OS when the visitor has expressed no preference.
+   Guarded on :not([data-theme="light"]) so an explicit light
+   choice still wins over a dark OS. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg:#0b0c0e; --card:#13151a; --sunken:#0f1116;
+    --ink:#edeef1; --ink-2:#d2d4da; --soft:#9a9da6; --faint:#7b7e88;
+    --line:#22252c; --line-2:#2e323b;
+    --accent:#8b9bff; --ok:#55d4a0; --ok-bg:rgba(85,212,160,.09); --ok-line:rgba(85,212,160,.24);
+    --warn:#e2b357; --warn-bg:rgba(226,179,87,.09); --warn-line:rgba(226,179,87,.24); --dot-warn:#e2b357;
+    --band-bg:#06070a; --band-ink:#fff; --band-dim:#7e828d;
+  }
+}

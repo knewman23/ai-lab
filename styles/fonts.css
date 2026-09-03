@@ -1,0 +1,32 @@
+/* Self-hosted so the page has no third-party dependency: the Google Fonts
+   stylesheet cost a render-blocking round trip, logged 401s to the console,
+   and its late swap was the whole 0.17 CLS. font-display:swap keeps text
+   visible while these 60KB load. */
+@font-face {
+  font-family: "Space Grotesk";
+  src: url("/fonts/space-grotesk-var.woff2") format("woff2-variations");
+  font-weight: 300 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "IBM Plex Mono";
+  src: url("/fonts/plex-mono-400.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "IBM Plex Mono";
+  src: url("/fonts/plex-mono-500.woff2") format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "IBM Plex Mono";
+  src: url("/fonts/plex-mono-600.woff2") format("woff2");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}

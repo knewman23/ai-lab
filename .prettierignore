@@ -2,3 +2,5 @@ dist/
 pnpm-lock.yaml
 public/fonts/
 docs/
+styles/tokens.css
+public/theme.js
