@@ -69,6 +69,12 @@ describe("marchingSquares", () => {
     }
   });
 
+  it("returns an empty array when nx or ny is smaller than 2", () => {
+    expect(marchingSquares(new Float32Array([1]), 1, 1, 0.5).length).toBe(0);
+    expect(marchingSquares(new Float32Array([0, 1]), 2, 1, 0.5).length).toBe(0);
+    expect(marchingSquares(new Float32Array([0, 1]), 1, 2, 0.5).length).toBe(0);
+  });
+
   it("emits two segments for an ambiguous saddle cell", () => {
     // Cell corners: bottom-left=1, bottom-right=0, top-right=1, top-left=0.
     // This is a diagonal (saddle) case at level 0.5.
@@ -104,5 +110,9 @@ describe("contourLevels", () => {
   it("defaults to 12 levels", () => {
     const levels = contourLevels(0, 1);
     expect(levels.length).toBe(12);
+  });
+
+  it("returns an empty array when count is 0", () => {
+    expect(contourLevels(0, 1, 0)).toEqual([]);
   });
 });

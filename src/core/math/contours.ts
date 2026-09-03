@@ -7,12 +7,14 @@
  * that space onto world coordinates.
  */
 
-type Point = readonly [number, number];
+/** Interpolated x where the value crosses `level` along a horizontal edge (fixed y). */
+function interpX(level: number, v0: number, v1: number, x0: number, x1: number): number {
+  return x0 + ((level - v0) / (v1 - v0)) * (x1 - x0);
+}
 
-/** Linear interpolation of the crossing point between two grid samples. */
-function interp(level: number, vA: number, vB: number, pA: Point, pB: Point): Point {
-  const t = (level - vA) / (vB - vA);
-  return [pA[0] + t * (pB[0] - pA[0]), pA[1] + t * (pB[1] - pA[1])];
+/** Interpolated y where the value crosses `level` along a vertical edge (fixed x). */
+function interpY(level: number, v0: number, v1: number, y0: number, y1: number): number {
+  return y0 + ((level - v0) / (v1 - v0)) * (y1 - y0);
 }
 
 /**
@@ -44,65 +46,76 @@ export function marchingSquares(
 
       if (caseIndex === 0 || caseIndex === 15) continue;
 
-      const pA: Point = [i, j];
-      const pB: Point = [i + 1, j];
-      const pC: Point = [i + 1, j + 1];
-      const pD: Point = [i, j + 1];
-
-      // Edge crossing points, computed lazily and shared across cases.
-      const left = (): Point => interp(level, a, d, pA, pD);
-      const bottom = (): Point => interp(level, a, b, pA, pB);
-      const right = (): Point => interp(level, b, c, pB, pC);
-      const top = (): Point => interp(level, d, c, pD, pC);
-
-      const emit = (p0: Point, p1: Point): void => {
-        out.push(p0[0], p0[1], p1[0], p1[1]);
-      };
-
       switch (caseIndex) {
         case 1:
-        case 14:
-          emit(left(), bottom());
+        case 14: {
+          const leftY = interpY(level, a, d, j, j + 1);
+          const bottomX = interpX(level, a, b, i, i + 1);
+          out.push(i, leftY, bottomX, j);
           break;
+        }
         case 2:
-        case 13:
-          emit(bottom(), right());
+        case 13: {
+          const bottomX = interpX(level, a, b, i, i + 1);
+          const rightY = interpY(level, b, c, j, j + 1);
+          out.push(bottomX, j, i + 1, rightY);
           break;
+        }
         case 3:
-        case 12:
-          emit(left(), right());
+        case 12: {
+          const leftY = interpY(level, a, d, j, j + 1);
+          const rightY = interpY(level, b, c, j, j + 1);
+          out.push(i, leftY, i + 1, rightY);
           break;
+        }
         case 4:
-        case 11:
-          emit(right(), top());
+        case 11: {
+          const rightY = interpY(level, b, c, j, j + 1);
+          const topX = interpX(level, d, c, i, i + 1);
+          out.push(i + 1, rightY, topX, j + 1);
           break;
+        }
         case 6:
-        case 9:
-          emit(bottom(), top());
+        case 9: {
+          const bottomX = interpX(level, a, b, i, i + 1);
+          const topX = interpX(level, d, c, i, i + 1);
+          out.push(bottomX, j, topX, j + 1);
           break;
+        }
         case 7:
-        case 8:
-          emit(left(), top());
+        case 8: {
+          const leftY = interpY(level, a, d, j, j + 1);
+          const topX = interpX(level, d, c, i, i + 1);
+          out.push(i, leftY, topX, j + 1);
           break;
+        }
         case 5: {
+          const leftY = interpY(level, a, d, j, j + 1);
+          const bottomX = interpX(level, a, b, i, i + 1);
+          const rightY = interpY(level, b, c, j, j + 1);
+          const topX = interpX(level, d, c, i, i + 1);
           const center = (a + b + c + d) / 4;
           if (center > level) {
-            emit(left(), top());
-            emit(bottom(), right());
+            out.push(i, leftY, topX, j + 1);
+            out.push(bottomX, j, i + 1, rightY);
           } else {
-            emit(left(), bottom());
-            emit(top(), right());
+            out.push(i, leftY, bottomX, j);
+            out.push(topX, j + 1, i + 1, rightY);
           }
           break;
         }
         case 10: {
+          const leftY = interpY(level, a, d, j, j + 1);
+          const bottomX = interpX(level, a, b, i, i + 1);
+          const rightY = interpY(level, b, c, j, j + 1);
+          const topX = interpX(level, d, c, i, i + 1);
           const center = (a + b + c + d) / 4;
           if (center > level) {
-            emit(left(), bottom());
-            emit(top(), right());
+            out.push(i, leftY, bottomX, j);
+            out.push(topX, j + 1, i + 1, rightY);
           } else {
-            emit(left(), top());
-            emit(bottom(), right());
+            out.push(i, leftY, topX, j + 1);
+            out.push(bottomX, j, i + 1, rightY);
           }
           break;
         }
