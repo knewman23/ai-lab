@@ -273,3 +273,66 @@ a {
   padding: 22px 22px 18px;
   color: var(--soft);
 }
+
+.home-page {
+  padding-top: 40px;
+  padding-bottom: 64px;
+}
+
+.topic + .topic {
+  margin-top: 48px;
+}
+
+.topic h2 {
+  margin: 0 0 18px;
+}
+
+.empty {
+  color: var(--soft);
+  font-size: 15.5px;
+  margin: 0;
+}
+
+/* ---------- visualization page ---------- */
+.viz {
+  display: grid;
+  grid-template-columns: 1fr 360px;
+  height: calc(100vh - 45px);
+}
+.viz-canvas {
+  position: relative;
+  min-height: 0;
+  background: var(--bg);
+}
+.viz-canvas canvas {
+  position: absolute;
+  inset: 0;
+}
+.viz-loading {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.viz-panel {
+  overflow: auto;
+  border-left: 1px solid var(--line);
+  background: var(--card);
+  padding: 20px;
+}
+
+@media (max-width: 800px) {
+  .viz {
+    grid-template-columns: 1fr;
+    height: auto;
+  }
+  .viz-canvas {
+    aspect-ratio: 4 / 3;
+  }
+  .viz-panel {
+    border-left: 0;
+    border-top: 1px solid var(--line);
+  }
+}
