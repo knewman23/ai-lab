@@ -306,8 +306,11 @@ cards. That change lives in the portfolio repo and is not part of this project's
    optimizers from this release.
 4. **GPT transformer** (machine-learning) — a tiny transformer block; token embeddings as
    points, attention heads as weighted arcs between tokens, residual stream as a spine.
-5. **Derivative & tangent explorer** (calculus) — 1D function, tangent line, secant → tangent
-   limit animation; a stepping stone to the surface scene.
+5. **Derivative & tangent explorer** (calculus) — a 1D function drawn on a vertical plane with a
+   draggable point on it: the tangent at that point, a secant whose step h is set by a slider,
+   and the derivative curve in a band underneath. Zooming the domain narrows the window until
+   the curve is indistinguishable from its tangent, and the point snaps to the corner of |x|
+   and the vertical tangent of √|x|.
 6. **Walkthrough mode** (shell) — optional numbered steps that reconfigure any scene.
 
 ## 10. Open questions for the owner

@@ -11,7 +11,6 @@ describe("registry", () => {
     id: string;
     topic: string;
   }> = [
-    { id: "derivative-tangent", topic: "calculus" },
     { id: "chain-rule-graph", topic: "calculus" },
     { id: "backprop-graph", topic: "machine-learning" },
     { id: "neural-network", topic: "machine-learning" },
@@ -41,6 +40,20 @@ describe("registry", () => {
     expect(entry?.status).toBe("ready");
     expect(typeof (entry as { mount?: unknown } | undefined)?.mount).toBe("function");
     expect(entry?.summary).not.toContain("cube");
+  });
+
+  it("has the derivative explorer ready to mount", () => {
+    const entry = findEntry("calculus", "derivative-tangent");
+    expect(entry).toBeDefined();
+    expect(entry?.status).toBe("ready");
+    expect(typeof (entry as { mount?: unknown } | undefined)?.mount).toBe("function");
+    expect(entry?.summary).not.toContain("roadmap");
+    expect(entry?.summary).not.toContain("soon");
+  });
+
+  it("lists the derivative explorer first among the calculus entries", () => {
+    const calculus = REGISTRY.filter((entry) => entry.topic === "calculus");
+    expect(calculus[0]?.id).toBe("derivative-tangent");
   });
 
   it("lists matrix transformation as the only linear algebra entry", () => {

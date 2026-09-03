@@ -6,6 +6,7 @@ a study tool and a portfolio piece. Live at
 
 ![Gradient descent on a loss surface](docs/screenshots/gradient-descent-light.png)
 ![Matrix transformation](docs/screenshots/matrix-transformation-light.png)
+![Derivative and tangent explorer](docs/screenshots/derivative-light.png)
 
 ## What's in it
 
@@ -119,7 +120,9 @@ Then register it in `src/app/registry.ts`.
 2. Backprop graph (machine learning) — the `Value` autograd graph laid out in 3D.
 3. Neural network (machine learning) — a small MLP with a live forward pass and training.
 4. GPT transformer (machine learning) — token embeddings, attention heads, residual stream.
-5. Derivative & tangent explorer (calculus) — 1D secant-to-tangent limit animation.
+5. ~~Derivative & tangent explorer (calculus)~~ — shipped: drag a point along a curve on a
+   vertical plane, watch the tangent follow, shrink h to collapse the secant onto it, read the
+   derivative curve in the band underneath, and zoom the domain until the curve straightens.
 6. Walkthrough mode (shell) — optional numbered steps that reconfigure any scene.
 
 ## Related

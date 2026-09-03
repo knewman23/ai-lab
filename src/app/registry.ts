@@ -1,16 +1,10 @@
+import { derivativeExplorer } from "../viz/derivative";
 import { gradientDescent } from "../viz/gradient-descent";
 import { matrixTransformation } from "../viz/matrix-transformation";
 import type { RegistryEntry } from "../viz/types";
 
 export const REGISTRY: readonly RegistryEntry[] = [
-  {
-    id: "derivative-tangent",
-    topic: "calculus",
-    title: "Derivative & tangent explorer",
-    summary:
-      "Drag along a 1D function to watch its secant line collapse into the tangent line at a point.",
-    status: "soon",
-  },
+  derivativeExplorer,
   {
     id: "chain-rule-graph",
     topic: "calculus",
