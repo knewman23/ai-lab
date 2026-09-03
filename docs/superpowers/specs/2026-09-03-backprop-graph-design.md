@@ -1,7 +1,7 @@
 # Backprop graph — the notebook-01 autograd DAG with stepped forward and backward passes
 
 Date: 2026-09-03
-Status: draft (revision 2, after spec review round 1)
+Status: draft (revision 3, after spec review round 2)
 Parent: [AI Lab design](2026-09-03-ai-lab-design.md); siblings: [Chain rule graph](2026-09-03-chain-rule-graph-design.md), [Gradient descent](2026-09-03-ai-lab-design.md)
 Registry: replaces the `machine-learning` roadmap entry `backprop-graph`
 Source material: `ai-frontier/notebooks/01-derivatives-and-the-numerical-gradient.ipynb` (the `Value`
@@ -40,7 +40,8 @@ beyond `+`, `×`, `tanh`, more than one output node, graph editing.
 ```ts
 export type Op = "leaf" | "add" | "mul" | "tanh";
 export interface GraphNode { readonly id: string; readonly label: string; readonly op: Op; readonly inputs: readonly string[] }
-export interface Graph { readonly key: string; // narrowed to GraphKey by graphs.ts readonly title: string; readonly nodes: readonly GraphNode[]; readonly output: string;
+export interface Graph { readonly key: string; // graphs.ts narrows this to GraphKey; typed string here to avoid an import cycle
+   readonly title: string; readonly nodes: readonly GraphNode[]; readonly output: string;
   readonly leaves: readonly { id: string; start: number; range: readonly [number, number] }[]; readonly hint: string }
 export type Values = Readonly<Record<string, number>>;
 export function topoOrder(g: Graph): readonly string[];            // leaves first, output last; deterministic (input order, then declaration order)
@@ -67,7 +68,7 @@ is a complete pass.
 |---|---|---|---|
 | `neuron` (default) | o = tanh(x1·w1 + x2·w2 + b) | x1 2, x2 0, w1 −3, w2 1 (all [−4, 4]); b 6.8813735870195432 ([−8, 8]) | the notebook's neuron; 10 nodes, 10 steps |
 | `product-sum` | d = a·b + c | a 2, b −3, c 10 (all [−10, 10]) | the smallest graph with both rules |
-| `shared-node` | L = f + e where e = a·b + c and f = e·c | a 2, b −3, c 10 | e has two consumer nodes (L and f), so e.grad = 1 after L's step and 11 after f's: accumulation you can watch |
+| `shared-node` | L = f + e where e = ab + c, ab = a·b, f = e·c | a 2, b −3, c 10 | e has two consumer nodes (L and f), so e.grad = 1 after L's step and 11 after f's: accumulation you can watch |
 
 Node ids and labels for `neuron`: `x1, w1, x2, w2, b` (leaves), `x1w1` ("x1·w1"), `x2w2` ("x2·w2"),
 `sum` ("x1·w1 + x2·w2"), `n` ("n"), `o` ("o"). Every node gets its label above the sphere; op
@@ -76,13 +77,13 @@ nodes additionally get their symbol (`+`, `×`, `tanh`) as an `op` label centred
 Tests: `topoOrder(neuron)` puts every input before its consumer and ends with `o`;
 `forward(neuron, starts)` gives n = 0.8814, o = 0.7071 (4 d.p.); `backward` gives the six notebook
 gradients (x1 −1.5, w1 1.0, x2 0.5, w2 0, b 0.5, n 0.5); `product-sum` d = 4 with a.grad = −3,
-b.grad = 2, c.grad = 1; `shared-node` e = 4, f = 40, L = 44; after L's backward step `gradsAfter` has L 1, f 1, e 1 (and no a, b, c); after f's step e 11, c 4; after e's step a −33, b 22, c 15; `localGrad(tanh)` matches a
+b.grad = 2, c.grad = 1; `shared-node` ab = −6, e = 4, f = 40, L = 44; after L's backward step `gradsAfter` has exactly L 1, f 1, e 1; after f's step e 11, c 4; after e's step ab 11, c 15; after ab's step a −33, b 22; `localGrad(tanh)` matches a
 central difference; `passSteps(neuron).length` = 10 (see the step count below); `revealed`
 at k = 0, mid-pass and full pass.
 
 Step count: forward steps = non-leaf nodes (neuron: 5); backward steps = non-leaf nodes in reverse
 topo order (a leaf has no `_backward` of its own; its gradient is complete once its last consumer
-has run). Neuron: 5 + 5 = 10 steps; `product-sum`: 2 + 2 = 4; `shared-node`: 3 + 3 = 6 (backward order L, f, e).
+has run). Neuron: 5 + 5 = 10 steps; `product-sum`: 2 + 2 = 4 (nodes ab, d); `shared-node`: 4 + 4 = 8 (nodes ab, e, f, L; backward order L, f, e, ab).
 
 ## 4. Layout (`viz/backprop/layout.ts`, pure, unit-tested)
 
@@ -115,8 +116,10 @@ opacity .35 (`transparent: true`). renderOrder 10.
 **Bars.** Two `BoxGeometry(0.16, 1, 0.16)` per node scaled along y: the value bar at X − 0.12 and
 the grad bar at X + 0.12, both at the node's Z, length s·|v| along −y for positive v and +y for
 negative v (sign = side of the wall). Value bars `--soft`, grad bars `--accent`. s_value = 0.3
-(|value| ≤ 10 → 3 units), s_grad = 1.5 (|grad| ≤ 2 → 3 units; `shared-node` grads reach 24 and are
-clamped to 3 units, with the label still showing the number). Bars are hidden until their quantity
+(|value| ≤ 10 → 3 units), s_grad = 1.5 (|grad| ≤ 2 → 3 units). Both kinds are clamped to 3 units
+(`shared-node` has f = 40, L = 44 and a.grad = −33; dragging c to its range edge pushes f past 100),
+with the label still showing the true number. Leaf values are within their ranges (≤ 10), so leaf
+bars never clamp and the fixed 6.4-tall hit boxes (§8) cover them. Bars are hidden until their quantity
 is revealed. Bar length eases over 300 ms (`t → 1 − (1 − t)³`) when it changes because a step
 revealed it; leaf edits move bars instantly; with `prefers-reduced-motion` everything is instant.
 At most 20 boxes, so plain meshes sharing one geometry.
@@ -162,8 +165,10 @@ forward(...)`, `revealed = revealed(graph, step)`, `grads = gradsAfter(graph, va
 (the step just taken, `steps[step − 1]`), `done: boolean`,
 `phase: "idle" | "forward" | "backward" | "done"`.
 
-Playing is driven by the assembler's `update(dt)`: it accumulates dt and dispatches `stepForward`
-every 0.7 s while `playing` (reduced motion: same cadence; steps are discrete anyway).
+Playing is driven by the assembler's `update(dt)`: it accumulates dt (seconds, from `core/loop.ts`)
+and dispatches `stepForward` every 0.7 s while `playing`; `update` returns true while playing so the
+loop's 1 s idle cutoff never starves the timer (reduced motion: same cadence; steps are discrete).
+`setShow(s, key, on)` with `ShowKey = "values" | "grads" | "edgeDerivs"`, as the chain-rule scene.
 
 ## 7. Controls (side panel, in order)
 
@@ -174,7 +179,8 @@ every 0.7 s while `playing` (reduced motion: same cadence; steps are discrete an
    0.7071"); a backward step reads "backward at <label>: <label>.grad = <g> → <input>.grad += <local>
    × <g>" for each input ("backward at o: o.grad = 1 → n.grad += 0.5 × 1"; "backward at n: n.grad =
    0.5 → sum.grad += 1 × 0.5, b.grad += 1 × 0.5") (built by `explanation.ts` from the current
-   `PassStep`), "Leaves are given; press Step to
+   `PassStep`; the forward template uses the node's label before "=", the backward template uses
+   node ids before ".grad"), "Leaves are given; press Step to
    run the forward pass." at k = 0, "Pass complete." when done.
 3. Leaves: one linear slider per leaf (label = leaf id, range from the graph, step 0.01, readout
    the value). Rewritten when the graph changes (the section is rebuilt).
@@ -229,7 +235,7 @@ src/viz/backprop/
 src/app/registry.ts   backprop-graph → ready; summary "Step through the forward and backward
                       passes of a small autograd graph: values fill in, then gradients flow back
                       along every edge with the local derivative written on it."
-README.md             fifth scene paragraph and screenshot line; roadmap item 2 struck through
+README.md             "Five scenes so far", fifth scene paragraph and screenshot line; roadmap item 2 struck through
 ```
 
 Testing: unit tests above; mount/dispose test as the other scenes plus "Step advances the pass
