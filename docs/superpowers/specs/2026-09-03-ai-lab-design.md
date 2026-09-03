@@ -24,7 +24,8 @@ Success criteria for the first release:
   with no changes to the shell.
 
 Out of scope for the first release: accounts, progress tracking, server-side anything,
-guided lesson mode, mobile-specific layouts beyond "does not break".
+guided lesson mode. Mobile gets one rule: below 800px the panel stacks under the scene,
+which takes a 4:3 viewport.
 
 ## 2. Decisions taken during brainstorming
 
@@ -55,13 +56,16 @@ Topics and the registry that populates the home page:
 | `machine-learning` | Machine Learning | **gradient-descent** | backprop graph (the `Value` autograd graph from ai-frontier notebook 01, laid out in 3D with forward/backward animation), neural network (layers, activations, weights as edge thickness, live forward pass), GPT transformer (token embeddings, attention heads as weighted arcs, residual stream) |
 
 Roadmap items are listed on the home page as disabled "coming soon" cards so the
-structure reads as a curriculum, not a single demo.
+structure reads as a curriculum, not a single demo (default pending the owner's answer in
+§10). An unknown hash, or the id of a "soon" entry typed directly, redirects to `#/`.
 
 ## 4. Architecture
 
 ```
+index.html                <head> carries the portfolio's inline theme script verbatim
+public/theme.js           the portfolio's toggle script, copied verbatim
 src/
-  main.ts                 boot: theme, router, mount shell
+  main.ts                 async boot: await createRenderer(), then theme, router, shell
   app/
     router.ts             hash → route object; emits on change
     shell.ts              header (title, breadcrumb, theme toggle), home page, viz page frame
@@ -95,33 +99,57 @@ styles/
 ### The Visualization interface
 
 Every visualization is a folder exporting one object. The shell knows nothing else.
+Roadmap entries are a separate, mount-less type so the registry can hold both.
 
 ```ts
-export interface Visualization {
-  id: string;              // "gradient-descent"
+export interface RoadmapEntry {
+  id: string;              // "backprop-graph"
   topic: TopicSlug;        // "machine-learning"
   title: string;
   summary: string;         // one sentence for the card
-  status: "ready" | "soon";
+  status: "soon";
+}
+
+export interface Visualization extends Omit<RoadmapEntry, "status"> {
+  status: "ready";
   mount(host: VizHost): VizInstance;
 }
 
+export type RegistryEntry = Visualization | RoadmapEntry;
+
+/** The WebGPURenderer class from "three/webgpu"; it also backs the WebGL 2 fallback. */
+export type Renderer = import("three/webgpu").WebGPURenderer;
+
+export interface ThemeColors extends EventTarget {   // dispatches "change" on toggle
+  bg: Color; card: Color; ink: Color; soft: Color; faint: Color;
+  line: Color; accent: Color;
+}
+
 export interface VizHost {
-  canvasContainer: HTMLElement;   // scene goes here
+  canvasContainer: HTMLElement;   // the renderer's canvas is already attached here
   panel: HTMLElement;             // controls + explanation go here
-  renderer: Renderer;             // shared, created once per page
-  theme: ThemeColors;             // live; emits "change"
+  renderer: Renderer;             // shared, created once per page load, already init()ed
+  theme: ThemeColors;
 }
 
 export interface VizInstance {
-  update(dt: number): void;       // called by the loop
+  update(dt: number): void;       // called by the loop; the viz calls renderer.render itself
   resize(w: number, h: number): void;
   dispose(): void;                // must release all GPU resources and listeners
 }
 ```
 
+Ownership: the shell owns the renderer (one per page load, since `WebGPURenderer.init()`
+is async) and the loop. Each viz owns its scene, camera and OrbitControls, built with the
+helpers in `core/scene.ts`, and renders itself inside `update`. That gives the viz direct
+access to the controls it needs (reset view, disable orbit while dragging, damping off under
+reduced motion) without widening `VizHost`.
+
 Routing to a viz: shell clears the frame, calls `mount`, starts the loop. Leaving:
 calls `dispose`, asserts `renderer.info.memory.geometries` returned to baseline in dev mode.
+If `createRenderer()` rejects (no WebGPU and no WebGL 2), the shell renders a plain-HTML
+notice in place of the scene naming the requirement and linking to the ai-frontier notebook
+for the same topic; the panel and home page still work.
 
 ### Theme flow
 
@@ -137,28 +165,36 @@ the scene has a hard-coded colour.
 
 - **Surface**: a mesh over a square domain, height = f(x, y). Vertex colour by height using a
   two-stop ramp from `--sunken` to `--accent`. A faint wireframe overlay in `--line`.
-  Below the surface at a fixed depth: a projected contour plot (line segments) so students
+  Below the surface at a fixed depth: a projected contour plot (marching squares over the
+  same height grid, 12 levels evenly spaced across the displayed height range) so students
   connect the 3D bowl to the 2D contour diagrams in textbooks.
-- **Marker**: a small sphere at (x, y, f(x, y)). Draggable: pointer ray intersects the surface
-  mesh; on drag the marker snaps to the hit point and the path resets.
+- **Marker**: a small sphere at (x, y, f(x, y)). Draggable: the pointer ray hits an invisible
+  horizontal plane at the marker's current height, giving (x, y); z is then f(x, y) evaluated
+  analytically, so the marker never leaves the surface under cursor jitter. Dragging resets
+  the path and the optimizer state (see Interaction details). Orbit is disabled during a drag.
 - **Gradient arrow**: at the marker, arrow along (∂f/∂x, ∂f/∂y, 0) projected onto the surface
   tangent, length scaled by |∇f| and clamped. Colour `--accent`. A second, dimmer arrow shows
   −∇f, the direction the optimizer will actually step.
 - **Tangent plane**: a semi-transparent square at the marker, oriented by the normal
   (−f_x, −f_y, 1). Toggleable.
 - **Path**: a polyline of all points visited since the last reset, with a small sphere at
-  each step. Fades from `--faint` (old) to `--accent` (recent).
+  each step. Fades from `--faint` (old) to `--accent` (recent). Capacity 2,000 points, used
+  as a ring buffer: the oldest point drops off once full.
 - **Camera**: OrbitControls with damping. A "reset view" button.
 
 ### Surfaces (all with analytic gradients, all unit-tested against finite differences)
 
-| Key | f(x, y) | Why |
-|---|---|---|
-| `bowl` | x² + y² | the canonical convex case |
-| `elongated` | x² + 10y² | shows zig-zagging and why learning rate matters |
-| `saddle` | x² − y² | a critical point that is not a minimum |
-| `himmelblau` | (x² + y − 11)² + (x + y² − 7)² | four minima, shows dependence on start |
-| `rosenbrock` | (1 − x)² + 100(y − x²)² | the classic narrow valley, scaled for display |
+Readouts, gradient arrows and optimizer steps always use the true f and ∇f. Only the rendered
+height and colour ramp are multiplied by the display scale, so the surface fits in the same
+camera framing. Each surface has a default start point that shows off its behaviour.
+
+| Key | f(x, y) | Domain | Display scale | Start | Why |
+|---|---|---|---|---|---|
+| `bowl` | x² + y² | [−3, 3]² | 1/6 | (2.5, 2) | the canonical convex case |
+| `elongated` | x² + 10y² | [−3, 3]² | 1/30 | (2.5, 1.5) | shows zig-zagging and why learning rate matters |
+| `saddle` | x² − y² | [−3, 3]² | 1/6 | (2.5, 0.05) | a critical point that is not a minimum |
+| `himmelblau` | (x² + y − 11)² + (x + y² − 7)² | [−5, 5]² | 1/300 | (0, 0) | four minima, shows dependence on start |
+| `rosenbrock` | (1 − x)² + 100(y − x²)² | x ∈ [−2, 2], y ∈ [−1, 3] | 1/800 | (−1.5, 2.5) | the classic narrow valley |
 
 ### Controls (side panel)
 
@@ -170,7 +206,9 @@ the scene has a hard-coded colour.
 
 ### Explanation panel
 
-Three short paragraphs and live equations, updated every frame:
+Three short paragraphs and live equations. KaTeX structure is rendered once per
+optimizer/surface change; the numeric readouts inside it update on state change (step or
+drag), never per frame.
 
 - What the surface is and what the ball represents (loss as a function of two parameters).
 - The gradient: `∇f(x,y) = (∂f/∂x, ∂f/∂y)` rendered by KaTeX, followed by the current numeric
@@ -186,8 +224,12 @@ Position (x, y), loss f, gradient (f_x, f_y), |∇f|, step count. Monospace, tab
 ### Interaction details
 
 - Pointer events (mouse + touch). Drag on the marker moves it; drag elsewhere orbits.
-- Marker is clamped to the domain. If an optimizer step leaves the domain (large learning
-  rate on `rosenbrock`), the run pauses and the readout shows "diverged".
+- Marker is clamped to the domain while dragging. If an optimizer step leaves the domain, or
+  produces NaN or ±Infinity (large learning rate on `rosenbrock`), the run pauses, the readout
+  shows "diverged", and Step and Run are disabled until Reset or a drag.
+- Optimizer state (momentum velocity; Adam m, v, t) and the step count reset to zero on: drag,
+  Reset, surface change, optimizer change. Changing the learning rate mid-run keeps state.
+  Reset returns the marker to the surface's start point.
 - `prefers-reduced-motion`: Run steps at 2 Hz and camera damping is disabled.
 - Keyboard: sliders and buttons are native elements, so tab/arrow keys work.
 
@@ -206,8 +248,10 @@ Position (x, y), loss f, gradient (f_x, f_y), |∇f|, step count. Monospace, tab
 - `pnpm` with `vite`, `typescript` (strict, `noUncheckedIndexedAccess`), `three`,
   `@types/three`, `katex`, `vitest`, `eslint` + `typescript-eslint`, `prettier`.
 - Tests: Vitest for `core/math/*` — every surface's analytic gradient vs finite differences
-  at 25 random points (tolerance 1e-4); each optimizer converges on `bowl` within N steps;
-  Adam bias correction matches the paper's closed form for the first three steps.
+  at 25 random points in its domain (relative tolerance 1e-4); each optimizer reaches
+  |∇f| < 1e-3 on `bowl` from (2.5, 2) within 200 steps at learning rate 0.1;
+  Adam bias correction matches the paper's closed form for the first three steps;
+  a diverging run (rosenbrock, SGD, lr 1) is reported as diverged, not thrown.
   Rendering is verified manually in Chrome during development (screenshots in the PR).
 - CI (`.github/workflows/ci.yml`): typecheck, lint, test on every push and PR.
 - Deploy (`.github/workflows/pages.yml`): build with `base: "/ai-lab/"` and publish `dist/`
