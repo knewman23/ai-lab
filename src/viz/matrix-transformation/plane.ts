@@ -8,7 +8,7 @@ import {
   Mesh,
   MeshBasicMaterial,
 } from "three";
-import { apply, clipSegment } from "../../core/math/matrix2";
+import { clipSegment } from "../../core/math/matrix2";
 import type { Mat2 } from "../../core/math/matrix2";
 import type { Vec2 } from "../../core/math/numeric";
 import type { ThemeColors } from "../types";
@@ -28,6 +28,21 @@ const GRID_FLOATS = 14 * 2 * 3;
 const DET_EPS = 1e-6;
 /** Half-width of the rectangle that stands in for a collapsed square. */
 const COLLAPSED_HALF_WIDTH = 0.02;
+/** Clipped grid segments shorter than this have collapsed to a point. */
+const SEGMENT_EPS = 1e-9;
+
+/**
+ * Writes M * v into `out` and returns it. `apply` would do the same, but it
+ * allocates, and this runs 30 times per frame.
+ */
+function mapInto(m: Mat2, v: Vec2, out: [number, number]): Vec2 {
+  out[0] = m[0] * v[0] + m[1] * v[1];
+  out[1] = m[2] * v[0] + m[3] * v[1];
+  return out;
+}
+
+const UNIT_X: Vec2 = [1, 0];
+const UNIT_Y: Vec2 = [0, 1];
 
 /** The 14 reference lines as endpoint pairs, in grid space. */
 function gridLines(): Vec2[] {
@@ -111,6 +126,11 @@ export function createPlane(theme: ThemeColors, bound = 5): Plane {
   group.add(reference.object, grid.object, ghost.object, fill);
 
   let lastDet = 1;
+  // Scratch endpoints, so setMatrix allocates nothing of its own.
+  const from: [number, number] = [0, 0];
+  const to: [number, number] = [0, 0];
+  const col1: [number, number] = [0, 0];
+  const col2: [number, number] = [0, 0];
 
   function applyTheme(): void {
     reference.material.color.copy(theme.line);
@@ -128,21 +148,19 @@ export function createPlane(theme: ThemeColors, bound = 5): Plane {
 
   /** Writes the collapsed stand-in rectangle; returns false if it is a point. */
   function setCollapsed(c1: Vec2, c2: Vec2): boolean {
-    const sum: Vec2 = [c1[0] + c2[0], c1[1] + c2[1]];
-    const pick = Math.hypot(...c1) >= Math.hypot(...c2) ? c1 : c2;
-    const dir = Math.hypot(...pick) > DET_EPS ? pick : sum;
-    const len = Math.hypot(...dir);
+    // The corners are collinear here, so the longer column gives the axis; if
+    // it is degenerate so is their sum, and the whole square is one point.
+    const dir = Math.hypot(c1[0], c1[1]) >= Math.hypot(c2[0], c2[1]) ? c1 : c2;
+    const len = Math.hypot(dir[0], dir[1]);
     if (len <= DET_EPS) return false;
 
     const ux = dir[0] / len;
     const uy = dir[1] / len;
-    let min = 0;
-    let max = 0;
-    for (const c of [c1, c2, sum]) {
-      const t = c[0] * ux + c[1] * uy;
-      min = Math.min(min, t);
-      max = Math.max(max, t);
-    }
+    // The four corners 0, c1, c2, c1 + c2 projected onto the collapsed axis.
+    const t1 = c1[0] * ux + c1[1] * uy;
+    const t2 = c2[0] * ux + c2[1] * uy;
+    const min = Math.min(0, t1, t2, t1 + t2);
+    const max = Math.max(0, t1, t2, t1 + t2);
     const nx = -uy * COLLAPSED_HALF_WIDTH;
     const ny = ux * COLLAPSED_HALF_WIDTH;
     setCorner(0, min * ux - nx, min * uy - ny);
@@ -158,8 +176,13 @@ export function createPlane(theme: ThemeColors, bound = 5): Plane {
     setMatrix(mt: Mat2, detMt: number): void {
       let n = 0;
       for (let i = 0; i < lines.length; i += 2) {
-        const clipped = clipSegment(apply(mt, lines[i]!), apply(mt, lines[i + 1]!), bound);
+        const p = mapInto(mt, lines[i]!, from);
+        const q = mapInto(mt, lines[i + 1]!, to);
+        const clipped = clipSegment(p, q, bound);
         if (clipped === null) continue;
+        const [a, b] = clipped;
+        // A line the matrix has squashed to a point draws nothing.
+        if (Math.abs(b[0] - a[0]) < SEGMENT_EPS && Math.abs(b[1] - a[1]) < SEGMENT_EPS) continue;
         for (const point of clipped) {
           gridPositions[n] = point[0];
           gridPositions[n + 1] = point[1];
@@ -167,13 +190,12 @@ export function createPlane(theme: ThemeColors, bound = 5): Plane {
           n += 3;
         }
       }
-      gridPositions.fill(0, n);
       grid.geometry.getAttribute("position").needsUpdate = true;
       grid.geometry.setDrawRange(0, n / 3);
       grid.geometry.computeBoundingSphere();
 
-      const c1 = apply(mt, [1, 0]);
-      const c2 = apply(mt, [0, 1]);
+      const c1 = mapInto(mt, UNIT_X, col1);
+      const c2 = mapInto(mt, UNIT_Y, col2);
       if (Math.abs(detMt) > DET_EPS) {
         setCorner(0, 0, 0);
         setCorner(1, c1[0], c1[1]);
