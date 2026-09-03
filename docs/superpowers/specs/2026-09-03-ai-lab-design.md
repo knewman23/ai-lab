@@ -1,7 +1,7 @@
 # AI Lab — interactive 3D visualizations for calculus, linear algebra and machine learning
 
 Date: 2026-09-03
-Status: draft, awaiting owner review
+Status: reviewed, awaiting owner sign-off
 Repo: `knewman23/ai-lab` → deployed at `https://knewman23.github.io/ai-lab/`
 Sibling projects: [ai-frontier](https://github.com/knewman23/ai-frontier) (from-scratch notebooks), [backprop-to-frontier](https://github.com/knewman23/backprop-to-frontier) (curriculum), [knewman23.github.io](https://github.com/knewman23/knewman23.github.io) (portfolio, gets a new card)
 
@@ -148,7 +148,8 @@ reduced motion) without widening `VizHost`.
 
 Boot order: theme, shell and router come up first and never depend on the renderer. The
 shell then awaits `createRenderer()` once. If it resolves, viz routes mount normally. If it
-rejects (no WebGPU and no WebGL 2), the shell never calls `mount`; a viz route instead shows
+rejects for any reason (no WebGPU and no WebGL 2, blocked GPU, context loss during init),
+the shell never calls `mount`; a viz route instead shows
 a plain-HTML notice in place of the whole viz frame naming the requirement and linking to the
 ai-frontier notebook for the same topic. The home page still works. `VizHost.renderer` stays
 a required `Renderer`.
@@ -174,8 +175,8 @@ the scene has a hard-coded colour.
   Below the surface at a fixed depth: a projected contour plot (marching squares over the
   same height grid, 12 levels evenly spaced across the displayed height range) so students
   connect the 3D bowl to the 2D contour diagrams in textbooks.
-- **Marker**: a small sphere at (x, y, f(x, y)). Draggable: the pointer ray hits an invisible
-  horizontal plane at the marker's current height, giving (x, y); z is then f(x, y) evaluated
+- **Marker**: a small sphere at (x, y, s·f(x, y)), the display height. Draggable: the pointer ray hits an invisible
+  horizontal plane at the marker's current height, giving (x, y); z is then s·f(x, y) evaluated
   analytically, so the marker never leaves the surface under cursor jitter. Dragging resets
   the path and the optimizer state (see Interaction details). Orbit is disabled during a drag.
 - **Gradient arrow**: at the marker, xy direction along the true ∇f, lifted to lie in the
@@ -241,7 +242,9 @@ Position (x, y), loss f, gradient (f_x, f_y), |∇f|, step count. Monospace, tab
   point outside it and "diverged" for NaN or ±Infinity.
 - Optimizer state (momentum velocity; Adam m, v, t) and the step count reset to zero on: drag,
   Reset, surface change, optimizer change. Changing the learning rate mid-run keeps state.
-  Reset returns the marker to the surface's start point.
+  Reset returns the marker to the surface's start point. Surface change behaves like Reset on
+  the new surface (marker to its start, path cleared); optimizer change keeps the marker and
+  clears the path.
 - `prefers-reduced-motion`: Run steps at 2 Hz and camera damping is disabled.
 - Keyboard: sliders and buttons are native elements, so tab/arrow keys work.
 
@@ -265,7 +268,8 @@ Position (x, y), loss f, gradient (f_x, f_y), |∇f|, step count. Monospace, tab
   the portfolio's self-hosted fonts.
 - Tests: Vitest for `core/math/*` — every surface's analytic gradient vs finite differences
   at 25 random points in its domain (relative tolerance 1e-4); each optimizer reaches
-  |∇f| < 1e-3 on `bowl` from (2.5, 2) within 200 steps at learning rate 0.1;
+  |∇f| < 1e-3 on `bowl` from (2.5, 2) within 200 steps at learning rate 0.1 (Adam oscillates
+  near a quadratic minimum; loosen its budget rather than "fix" the optimizer if it misses);
   Adam bias correction matches the paper's closed form for the first three steps;
   a diverging run (rosenbrock, SGD, lr 1) is reported as diverged, not thrown.
   Rendering is verified manually in Chrome during development (screenshots in the PR).
