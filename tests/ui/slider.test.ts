@@ -12,7 +12,7 @@ function input(el: HTMLElement): HTMLInputElement {
 function output(el: HTMLElement): HTMLOutputElement {
   const node = el.querySelector("output");
   if (!node) throw new Error("output not found");
-  return node as HTMLOutputElement;
+  return node;
 }
 
 describe("createLogSlider", () => {
