@@ -1,4 +1,5 @@
-import { TOPICS, type RegistryEntry, type TopicSlug } from "../viz/types";
+import { gradientDescent } from "../viz/gradient-descent";
+import type { RegistryEntry } from "../viz/types";
 
 export const REGISTRY: readonly RegistryEntry[] = [
   {
@@ -25,12 +26,13 @@ export const REGISTRY: readonly RegistryEntry[] = [
       "Drag the basis vectors and watch a unit cube deform, with the determinant shown as volume and eigenvectors as the lines that don't turn.",
     status: "soon",
   },
+  gradientDescent,
   {
     id: "backprop-graph",
     topic: "machine-learning",
     title: "Backprop graph",
     summary:
-      "See the Value autograd graph from ai-frontier notebook 01 laid out in 3D with forward and backward animation.",
+      "See the autograd graph behind backpropagation, laid out in 3D with forward and backward passes animated.",
     status: "soon",
   },
   {
@@ -50,17 +52,6 @@ export const REGISTRY: readonly RegistryEntry[] = [
     status: "soon",
   },
 ];
-
-export function entriesByTopic(): Map<TopicSlug, RegistryEntry[]> {
-  const map = new Map<TopicSlug, RegistryEntry[]>();
-  for (const topic of TOPICS) {
-    map.set(topic.slug, []);
-  }
-  for (const entry of REGISTRY) {
-    map.get(entry.topic)!.push(entry);
-  }
-  return map;
-}
 
 export function findEntry(topic: string, id: string): RegistryEntry | undefined {
   return REGISTRY.find((entry) => entry.topic === topic && entry.id === id);

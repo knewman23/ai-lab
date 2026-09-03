@@ -1,26 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { entriesByTopic, findEntry, REGISTRY } from "../../src/app/registry";
-import { TOPICS } from "../../src/viz/types";
+import { findEntry, REGISTRY } from "../../src/app/registry";
 
 describe("registry", () => {
   it("has unique ids", () => {
     const ids = REGISTRY.map((entry) => entry.id);
     expect(new Set(ids).size).toBe(ids.length);
-  });
-
-  it("groups entries by topic with every topic present, in TOPICS order", () => {
-    const map = entriesByTopic();
-    const keys = Array.from(map.keys());
-    expect(keys).toEqual(TOPICS.map((topic) => topic.slug));
-  });
-
-  it("files each entry under its own topic", () => {
-    const map = entriesByTopic();
-    for (const [topic, entries] of map) {
-      for (const entry of entries) {
-        expect(entry.topic).toBe(topic);
-      }
-    }
   });
 
   const roadmapExpectations: ReadonlyArray<{
@@ -45,8 +29,16 @@ describe("registry", () => {
     },
   );
 
-  it("returns undefined for an unregistered visualization id", () => {
-    expect(findEntry("machine-learning", "gradient-descent")).toBeUndefined();
+  it("has the gradient descent visualization ready to mount", () => {
+    const entry = findEntry("machine-learning", "gradient-descent");
+    expect(entry).toBeDefined();
+    expect(entry?.status).toBe("ready");
+    expect(typeof (entry as { mount?: unknown } | undefined)?.mount).toBe("function");
+  });
+
+  it("lists gradient descent first among the machine learning entries", () => {
+    const machineLearning = REGISTRY.filter((entry) => entry.topic === "machine-learning");
+    expect(machineLearning[0]?.id).toBe("gradient-descent");
   });
 
   it("returns undefined for an unknown topic", () => {
