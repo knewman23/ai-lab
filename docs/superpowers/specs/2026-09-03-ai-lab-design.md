@@ -236,7 +236,13 @@ Position (x, y), loss f, gradient (f_x, f_y), |∇f|, step count. Monospace, tab
 
 ### Interaction details
 
-- Pointer events (mouse + touch). Drag on the marker moves it; drag elsewhere orbits.
+- Pointer events (mouse + touch). Drag on the marker moves it; drag elsewhere orbits. A plain
+  click on the surface (pointer moved under 6 px, released within 400 ms) places the marker at
+  the clicked point, with the same reset semantics as a drag. Hovering the marker shows a grab
+  cursor.
+- An on-canvas "How to explore" hint (bottom-left of the scene) lists the mouse and touch
+  controls. It hides on "Got it" or on the first drag/click, and the dismissal is remembered in
+  `localStorage` (best effort; if storage is unavailable the hint simply shows again).
 - Marker is clamped to the domain while dragging. If an optimizer step leaves the domain, or
   produces NaN or ±Infinity (large learning rate on `rosenbrock`), the run pauses and Step and
   Run are disabled until Reset or a drag. The readout says "left the domain" for a finite
