@@ -6,7 +6,8 @@ export type Vec3 = readonly [number, number, number];
 /**
  * An axis-aligned face of the scene box that a layer can draw on. Centred
  * face-local (a, b) lands at world `centre + (a, b)` along `axes`, with the
- * fixed axis held at `offset + lift`, just inside the face.
+ * fixed axis held at `offset + lift`, just inside the face. `axes` and
+ * `fixedAxis` together must be a permutation of 0, 1, 2.
  */
 export interface Face {
   readonly axes: readonly [0 | 1 | 2, 0 | 1 | 2];
@@ -17,8 +18,9 @@ export interface Face {
 }
 
 /**
- * The three visible faces of the 6x6x6 corner with vertex (-3, 0, 0); `lift`
- * points along each face's interior normal (front +y, side +x, floor +z).
+ * The three visible faces of the chain-rule scene's 6x6x6 corner with vertex
+ * (-3, 0, 0), so the -3 and 3 here are that scene's; `lift` points along each
+ * face's interior normal (front +y, side +x, floor +z).
  */
 export const FACES = {
   front: { axes: [0, 2], fixedAxis: 1, offset: 0, lift: 0.01, centre: [0, 3] },
@@ -26,8 +28,12 @@ export const FACES = {
   floor: { axes: [0, 1], fixedAxis: 2, offset: 0, lift: 0.01, centre: [0, 3] },
 } satisfies Record<"front" | "side" | "floor", Face>;
 
+/** How a layer's vertices are placed: flat (a, 0, b), on a face, or raw world coordinates. */
+export type LayerKind = "flat" | "face" | "world";
+
 /** A line layer and the buffer it draws from. */
 export interface Layer {
+  readonly kind: LayerKind;
   readonly object: LineSegments;
   readonly geometry: BufferGeometry;
   readonly material: LineBasicMaterial;
@@ -67,8 +73,10 @@ export function lineLayer(endpoints: number, renderOrder: number, opts: LayerOpt
   });
   const object = new LineSegments(geometry, material);
   object.renderOrder = renderOrder;
-  const layer: Layer = { object, geometry, material, positions };
-  return opts.face === undefined ? layer : { ...layer, face: opts.face };
+  if (opts.face !== undefined) {
+    return { kind: "face", object, geometry, material, positions, face: opts.face };
+  }
+  return { kind: opts.depth === true ? "world" : "flat", object, geometry, material, positions };
 }
 
 /** Publishes the first `endpoints` vertices of a layer's buffer. */

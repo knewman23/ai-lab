@@ -30,6 +30,9 @@ export function writePolyline(
  * on a flat layer, (a, 0, b).
  */
 function setEndpoint(layer: Layer, n: number, a: number, b: number): void {
+  if (import.meta.env.DEV && layer.kind === "world") {
+    throw new Error("face-local write into a world layer; use writeWorldSegments");
+  }
   const at = n * 3;
   const { face } = layer;
   if (face === undefined) {
@@ -67,7 +70,14 @@ export function writeClippedPolyline(
     from[1] = B[i]!;
     to[0] = A[i + 1]!;
     to[1] = B[i + 1]!;
-    if (!from.every(Number.isFinite) || !to.every(Number.isFinite)) continue;
+    if (
+      !Number.isFinite(from[0]) ||
+      !Number.isFinite(from[1]) ||
+      !Number.isFinite(to[0]) ||
+      !Number.isFinite(to[1])
+    ) {
+      continue;
+    }
     const clipped = clipSegment(from, to, bound);
     if (clipped === null) continue;
     const [p, q] = clipped;
@@ -93,6 +103,9 @@ export function writeWorldSegments(
   layer: Layer,
   segments: readonly (readonly [Vec3, Vec3])[],
 ): void {
+  if (import.meta.env.DEV && layer.kind !== "world") {
+    throw new Error(`world write into a ${layer.kind} layer; create it with { depth: true }`);
+  }
   let n = 0;
   for (const segment of segments) {
     for (const point of segment) {
