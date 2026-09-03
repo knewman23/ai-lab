@@ -46,7 +46,7 @@ new tokens.
 
 Each preset carries two display scales sᵤ and s_y (§4). Display coordinates:
 
-| Face | Plane | Axis 1 | Axis 2 | Curve, 241 samples | Clip box (face-local, half-extents) |
+| Face | Plane | Axis 1 | Axis 2 | Curve, 241 samples | Clip box (world centre, half-extents) |
 |---|---|---|---|---|---|
 | Front wall | y = 0 | X = x, x ∈ [−3, 3] | Z = 3 + sᵤ·u | u = g(x) | centre (0, 3), half (3, 3) |
 | Side wall | x = −3 | Y = 3 + s_y·y (depth) | Z = 3 + sᵤ·u | y = f(u) for u ∈ [−3/sᵤ, 3/sᵤ], i.e. the u range the wall spans; samples where f is undefined (NaN) are dropped, splitting the run | centre (3, 3), half (3, 3) |
@@ -69,8 +69,10 @@ does the translation and the lift. A face layer has `depthTest: true`, `depthWri
 `transparent: true`; `renderOrder` orders coplanar layers on the same face. Without a face the
 layer behaves exactly as today (world (a, 0, b), no lift, `depthTest: false`), so the derivative
 scene is unchanged apart from its import paths. Only `curves.ts` uses face layers; `links.ts`
-(§3.2) spans all three faces per layer, so it writes world coordinates into plain layers created
-with a `depth: true` option and applies the lift itself.
+(§3.2) and `faces.ts` (outline, axes, ticks) span more than one face per layer, so they write world
+coordinates into plain layers created with a `depth: true` option and apply the lift themselves
+(a corner edge lies on two faces and is lifted along both interior normals). The derivative-only
+constant `CLIP` stays in `viz/derivative/` rather than moving with the helper.
 
 The lift is about z-fighting, not occlusion: the home camera (§3.3) looks at the front wall from
 the −y side, through the translucent face, and the face's `depthWrite: false` is what keeps the
@@ -94,7 +96,7 @@ floor; P′, Q′, R′ the same at x + Δx.
 |---|---|---|---|
 | 2 | Curves | `--ink` | one layer per face |
 | 3 | Connectors | `--soft`, opacity .8 | at P's height: P → (−3, 0, Z_u) along −x; → Q along +y on the side wall; Q → (−3, Y_y, 0) down the side wall; → R along +x on the floor; P → (x, 0, 0) down the front wall; (x, 0, 0) → R along +y on the floor. The closed rectangle on the floor and the two on the walls are the proof that R is the composite. Toggle "Connectors" |
-| 4 | Primed connectors | `--faint`, opacity .6 | the same six segments for P′, Q′, R′; shown only when Δx_eff ≠ null and the connectors toggle is on |
+| 4 | Primed connectors | `--faint`, opacity .6 | the same six segments for P′, Q′, R′; shown only when dxEff ≠ null and the connectors toggle is on |
 | 5 | Δ triangles | `--soft`, opacity .9 | front wall: P → (x + Δx, u) → P′; side wall: Q → (u + Δu, y) → Q′; floor: R → (x + Δx, y) → R′. Each triangle is the two legs (horizontal then vertical/depth) plus the hypotenuse, which is the secant through the two points, extended and clipped to the face box. The side-wall secant is hidden when `dyDu === null` (Q = Q′, no direction); its legs are still drawn. Toggle "Δ triangles" (legs) and "Secants" (hypotenuses) |
 | 6 | Tangents | `--accent` | through P with display slope sᵤ·g′(x) in (X, Z); through Q with display slope dY/dZ = `sideSlope` (§4), hidden when `sideSlope` is null; through R with display slope s_y·(f∘g)′(x) in (X, Y). Extended and clipped to the face box. Toggle "Tangents", off by default so the secants read first |
 | 10 | Points | 3D, depth on, `transparent: true` | P `--ink` r 0.08 (draggable; hit sphere `hitP` r 0.2 invisible); Q `--soft` r 0.07; R `--ink` r 0.08 (draggable; hit sphere `hitR` r 0.2 invisible); P′, Q′, R′ `--soft` r 0.05, shown when `dxEff !== null` and (triangles or secants) is on: they are the far vertices of the triangles |
@@ -106,8 +108,8 @@ length (the segment collapses; nothing special is done).
 
 Drag targets: one `attachDrag` call with `hitTargets: [hitP, hitR]` and a per-index plane:
 `plane: { normal: (i) => i === 1 ? (0, 0, 1) : (0, 1, 0), getOffset: () => 0 }` (the shared drag
-gains the option of a normal function; a click on the surface arrives as index −1 and so uses the
-front wall). P's hit reports `[x, 0]`, R's `[x, y]`, a click `[x, 0]`; all map `pos[0]` → `setX`.
+gains the option of a normal function). Click-to-place raycasts `surfaceTarget` directly and never
+consults the plane, so it lands on the front wall because that mesh is the surface target. P's hit reports `[x, 0]`, R's `[x, y]`, a click `[x, 0]`; all map `pos[0]` → `setX`.
 `surfaceTarget` is the front face mesh itself (already a raycastable `DoubleSide` mesh), so no
 extra click plane exists. A single attachment means a tap on R can never fall through to
 click-to-place. Orbit elsewhere.
@@ -148,7 +150,7 @@ export const DOMAIN = [-3, 3]; export const DX_RANGE = [1e-3, 2]; export const F
 | `sin3x` | sin 3x | 3x | sin u | 1/3 | 2.5 | 0.4 | linear inner: the slope is just ×3 |
 | `sinsq` | sin x² | x² | sin u | 1/3 | 2.5 | 1.2 | inner slope grows with x; the composite oscillates faster |
 | `gauss` | e^(−x²/2) | −x²/2 | eᵘ | 2/3 | 2.5 | 1 | the bell curve; f′ = f; side curve clipped above u ≈ 0.18 |
-| `sqrtq` | √(x²+1) | x² + 1 | √u | 0.3 | 0.9 | 1.5 | f undefined for u < 0: the side curve starts at (u, y) = (0, 0), the wall's centre on its y axis, and is clipped above |
+| `sqrtq` | √(x²+1) | x² + 1 | √u | 0.3 | 0.9 | 1.5 | f undefined for u < 0: the side curve starts at (u, y) = (0, 0), the wall's centre on its y axis (it reaches the top edge, s_y·√10 = 2.85, without clipping) |
 | `sincube` | sin³x | sin x | u³ | 3 | 2.5 | 0.8 | g′ = cos x zeroes the product at the peaks |
 
 Helpers:
@@ -204,7 +206,8 @@ math helpers; `setComp` resets x to the new start.
 Readouts, grouped:
 
 - Values: x; u = g(x); y = f(u).
-- Derivatives: g′(x); f′(u) ("undefined" when NaN); dy/dx = f′(u)·g′(x).
+- Derivatives: g′(x); f′(u); dy/dx = f′(u)·g′(x). Every shipped preset's g maps into f's domain, so
+  these are never NaN; display "undefined" if one ever were.
 - Ratios (or "—" when dxEff is null): Δu/Δx; Δy/Δu ("— (Δu = 0)" when null); Δy/Δx.
 
 Explanation (`createEquation` for structure, plain spans for numbers):
@@ -235,7 +238,7 @@ src/core/math/compositions.ts                       + tests
 src/core/math/sampling1d.ts   + sampleOn            + tests
 src/viz/shared/layer.ts       moved from viz/derivative/layer.ts; gains the optional Face
                               (§3.1) and a `depth` option; NaN-safe clipping; derivative
-                              imports updated, its tests unchanged
+                              imports updated, its tests unchanged         + test (face → world)
 src/viz/shared/drag.ts        `plane.normal` may be a function of the hit index (−1 for a
                               surface click); existing callers unchanged           + test
 src/viz/chain-rule/
@@ -267,8 +270,8 @@ once, both drags, click-to-place, theme toggle) before merge.
 
 - **Occlusion.** The side wall can hide the floor's far corner at some orbit angles. Faces are
   translucent (opacity .35) and lines are lifted, so the curves stay visible through a face.
-- **Steep side curves.** `gauss` and `sqrtq` leave the wall; clipping handles it, and the panel's
-  hint says so for those presets.
+- **Steep side curve.** `gauss` leaves the side wall above u ≈ 0.18; clipping handles it, and the
+  preset's hint says so.
 - **Δu = 0.** Handled in `deltas` and the explanation.
 - **Half-used walls.** `gauss` (u ≤ 0) and `sqrtq` (u ≥ 1) use only half the front wall's height
   because the u mapping has no per-preset offset. Accepted for this cut; not a bug.
