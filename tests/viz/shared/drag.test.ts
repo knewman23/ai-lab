@@ -39,6 +39,21 @@ function pointer(type: string, x: number, y: number, pointerId = 1): PointerEven
   return event as PointerEvent;
 }
 
+/** A div standing in for the canvas: a stubbed 200x200 rect and inert pointer capture. */
+function fakeCanvas(): HTMLDivElement {
+  const canvas = document.createElement("div");
+  vi.spyOn(canvas, "getBoundingClientRect").mockReturnValue({
+    left: 0,
+    top: 0,
+    width: SIZE,
+    height: SIZE,
+  } as DOMRect);
+  canvas.setPointerCapture = vi.fn();
+  canvas.releasePointerCapture = vi.fn();
+  canvas.hasPointerCapture = vi.fn(() => false);
+  return canvas;
+}
+
 function ball(x: number): Mesh {
   const mesh = new Mesh(new SphereGeometry(0.2, 8, 8));
   mesh.position.set(x, 0, 0);
@@ -52,16 +67,7 @@ type Overrides = Partial<Pick<DragBase, "hitTargets" | "enabled">> & {
 };
 
 function harness(overrides: Overrides = {}) {
-  const canvas = document.createElement("div");
-  vi.spyOn(canvas, "getBoundingClientRect").mockReturnValue({
-    left: 0,
-    top: 0,
-    width: SIZE,
-    height: SIZE,
-  } as DOMRect);
-  canvas.setPointerCapture = vi.fn();
-  canvas.releasePointerCapture = vi.fn();
-  canvas.hasPointerCapture = vi.fn(() => false);
+  const canvas = fakeCanvas();
 
   const camera = new PerspectiveCamera(90, 1, 0.1, 100);
   camera.position.set(0, 0, 1);
@@ -100,16 +106,7 @@ function harness(overrides: Overrides = {}) {
  * and screen y 0..200 spans world z 1..-1.
  */
 function verticalHarness() {
-  const canvas = document.createElement("div");
-  vi.spyOn(canvas, "getBoundingClientRect").mockReturnValue({
-    left: 0,
-    top: 0,
-    width: SIZE,
-    height: SIZE,
-  } as DOMRect);
-  canvas.setPointerCapture = vi.fn();
-  canvas.releasePointerCapture = vi.fn();
-  canvas.hasPointerCapture = vi.fn(() => false);
+  const canvas = fakeCanvas();
 
   const camera = new PerspectiveCamera(90, 1, 0.1, 100);
   camera.position.set(0, -1, 0);
@@ -140,6 +137,57 @@ function verticalHarness() {
   };
 
   return { canvas, controls, onDrag, detach, send };
+}
+
+/** Screen point over the wall ball, one over the floor ball, one to drag either to. */
+const ON_WALL_BALL: readonly [number, number] = [150, 50];
+const ON_FLOOR_BALL: readonly [number, number] = [50, 150];
+const OBLIQUE_MOVE: readonly [number, number] = [130, 150];
+
+/**
+ * The same rect seen by a Z-up camera at (0, -1, 1) looking at the origin, so
+ * that the y = 0 wall and the z = 0 floor meet a pointer ray at different
+ * points. With forward (0, 1, -1)/sqrt2, right (1, 0, 0) and camera-up
+ * (0, 1, 1)/sqrt2, the ray for NDC (nx, ny) leaves the camera along
+ * (nx, (1+ny)/sqrt2, (ny-1)/sqrt2), so it meets
+ *   y = 0 at x = nx*sqrt2/(1+ny), z = 2ny/(1+ny), and
+ *   z = 0 at x = nx*sqrt2/(1-ny), y = 2ny/(1-ny).
+ * Ball 0 sits on the wall under ON_WALL_BALL (nx = ny = 0.5) and ball 1 on the
+ * floor under ON_FLOOR_BALL (nx = ny = -0.5).
+ */
+function obliqueHarness(normal: (index: number) => Vector3) {
+  const canvas = fakeCanvas();
+
+  const camera = new PerspectiveCamera(90, 1, 0.1, 100);
+  camera.position.set(0, -1, 1);
+  camera.up.set(0, 0, 1);
+  camera.lookAt(0, 0, 0);
+  camera.updateMatrixWorld();
+
+  const wallBall = new Mesh(new SphereGeometry(0.2, 8, 8));
+  wallBall.position.set(Math.SQRT2 / 3, 0, 2 / 3);
+  wallBall.updateMatrixWorld();
+  const floorBall = new Mesh(new SphereGeometry(0.2, 8, 8));
+  floorBall.position.set(-Math.SQRT2 / 3, -2 / 3, 0);
+  floorBall.updateMatrixWorld();
+
+  const controls = { enabled: true } as OrbitControls;
+  const onDrag = vi.fn<(index: number, pos: Vec2) => void>();
+
+  const detach = attachDrag({
+    canvas,
+    camera,
+    controls,
+    hitTargets: [wallBall, floorBall],
+    plane: { normal, getOffset: () => 0 },
+    onDrag,
+  });
+
+  const send = (type: string, [x, y]: readonly [number, number], id = 1): void => {
+    canvas.dispatchEvent(pointer(type, x, y, id));
+  };
+
+  return { onDrag, detach, send };
 }
 
 /**
@@ -309,6 +357,42 @@ describe("attachDrag", () => {
     expect(x).toBeCloseTo(-0.3, 6);
     // The hit's world y: the drag plane itself, reported unchanged.
     expect(y).toBeCloseTo(0, 6);
+
+    detach();
+  });
+
+  it("asks the plane normal for the grabbed target and drags the wall ball on y = 0", () => {
+    const normal = vi.fn((i: number) => (i === 1 ? new Vector3(0, 0, 1) : new Vector3(0, 1, 0)));
+    const { onDrag, detach, send } = obliqueHarness(normal);
+
+    send("pointerdown", ON_WALL_BALL);
+    // OBLIQUE_MOVE is NDC (0.3, -0.5): on y = 0, x = 0.3*sqrt2/0.5.
+    send("pointermove", OBLIQUE_MOVE);
+
+    expect(normal).toHaveBeenCalledWith(0);
+    expect(normal).not.toHaveBeenCalledWith(1);
+    const [index, [x, y]] = only(onDrag);
+    expect(index).toBe(0);
+    expect(x).toBeCloseTo(0.6 * Math.SQRT2, 6);
+    expect(y).toBeCloseTo(0, 6);
+
+    detach();
+  });
+
+  it("asks the plane normal for the grabbed target and drags the floor ball on z = 0", () => {
+    const normal = vi.fn((i: number) => (i === 1 ? new Vector3(0, 0, 1) : new Vector3(0, 1, 0)));
+    const { onDrag, detach, send } = obliqueHarness(normal);
+
+    send("pointerdown", ON_FLOOR_BALL);
+    // The same screen point on z = 0: x = 0.3*sqrt2/1.5, y = 2*(-0.5)/1.5.
+    send("pointermove", OBLIQUE_MOVE);
+
+    expect(normal).toHaveBeenCalledWith(1);
+    expect(normal).not.toHaveBeenCalledWith(0);
+    const [index, [x, y]] = only(onDrag);
+    expect(index).toBe(1);
+    expect(x).toBeCloseTo(0.2 * Math.SQRT2, 6);
+    expect(y).toBeCloseTo(-2 / 3, 6);
 
     detach();
   });

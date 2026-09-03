@@ -37,11 +37,16 @@ export type DragOptions = DragBase &
       }
     | {
         /**
-         * The plane the object at `index` drags on: `normal` is its direction,
-         * and `getOffset` the signed distance from the origin along it. The
-         * normal is copied and normalised, so the caller may reuse the vector.
+         * The plane the object at `index` drags on: `normal` is its direction —
+         * one vector for every target, or a function of the grabbed target's
+         * index when targets live on differently oriented planes — and
+         * `getOffset` the signed distance from the origin along it. The normal
+         * is copied and normalised, so the caller may reuse the vector.
          */
-        plane: { normal: Vector3; getOffset(index: number): number };
+        plane: {
+          normal: Vector3 | ((index: number) => Vector3);
+          getOffset(index: number): number;
+        };
         getPlaneZ?: never;
       }
   );
@@ -108,7 +113,11 @@ export function attachDrag(opts: DragOptions): () => void {
   /** Re-aims the drag plane at whichever source the caller gave, for this target. */
   function setDragPlane(index: number): void {
     if ("plane" in opts) {
-      dragPlane.set(opts.plane.normal, -opts.plane.getOffset(index));
+      const { normal } = opts.plane;
+      dragPlane.set(
+        typeof normal === "function" ? normal(index) : normal,
+        -opts.plane.getOffset(index),
+      );
       // set() copies the normal as given; the offset only reads as a world
       // distance once that copy is a unit vector.
       dragPlane.normal.normalize();
