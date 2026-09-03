@@ -72,6 +72,8 @@ export function createGdPanel(
   const runSection = panel.section("Run");
   const runRow = document.createElement("div");
   runRow.className = "btn-row";
+  runRow.setAttribute("role", "group");
+  runRow.setAttribute("aria-label", "Run controls");
   const stepBtn = createButton({ label: "Step", onClick: () => handlers.onStep() });
   const runBtn = createButton({
     label: "Run",
@@ -148,7 +150,7 @@ export function createGdPanel(
     el: panel.el,
     render,
     dispose(): void {
-      host.innerHTML = "";
+      host.replaceChildren();
     },
   };
 }
