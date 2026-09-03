@@ -109,8 +109,18 @@ export function eigen(m: Mat2): Eigen {
   };
 }
 
-/** Liang-Barsky clip of segment [p, q] against the square [-bound, bound]^2. */
-export function clipSegment(p: Vec2, q: Vec2, bound: number): readonly [Vec2, Vec2] | null {
+/**
+ * Liang-Barsky clip of segment [p, q] against an axis-aligned box centred on the
+ * origin: a scalar `bound` gives the square [-bound, bound]^2, a pair [bx, by]
+ * the rectangle [-bx, bx] x [-by, by].
+ */
+export function clipSegment(
+  p: Vec2,
+  q: Vec2,
+  bound: number | readonly [number, number],
+): readonly [Vec2, Vec2] | null {
+  const boundX = typeof bound === "number" ? bound : bound[0];
+  const boundY = typeof bound === "number" ? bound : bound[1];
   const dx = q[0] - p[0];
   const dy = q[1] - p[1];
   let t0 = 0;
@@ -131,11 +141,11 @@ export function clipSegment(p: Vec2, q: Vec2, bound: number): readonly [Vec2, Ve
     return true;
   };
 
-  // Left, right, bottom, top edges of [-bound, bound]^2, in that order.
-  if (!clipEdge(-dx, p[0] + bound)) return null;
-  if (!clipEdge(dx, bound - p[0])) return null;
-  if (!clipEdge(-dy, p[1] + bound)) return null;
-  if (!clipEdge(dy, bound - p[1])) return null;
+  // Left, right, bottom, top edges of the box, in that order.
+  if (!clipEdge(-dx, p[0] + boundX)) return null;
+  if (!clipEdge(dx, boundX - p[0])) return null;
+  if (!clipEdge(-dy, p[1] + boundY)) return null;
+  if (!clipEdge(dy, boundY - p[1])) return null;
 
   const rp: Vec2 = [p[0] + t0 * dx, p[1] + t0 * dy];
   const rq: Vec2 = [p[0] + t1 * dx, p[1] + t1 * dy];

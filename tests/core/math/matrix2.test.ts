@@ -237,4 +237,39 @@ describe("clipSegment", () => {
     const p: Vec2 = [1, 1];
     expect(clipSegment(p, p, bound)).toEqual([p, p]);
   });
+
+  describe("rectangular bounds", () => {
+    const box = [3.5, 3.4] as const;
+
+    it("clips against the box's top edge, not its width", () => {
+      const p: Vec2 = [0, 0];
+      const q: Vec2 = [1, 10];
+      const result = clipSegment(p, q, box);
+      if (result === null) throw new Error("expected a clipped segment");
+      const [rp, rq] = result;
+      expect(rp).toEqual([0, 0]);
+      expect(rq[1]).toBeCloseTo(3.4, 10);
+      expect(rq[0]).toBeCloseTo(0.34, 10);
+    });
+
+    it("clips against the box's right edge at the wider bound", () => {
+      const p: Vec2 = [0, 0];
+      const q: Vec2 = [10, 0];
+      const result = clipSegment(p, q, box);
+      if (result === null) throw new Error("expected a clipped segment");
+      expect(result[1][0]).toBeCloseTo(3.5, 10);
+    });
+
+    it("leaves a segment inside the box unchanged", () => {
+      const p: Vec2 = [-3.4, -3.3];
+      const q: Vec2 = [3.4, 3.3];
+      expect(clipSegment(p, q, box)).toEqual([p, q]);
+    });
+
+    it("returns null for a segment past the box's shorter axis", () => {
+      const p: Vec2 = [-3, 3.5];
+      const q: Vec2 = [3, 3.5];
+      expect(clipSegment(p, q, box)).toBeNull();
+    });
+  });
 });
