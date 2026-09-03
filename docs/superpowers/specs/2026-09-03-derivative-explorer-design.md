@@ -138,9 +138,10 @@ unchanged). `derived(s)`: `fx`, `d: Derivative`, `hEff: number | null`, `secant:
 ## 6. Controls (side panel, in order)
 
 1. Function select (table order).
-2. h slider (log, 1e-3 … 2, default 1, readout `h = <fmt>`; when `hEff` is a number and differs
-   from h append ` (clipped to <fmt>)`; when `hEff` is null the readout reads `h = <fmt> (x is at
-   the right edge; no secant)`).
+2. h slider (log, 1e-3 … 2, default 1, readout `h = <fmt>`). A separate note under the slider,
+   rewritten on every render: hidden normally; "clipped to <fmt(hEff)> so x + h stays in the
+   domain" when hEff differs from h; "x is at the right edge; no secant" when hEff is null. (A
+   slider's own readout only refreshes on input, so state-dependent text cannot live there.)
 3. Buttons: Zoom in (disabled at zoom 3), Reset zoom (disabled at zoom 0), Reset, Reset view.
 4. Toggles: Tangent, Secant, Derivative curve.
 

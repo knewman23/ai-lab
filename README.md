@@ -10,7 +10,7 @@ a study tool and a portfolio piece. Live at
 
 ## What's in it
 
-Two scenes so far.
+Three scenes so far.
 
 **Gradient descent** on a draggable 3D loss surface. Drag the ball anywhere on the surface
 and watch the gradient arrow and tangent plane follow it, pick SGD, momentum or Adam and
@@ -22,6 +22,12 @@ live KaTeX equations and readouts that update as you go.
 four entries, and watch the grid and the unit square deform under the matrix; the fill turns
 warn-coloured when the determinant flips sign, the eigenvectors are drawn as the lines that
 don't turn, and an Animate slider morphs the whole plane from the identity.
+
+**Derivative and tangent explorer.** Drag a point along one of six curves and watch the tangent
+follow it, shrink h to see the secant rotate onto the tangent while the readouts converge, and
+read the derivative as the height of a second curve drawn underneath. Two curves are not
+differentiable at zero: |x| shows the corner, √|x| the vertical tangent. Zoom in three times to
+see any smooth curve become its tangent.
 
 ## Run it
 

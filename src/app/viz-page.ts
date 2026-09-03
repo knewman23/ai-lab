@@ -56,7 +56,14 @@ export function createVizPage(deps: VizPageDeps): VizPage {
   let observer: ResizeObserver | null = null;
   let listeners: AbortController | null = null;
   let renderer: Renderer | null = null;
-  let baseline = 0;
+  // DEV leak check. `renderer.info.memory.geometries` counts geometries uploaded and not yet
+  // disposed for the renderer's whole lifetime, and three keeps some shared geometry alive on
+  // purpose (ArrowHelper's module-level line and cone), so a pre-mount vs post-dispose
+  // comparison false-positives on the first visit. Instead we remember the post-dispose count
+  // per visualization id and warn only when a later visit leaves more behind than the last one:
+  // that is the signature of a real per-mount leak.
+  const highWater = new Map<string, number>();
+  let currentId: string | null = null;
 
   /** Everything a running viz holds, minus the frame and the instance itself. */
   function stopDriving(): void {
@@ -74,16 +81,18 @@ export function createVizPage(deps: VizPageDeps): VizPage {
 
     if (instance) {
       instance.dispose();
-      if (import.meta.env.DEV && renderer) {
+      if (import.meta.env.DEV && renderer && currentId) {
         const geometries = renderer.info.memory.geometries;
-        if (geometries > baseline) {
-          console.warn(`viz leaked geometries: ${baseline} -> ${geometries}`);
+        const previous = highWater.get(currentId);
+        if (previous !== undefined && geometries > previous) {
+          console.warn(`viz "${currentId}" leaked geometries: ${previous} -> ${geometries}`);
         }
+        highWater.set(currentId, geometries);
       }
       instance = null;
     }
     renderer = null;
-    baseline = 0;
+    currentId = null;
 
     // The renderer outlives the route; only its host frame goes.
     frame?.el.remove();
@@ -121,7 +130,7 @@ export function createVizPage(deps: VizPageDeps): VizPage {
     try {
       renderer = result.renderer;
       own.canvasContainer.replaceChildren(renderer.domElement);
-      baseline = renderer.info.memory.geometries;
+      currentId = entry.id;
 
       const mounted = entry.mount({
         canvasContainer: own.canvasContainer,
@@ -166,7 +175,7 @@ export function createVizPage(deps: VizPageDeps): VizPage {
       }
       instance = null;
       renderer = null;
-      baseline = 0;
+      currentId = null;
       own.showNotice(
         notice(
           "This visualization failed to start",
