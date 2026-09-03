@@ -1,4 +1,7 @@
-import { Color } from "three";
+// Deep import (an official "three/src/*" export): the theme boots on the home
+// page, and pulling Color from "three" would drag all 210 kB of three.core into
+// the entry chunk. This is the same class, from source, with only its own maths.
+import { Color } from "three/src/math/Color.js";
 import type { ThemeColors } from "../viz/types";
 
 export interface ThemeHandle extends ThemeColors {

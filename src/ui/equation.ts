@@ -1,3 +1,6 @@
+// Imported here, not in main.ts, so KaTeX's stylesheet ships with the chunk
+// that renders equations instead of preloading on the home page.
+import "katex/dist/katex.min.css";
 import katex from "katex";
 
 export interface Equation {

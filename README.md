@@ -53,7 +53,8 @@ flips between light and dark along with the page theme.
 ## Add a visualization
 
 Every visualization is a folder exporting one object matching this shape (see
-`src/viz/types.ts`):
+`src/viz/types.ts`). The registry holds the card metadata plus a loader, so each
+scene ships as its own chunk and the home page never downloads Three.js:
 
 ```ts
 export interface Visualization {
@@ -69,6 +70,12 @@ export interface VizInstance {
   update(dt: number): boolean; // render here; return true if it rendered
   resize(w: number, h: number): void;
   dispose(): void; // release all GPU resources and listeners
+}
+
+// What the registry stores: the same card metadata, and a loader for the module.
+export interface LazyVisualization extends Omit<RoadmapEntry, "status"> {
+  readonly status: "ready";
+  readonly load: () => Promise<Visualization>;
 }
 ```
 
@@ -116,7 +123,22 @@ export const spinningCube: Visualization = {
 };
 ```
 
-Then register it in `src/app/registry.ts`.
+Then register it in `src/app/registry.ts`, repeating the card metadata and
+pointing `load` at the folder:
+
+```ts
+{
+  id: "spinning-cube",
+  topic: "machine-learning",
+  title: "Spinning cube",
+  summary: "A cube rotating on the Z axis, the smallest thing that fills a frame.",
+  status: "ready",
+  load: () => import("../viz/spinning-cube").then((m) => m.spinningCube),
+},
+```
+
+The registry test asserts the loaded module's `id`, `topic`, `title` and
+`summary` match the entry, so the two copies cannot drift.
 
 ## Roadmap
 

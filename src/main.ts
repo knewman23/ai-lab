@@ -2,7 +2,6 @@ import "../styles/fonts.css";
 import "../styles/tokens.css";
 import "../styles/shell.css";
 import "../styles/panel.css";
-import "katex/dist/katex.min.css";
 import { createShell } from "./app/shell";
 
 const app = document.querySelector<HTMLDivElement>("#app");

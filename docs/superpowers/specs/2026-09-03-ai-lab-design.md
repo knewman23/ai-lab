@@ -65,11 +65,11 @@ structure reads as a curriculum, not a single demo (default pending the owner's 
 index.html                <head> carries the portfolio's inline theme script verbatim
 public/theme.js           the portfolio's toggle script, copied verbatim
 src/
-  main.ts                 boot: theme, shell, router first; then await createRenderer()
+  main.ts                 boot: theme, shell, router first; the renderer loads on the first viz route
   app/
     router.ts             hash → route object; emits on change
     shell.ts              header (title, breadcrumb, theme toggle), home page, viz page frame
-    registry.ts           the list of Visualization objects, grouped by topic
+    registry.ts           card metadata + a per-scene chunk loader, grouped by topic
   core/
     renderer.ts           createRenderer(): WebGPURenderer or WebGL fallback, resize, DPR cap
     scene.ts              camera, OrbitControls, lights, grid, shared disposal helper
@@ -115,7 +115,13 @@ export interface Visualization extends Omit<RoadmapEntry, "status"> {
   mount(host: VizHost): VizInstance;
 }
 
-export type RegistryEntry = Visualization | RoadmapEntry;
+/** What the registry stores for a ready scene: card metadata plus a chunk loader. */
+export interface LazyVisualization extends Omit<RoadmapEntry, "status"> {
+  status: "ready";
+  load: () => Promise<Visualization>;
+}
+
+export type RegistryEntry = LazyVisualization | RoadmapEntry;
 
 /** The WebGPURenderer class from "three/webgpu"; it also backs the WebGL 2 fallback. */
 export type Renderer = import("three/webgpu").WebGPURenderer;
@@ -146,8 +152,13 @@ helpers in `core/scene.ts`, and renders itself inside `update`. That gives the v
 access to the controls it needs (reset view, disable orbit while dragging, damping off under
 reduced motion) without widening `VizHost`.
 
-Boot order: theme, shell and router come up first and never depend on the renderer. The
-shell then awaits `createRenderer()` once. If it resolves, viz routes mount normally. If it
+Boot order: theme, shell and router come up first and never depend on the renderer, and the
+home page loads no Three.js and no KaTeX: the registry holds only card metadata and a
+`load()` per scene, and every scene is its own chunk. The first viz route creates the
+renderer, importing `core/renderer.ts` (and with it `three/webgpu`) at the same time as it
+loads the scene's chunk; the promise is memoised, so the renderer is still created once per
+page load and reused across scenes. If it resolves, viz routes mount normally. If a scene's
+chunk fails to download, that route shows the "failed to start" notice. If the renderer
 rejects for any reason (no WebGPU and no WebGL 2, blocked GPU, context loss during init),
 the shell never calls `mount`; a viz route instead shows
 a plain-HTML notice in place of the whole viz frame naming the requirement and linking to the
