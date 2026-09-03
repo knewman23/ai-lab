@@ -298,8 +298,9 @@ cards. That change lives in the portfolio repo and is not part of this project's
 
 1. **Backprop graph** (machine-learning) — the `Value` autograd graph from ai-frontier
    notebook 01 laid out in 3D; edit inputs, watch forward values and backward gradients flow.
-2. **Matrix transformation** (linear-algebra) — drag basis vectors, watch a unit cube and a
-   point cloud deform; show determinant as volume, eigenvectors as the lines that don't turn.
+2. **Matrix transformation** (linear-algebra) — drag the two basis vectors of a 2×2 matrix and
+   watch the plane, its grid and the unit square deform; show the determinant as the signed
+   area of that square, eigenvectors as the lines that don't turn.
 3. **Neural network** (machine-learning) — a small MLP; layers as planes, weights as edge
    thickness/colour, a live forward pass on a 2D classification problem, train with the
    optimizers from this release.

@@ -28,6 +28,14 @@ const GRID_FLOATS = 14 * 2 * 3;
 const DET_EPS = 1e-6;
 /** Half-width of the rectangle that stands in for a collapsed square. */
 const COLLAPSED_HALF_WIDTH = 0.02;
+/** Fill alpha for a determinant that keeps orientation. */
+const FILL_OPACITY = 0.35;
+/**
+ * Fill alpha for the warn case. The light palette's `--warn` is a dark gold,
+ * which at 0.35 over the near-white page washes out to a neutral beige; the
+ * extra alpha is what keeps "orientation reversed" readable in both themes.
+ */
+const WARN_FILL_OPACITY = 0.45;
 /** Clipped grid segments shorter than this have collapsed to a point. */
 const SEGMENT_EPS = 1e-9;
 
@@ -117,7 +125,7 @@ export function createPlane(theme: ThemeColors, bound = 5): Plane {
     depthTest: false,
     depthWrite: false,
     side: DoubleSide,
-    opacity: 0.35,
+    opacity: FILL_OPACITY,
   });
   const fill = new Mesh(fillGeometry, fillMaterial);
   fill.renderOrder = 5;
@@ -132,11 +140,18 @@ export function createPlane(theme: ThemeColors, bound = 5): Plane {
   const col1: [number, number] = [0, 0];
   const col2: [number, number] = [0, 0];
 
+  /** Paints the fill for a determinant: accent when orientation holds, warn otherwise. */
+  function paintFill(detMt: number): void {
+    const warn = detMt <= DET_EPS;
+    fillMaterial.color.copy(warn ? theme.warn : theme.accent);
+    fillMaterial.opacity = warn ? WARN_FILL_OPACITY : FILL_OPACITY;
+  }
+
   function applyTheme(): void {
     reference.material.color.copy(theme.line);
     grid.material.color.copy(theme.soft);
     ghost.material.color.copy(theme.faint);
-    fillMaterial.color.copy(lastDet > DET_EPS ? theme.accent : theme.warn);
+    paintFill(lastDet);
   }
   applyTheme();
   theme.addEventListener("change", applyTheme);
@@ -209,7 +224,7 @@ export function createPlane(theme: ThemeColors, bound = 5): Plane {
       fillGeometry.computeBoundingSphere();
 
       lastDet = detMt;
-      fillMaterial.color.copy(detMt > DET_EPS ? theme.accent : theme.warn);
+      paintFill(detMt);
     },
 
     setShow(show: { grid: boolean; ghost: boolean }): void {

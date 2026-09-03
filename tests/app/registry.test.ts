@@ -13,7 +13,6 @@ describe("registry", () => {
   }> = [
     { id: "derivative-tangent", topic: "calculus" },
     { id: "chain-rule-graph", topic: "calculus" },
-    { id: "matrix-transformation", topic: "linear-algebra" },
     { id: "backprop-graph", topic: "machine-learning" },
     { id: "neural-network", topic: "machine-learning" },
     { id: "gpt-transformer", topic: "machine-learning" },
@@ -34,6 +33,19 @@ describe("registry", () => {
     expect(entry).toBeDefined();
     expect(entry?.status).toBe("ready");
     expect(typeof (entry as { mount?: unknown } | undefined)?.mount).toBe("function");
+  });
+
+  it("has the matrix transformation visualization ready to mount", () => {
+    const entry = findEntry("linear-algebra", "matrix-transformation");
+    expect(entry).toBeDefined();
+    expect(entry?.status).toBe("ready");
+    expect(typeof (entry as { mount?: unknown } | undefined)?.mount).toBe("function");
+    expect(entry?.summary).not.toContain("cube");
+  });
+
+  it("lists matrix transformation as the only linear algebra entry", () => {
+    const linearAlgebra = REGISTRY.filter((entry) => entry.topic === "linear-algebra");
+    expect(linearAlgebra.map((entry) => entry.id)).toEqual(["matrix-transformation"]);
   });
 
   it("lists gradient descent first among the machine learning entries", () => {

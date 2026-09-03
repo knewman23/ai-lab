@@ -5,14 +5,22 @@ a study tool and a portfolio piece. Live at
 [knewman23.github.io/ai-lab](https://knewman23.github.io/ai-lab/).
 
 ![Gradient descent on a loss surface](docs/screenshots/gradient-descent-light.png)
+![Matrix transformation](docs/screenshots/matrix-transformation-light.png)
 
 ## What's in it
 
-The first release ships one scene: gradient descent on a draggable 3D loss surface. Drag
-the ball anywhere on the surface and watch the gradient arrow and tangent plane follow it,
-pick SGD, momentum or Adam and step or run the optimizer to trace its path, switch between
-five surfaces (a convex bowl, an elongated bowl, a saddle, Himmelblau's function and the
-Rosenbrock valley), and read live KaTeX equations and readouts that update as you go.
+Two scenes so far.
+
+**Gradient descent** on a draggable 3D loss surface. Drag the ball anywhere on the surface
+and watch the gradient arrow and tangent plane follow it, pick SGD, momentum or Adam and
+step or run the optimizer to trace its path, switch between five surfaces (a convex bowl,
+an elongated bowl, a saddle, Himmelblau's function and the Rosenbrock valley), and read
+live KaTeX equations and readouts that update as you go.
+
+**Matrix transformation** on the plane. Drag the tips of the two basis vectors, or type the
+four entries, and watch the grid and the unit square deform under the matrix; the fill turns
+warn-coloured when the determinant flips sign, the eigenvectors are drawn as the lines that
+don't turn, and an Animate slider morphs the whole plane from the identity.
 
 ## Run it
 
@@ -105,9 +113,10 @@ Then register it in `src/app/registry.ts`.
 
 ## Roadmap
 
-1. Backprop graph (machine learning) — the `Value` autograd graph laid out in 3D.
-2. Matrix transformation (linear algebra) — drag basis vectors, watch a cube and point
-   cloud deform, see determinant as volume and eigenvectors as the lines that don't turn.
+1. ~~Matrix transformation (linear algebra)~~ — shipped: drag the two basis vectors of a 2×2
+   matrix, watch the plane and unit square deform, see the determinant as signed area and
+   eigenvectors as the lines that don't turn.
+2. Backprop graph (machine learning) — the `Value` autograd graph laid out in 3D.
 3. Neural network (machine learning) — a small MLP with a live forward pass and training.
 4. GPT transformer (machine learning) — token embeddings, attention heads, residual stream.
 5. Derivative & tangent explorer (calculus) — 1D secant-to-tangent limit animation.

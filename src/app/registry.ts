@@ -1,4 +1,5 @@
 import { gradientDescent } from "../viz/gradient-descent";
+import { matrixTransformation } from "../viz/matrix-transformation";
 import type { RegistryEntry } from "../viz/types";
 
 export const REGISTRY: readonly RegistryEntry[] = [
@@ -18,14 +19,7 @@ export const REGISTRY: readonly RegistryEntry[] = [
       "Follow how a change at the input of a composed function propagates through each nested layer.",
     status: "soon",
   },
-  {
-    id: "matrix-transformation",
-    topic: "linear-algebra",
-    title: "Matrix transformation",
-    summary:
-      "Drag the basis vectors and watch a unit cube deform, with the determinant shown as volume and eigenvectors as the lines that don't turn.",
-    status: "soon",
-  },
+  matrixTransformation,
   gradientDescent,
   {
     id: "backprop-graph",

@@ -29,12 +29,7 @@ describe("PRESETS", () => {
     expect(PRESETS.scale).toEqual({ title: "Scale", m: [2, 0, 0, 0.5] });
     expect(PRESETS.shear).toEqual({ title: "Shear", m: [1, 1, 0, 1] });
     expect(PRESETS.rotation.title).toBe("Rotation 45°");
-    expect(PRESETS.rotation.m).toEqual([
-      Math.SQRT1_2,
-      -Math.SQRT1_2,
-      Math.SQRT1_2,
-      Math.SQRT1_2,
-    ]);
+    expect(PRESETS.rotation.m).toEqual([Math.SQRT1_2, -Math.SQRT1_2, Math.SQRT1_2, Math.SQRT1_2]);
     expect(PRESETS.reflection).toEqual({ title: "Reflection across x", m: [1, 0, 0, -1] });
     expect(PRESETS.projection).toEqual({ title: "Projection onto x", m: [1, 0, 0, 0] });
   });
