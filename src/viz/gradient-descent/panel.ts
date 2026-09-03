@@ -41,7 +41,9 @@ export function createGdPanel(
   const panel = createPanel();
   host.append(panel.el);
 
-  const surfaceSection = panel.section("Surface");
+  // One "Setup" section: each widget carries its own label, so per-widget headings would repeat them.
+  const setupSection = panel.section("Setup");
+  const surfaceSection = setupSection;
   const surface = createSelect({
     label: "Surface",
     options: SURFACE_KEYS.map((key) => ({ value: key, title: SURFACES[key].title })),
@@ -50,7 +52,7 @@ export function createGdPanel(
   });
   surfaceSection.append(surface.el);
 
-  const optimizerSection = panel.section("Optimizer");
+  const optimizerSection = setupSection;
   const optimizer = createSelect({
     label: "Optimizer",
     options: OPTIMIZER_KEYS.map((key) => ({ value: key, title: OPTIMIZERS[key].title })),
@@ -59,7 +61,7 @@ export function createGdPanel(
   });
   optimizerSection.append(optimizer.el);
 
-  const lrSection = panel.section("Learning rate");
+  const lrSection = setupSection;
   const lr = createLogSlider({
     label: "Learning rate",
     min: 1e-3,
