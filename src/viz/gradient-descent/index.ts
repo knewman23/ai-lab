@@ -7,6 +7,7 @@ import type { Visualization, VizHost, VizInstance } from "../types";
 import { createContourLines } from "./contour-lines";
 import { attachDrag } from "./drag";
 import { frameFor, type Framing } from "./framing";
+import { createUsageHint, type UsageHint } from "./hint";
 import { createMarker } from "./marker";
 import { createGdPanel, type GdPanel } from "./panel";
 import { createPathLine } from "./path-line";
@@ -127,6 +128,7 @@ function mount(host: VizHost): VizInstance {
   }
 
   let detachDrag: (() => void) | undefined;
+  let hint: UsageHint | undefined;
 
   try {
     panel = createGdPanel(
@@ -150,16 +152,24 @@ function mount(host: VizHost): VizInstance {
       { backend: backendName(host.renderer) },
     );
 
+    hint = createUsageHint(host.canvasContainer);
+
     detachDrag = attachDrag({
       canvas: host.renderer.domElement,
       camera: kit.camera,
       controls: kit.controls,
       hitTarget: marker.hitTarget,
+      surfaceTarget: surfaceMesh.group,
       getSurface: () => SURFACES[state.surface],
       getPosition: () => state.pos,
-      onDrag: (p) => apply(drag(state, p)),
+      onDrag: (p) => {
+        // The first move of the ball is proof the hint has been read.
+        hint?.hide();
+        apply(drag(state, p));
+      },
     });
   } catch (error) {
+    hint?.dispose();
     panel?.dispose();
     unwind();
     throw error;
@@ -192,6 +202,7 @@ function mount(host: VizHost): VizInstance {
     dispose(): void {
       host.theme.removeEventListener("change", onThemeChange);
       detachDrag?.();
+      hint?.dispose();
       path.dispose();
       marker.dispose();
       contours.dispose();

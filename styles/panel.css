@@ -215,3 +215,60 @@ input[type="range"]::-moz-range-track {
   overflow-x: auto;
   color: var(--ink);
 }
+
+/* ---------- on-canvas usage hint ---------- */
+.canvas-hint {
+  position: absolute;
+  left: 16px;
+  bottom: 16px;
+  z-index: 1;
+  max-width: 320px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  padding: 12px 14px;
+  color: var(--soft);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.canvas-hint h3 {
+  margin: 0 0 8px;
+}
+.canvas-hint ul {
+  margin: 0;
+  padding-left: 18px;
+}
+.canvas-hint li + li {
+  margin-top: 6px;
+}
+.canvas-hint button {
+  margin-top: 12px;
+  padding: 5px 12px;
+  font-size: 12px;
+}
+
+/* Narrow viewports get the one line that matters and no heading. */
+@media (max-width: 800px) {
+  .canvas-hint {
+    left: 12px;
+    right: 12px;
+    bottom: 12px;
+    max-width: none;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .canvas-hint h3,
+  .canvas-hint li + li {
+    display: none;
+  }
+  .canvas-hint ul {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .canvas-hint button {
+    margin-top: 0;
+    flex-shrink: 0;
+  }
+}

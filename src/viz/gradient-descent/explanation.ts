@@ -16,7 +16,7 @@ export function createExplanation(): Explanation {
 
   const intro = document.createElement("p");
   intro.textContent =
-    "The surface is the loss as a function of two parameters, x and y. The ball is the current parameter vector; its height is the loss at that point.";
+    "The surface is the loss as a function of two parameters, x and y. The ball is the current parameter vector; its height is the loss at that point. Drag the ball, or click anywhere on the surface, to start from a different point.";
   el.append(intro);
 
   const gradHeading = document.createElement("h3");

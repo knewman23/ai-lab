@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { createThemeColors } from "../../../src/core/theme";
 import { gradientDescent } from "../../../src/viz/gradient-descent";
 import type { Renderer, VizHost } from "../../../src/viz/types";
@@ -21,6 +21,12 @@ function host(): { host: VizHost; theme: ReturnType<typeof createThemeColors> } 
   };
 }
 
+const HINT_KEY = "ai-lab.hint.gradient-descent";
+
+afterEach(() => {
+  localStorage.clear();
+});
+
 describe("gradientDescent.mount", () => {
   it("renders the first frame, then idles until something changes", () => {
     const { host: h } = host();
@@ -41,5 +47,27 @@ describe("gradientDescent.mount", () => {
       viz.dispose();
     }).not.toThrow();
     expect(remove).toHaveBeenCalledWith("change", expect.any(Function));
+  });
+
+  it("shows the usage hint over the canvas until it is dismissed", () => {
+    const { host: h } = host();
+    const viz = gradientDescent.mount(h);
+
+    const button = h.canvasContainer.querySelector<HTMLButtonElement>(".canvas-hint button");
+    expect(button).not.toBeNull();
+    button?.click();
+    expect(h.canvasContainer.querySelector(".canvas-hint")).toBeNull();
+
+    viz.dispose();
+  });
+
+  it("leaves the hint off once a previous visit dismissed it", () => {
+    localStorage.setItem(HINT_KEY, "1");
+    const { host: h } = host();
+    const viz = gradientDescent.mount(h);
+
+    expect(h.canvasContainer.querySelector(".canvas-hint")).toBeNull();
+
+    viz.dispose();
   });
 });
