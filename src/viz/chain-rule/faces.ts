@@ -6,13 +6,20 @@ import { axisSegments, outlineSegments } from "./faces-geometry";
 
 export interface Faces {
   readonly group: Group;
-  /** The front wall (y = 0): the surface a click lands on to place x. */
+  /**
+   * The front wall (y = 0): the surface a click lands on to place x. It shares
+   * its geometry and material with the other two faces; split them before
+   * styling one face on its own.
+   */
   readonly front: Mesh;
   dispose(): void;
 }
 
 /** Edge of each square face. */
 const SIZE = 6;
+/** Half-edge: the distance from a face's centre to its edges. */
+const HALF = SIZE / 2;
+/** Translucent enough that lines and curves behind a face stay readable. */
 const OPACITY = 0.35;
 
 /**
@@ -33,13 +40,13 @@ export function createFaces(theme: ThemeColors): Faces {
   // its normal points along the axis it holds fixed, then moved to the face centre.
   const front = new Mesh(geometry, material);
   front.rotation.x = Math.PI / 2; // normal +z -> -y: the plane y = 0
-  front.position.set(0, 0, 3);
+  front.position.set(0, 0, HALF);
   const side = new Mesh(geometry, material);
   side.rotation.y = Math.PI / 2; // normal +z -> +x: the plane x = -3
-  side.position.set(-3, 3, 3);
+  side.position.set(-HALF, HALF, HALF);
   const floor = new Mesh(geometry, material); // already the plane z = 0
-  floor.position.set(0, 3, 0);
-  for (const face of [front, side, floor]) face.renderOrder = 0;
+  floor.position.set(0, HALF, 0);
+  // The faces keep Three's default renderOrder of 0, matching the outline layer; the axes layer sits above at 1.
 
   const outline = outlineSegments();
   const outlineLayer = lineLayer(outline.length * 2, 0, { depth: true });

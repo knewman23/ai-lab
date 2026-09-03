@@ -1,5 +1,5 @@
 import { clipSegment } from "../../core/math/matrix2";
-import { commit, type Layer, type Vec3 } from "./layer";
+import { commit, type Layer, type Segment } from "./layer";
 
 /**
  * Appends a sampled polyline to a buffer as consecutive segments, starting at
@@ -99,10 +99,7 @@ export function writePoints(layer: Layer, points: readonly (readonly [number, nu
 }
 
 /** Writes world-space segments verbatim into a `{ depth: true }` layer and publishes them. */
-export function writeWorldSegments(
-  layer: Layer,
-  segments: readonly (readonly [Vec3, Vec3])[],
-): void {
+export function writeWorldSegments(layer: Layer, segments: readonly Segment[]): void {
   if (import.meta.env.DEV && layer.kind !== "world") {
     throw new Error(`world write into a ${layer.kind} layer; create it with { depth: true }`);
   }

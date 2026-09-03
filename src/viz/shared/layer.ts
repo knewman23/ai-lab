@@ -3,6 +3,9 @@ import { BufferAttribute, BufferGeometry, LineBasicMaterial, LineSegments } from
 /** A world-space point. */
 export type Vec3 = readonly [number, number, number];
 
+/** A world-space segment: two endpoints. */
+export type Segment = readonly [Vec3, Vec3];
+
 /**
  * An axis-aligned face of the scene box that a layer can draw on. Centred
  * face-local (a, b) lands at world `centre + (a, b)` along `axes`, with the
