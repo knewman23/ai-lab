@@ -47,6 +47,25 @@ describe("primeSamples", () => {
       }
     }
   });
+
+  it("clamps sqrtabs to the band on both arms near the singularity", () => {
+    const runs = primeSamples(FNS.sqrtabs, 241);
+    expect(runs.length).toBe(2);
+    const [left, right] = runs as readonly [
+      { X: Float32Array; Z: Float32Array },
+      { X: Float32Array; Z: Float32Array },
+    ];
+
+    // The left arm approaches 0 from below: f' -> -infinity, clamped to the band's low end.
+    const leftNearZero = left.X[left.X.length - 1] as number;
+    expect(leftNearZero).toBeLessThan(0);
+    expect(left.Z[left.Z.length - 1]).toBeCloseTo(BAND[0], 9);
+
+    // The right arm approaches 0 from above: f' -> +infinity, clamped to the band's high end.
+    const rightNearZero = right.X[0] as number;
+    expect(rightNearZero).toBeGreaterThan(0);
+    expect(right.Z[0]).toBeCloseTo(BAND[1], 9);
+  });
 });
 
 describe("zoomSamples", () => {
@@ -74,8 +93,8 @@ describe("zoomSamples", () => {
 
     expect(X[120]).toBeCloseTo(0, 9);
     expect(Z[120]).toBeCloseTo(0, 9);
-    expect(X[0]).toBeGreaterThanOrEqual(-3 - 1e-6);
-    expect(X[n - 1]).toBeLessThanOrEqual(3 + 1e-6);
+    expect(X[0]).toBeCloseTo(-3, 9);
+    expect(X[n - 1]).toBeCloseTo(3, 9);
   });
 
   it("converges to the tangent as K grows: max deviation falls at least 3x per zoom step", () => {

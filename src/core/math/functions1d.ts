@@ -33,7 +33,8 @@ export const Z0 = -6;
 /** Display band the derivative curve is scaled/clamped into. */
 export const BAND = [-8.5, -3.5] as const satisfies readonly [number, number];
 
-const SINGULAR_EPS = 1e-9;
+/** Distance from a singular point (or the domain edge) below which it is treated as reached. */
+export const SINGULAR_EPS = 1e-9;
 
 function sign(x: number): number {
   return x < 0 ? -1 : 1;
@@ -141,9 +142,12 @@ export function secantSlope(fn: Fn1D, x: number, h: number): number {
   return (fn.f(x + h) - fn.f(x)) / h;
 }
 
+/** Below this remaining room, effectiveH reports no secant is possible. */
+const MIN_H = 1e-9;
+
 /** Clips h so x + h stays within the domain's right edge; null when no room remains. */
 export function effectiveH(x: number, h: number): number | null {
   const room = DOMAIN[1] - x;
   const clipped = Math.min(h, room);
-  return clipped < SINGULAR_EPS ? null : clipped;
+  return clipped < MIN_H ? null : clipped;
 }

@@ -1,6 +1,4 @@
-import { BAND, DOMAIN, type Fn1D, Z0 } from "./functions1d";
-
-const SINGULAR_EPS = 1e-9;
+import { BAND, DOMAIN, type Fn1D, SINGULAR_EPS, Z0 } from "./functions1d";
 
 /** Even samples of the main curve over the domain: X in [-3, 3], Z = scale * f(X). */
 export function curveSamples(fn: Fn1D, n = 241): { X: Float32Array; Z: Float32Array } {
@@ -22,7 +20,14 @@ function clampBand(z: number): number {
 /**
  * Samples of the derivative curve, split into separate runs at `singularAt` so a jump or
  * vertical tangent is drawn as a gap rather than a riser. Functions with no singularity produce
- * a single run.
+ * a single run of length `n`; a function with a singularity produces two runs whose lengths sum
+ * to `n` or `n - 1` (one fewer when a grid sample lands exactly on the singularity, in which case
+ * that sample is dropped rather than assigned to either run). The return type is
+ * `readonly { X: Float32Array; Z: Float32Array }[]`: a variable-length array of runs.
+ *
+ * A run boundary is placed wherever consecutive grid samples straddle `singularAt` (one on each
+ * side, by sign of `x - singularAt`) as well as at an exact hit, so the split is correct for any
+ * `n` and any `singularAt`, not just grid points that land exactly on it.
  */
 export function primeSamples(fn: Fn1D, n = 241): readonly { X: Float32Array; Z: Float32Array }[] {
   const [lo, hi] = DOMAIN;
@@ -34,11 +39,23 @@ export function primeSamples(fn: Fn1D, n = 241): readonly { X: Float32Array; Z: 
   const singular = fn.singularAt;
   let current: number[] = [];
   const segments: number[][] = [current];
+  let prevSide: number | null = null;
   for (const x of xs) {
-    if (singular !== null && Math.abs(x - singular) < SINGULAR_EPS) {
-      current = [];
-      segments.push(current);
-      continue;
+    if (singular !== null) {
+      const side = x - singular;
+      if (Math.abs(side) < SINGULAR_EPS) {
+        // Exact hit: drop this sample and start a fresh run.
+        current = [];
+        segments.push(current);
+        prevSide = null;
+        continue;
+      }
+      if (prevSide !== null && prevSide * side < 0) {
+        // Straddled the singularity between the previous sample and this one.
+        current = [];
+        segments.push(current);
+      }
+      prevSide = side;
     }
     current.push(x);
   }
