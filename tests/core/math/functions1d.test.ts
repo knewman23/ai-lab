@@ -1,27 +1,16 @@
 import { describe, expect, it } from "vitest";
-import {
-  BAND,
-  DOMAIN,
-  FN_KEYS,
-  FNS,
-  Z0,
-  curveSamples,
-  effectiveH,
-  primeSamples,
-  secantSlope,
-  zoomSamples,
-} from "../../../src/core/math/functions1d";
+import { DOMAIN, FN_KEYS, FNS, effectiveH, secantSlope } from "../../../src/core/math/functions1d";
 
-/** Small deterministic LCG so domain sampling is reproducible across runs. */
-function makeLcg(seed: number): () => number {
-  let state = seed >>> 0;
-  return (): number => {
-    state = (Math.imul(1103515245, state) + 12345) & 0x7fffffff;
-    return state / 0x7fffffff;
-  };
-}
+/**
+ * Fixed sample of 25 x values spread across the domain, none within 0.05 of 0 (where `abs` and
+ * `sqrtabs` are not differentiable), so the finite-difference check below is reproducible.
+ */
+const SAMPLE_XS: readonly number[] = [
+  -2.88, -2.64, -2.4, -2.16, -1.92, -1.68, -1.44, -1.2, -0.96, -0.72, -0.48, -0.24, 0.1, 0.24, 0.48,
+  0.72, 0.96, 1.2, 1.44, 1.68, 1.92, 2.16, 2.4, 2.64, 2.88,
+];
 
-/** Central-difference approximation of a scalar function's derivative. */
+/** Central-difference approximation of a scalar function's derivative: (f(x+h) - f(x-h)) / 2h. */
 function centralDifference1d(f: (x: number) => number, x: number, h = 1e-5): number {
   return (f(x + h) - f(x - h)) / (2 * h);
 }
@@ -73,19 +62,40 @@ describe("FN_KEYS and FNS table", () => {
       expect(fn.hint.length).toBeGreaterThan(0);
     }
   });
+
+  it("matches the spec's titles", () => {
+    expect(FNS.square.title).toBe("x²");
+    expect(FNS.cubic.title).toBe("x³ − 3x");
+    expect(FNS.sine.title).toBe("sin x");
+    expect(FNS.exp.title).toBe("eˣ⁄5");
+    expect(FNS.abs.title).toBe("|x|");
+    expect(FNS.sqrtabs.title).toBe("√|x|");
+  });
+
+  it("matches the spec's KaTeX strings for f", () => {
+    expect(FNS.square.tex).toBe("x^2");
+    expect(FNS.cubic.tex).toBe("x^3 - 3x");
+    expect(FNS.sine.tex).toBe("\\sin x");
+    expect(FNS.exp.tex).toBe("e^{x}/5");
+    expect(FNS.abs.tex).toBe("|x|");
+    expect(FNS.sqrtabs.tex).toBe("\\sqrt{|x|}");
+  });
+
+  it("matches the spec's KaTeX strings for f'", () => {
+    expect(FNS.square.texPrime).toBe("2x");
+    expect(FNS.cubic.texPrime).toBe("3x^2 - 3");
+    expect(FNS.sine.texPrime).toBe("\\cos x");
+    expect(FNS.exp.texPrime).toBe("e^{x}/5");
+    expect(FNS.abs.texPrime).toBe("\\operatorname{sign}(x)");
+    expect(FNS.sqrtabs.texPrime).toBe("\\frac{\\operatorname{sign}(x)}{2\\sqrt{|x|}}");
+  });
 });
 
 describe("value derivatives vs finite differences", () => {
   for (const key of FN_KEYS) {
-    it(`${key}: value derivative matches central differences at 25 seeded points`, () => {
+    it(`${key}: value derivative matches central differences at 25 fixed points`, () => {
       const fn = FNS[key];
-      const rand = makeLcg(key.length * 7919 + 17);
-      let count = 0;
-      while (count < 25) {
-        const x = DOMAIN[0] + rand() * (DOMAIN[1] - DOMAIN[0]);
-        if (Math.abs(x) <= 0.05) continue;
-        count++;
-
+      for (const x of SAMPLE_XS) {
         const d = fn.d(x);
         expect(d.kind).toBe("value");
         if (d.kind !== "value") continue;
@@ -115,6 +125,14 @@ describe("non-differentiable points", () => {
     const left = FNS.abs.d(-0.5);
     expect(left.kind).toBe("value");
     if (left.kind === "value") expect(left.v).toBe(-1);
+  });
+
+  it("treats the 1e-9 threshold as the boundary between jump and value", () => {
+    expect(FNS.abs.d(1e-12)).toEqual({ kind: "jump", left: -1, right: 1 });
+
+    const beyond = FNS.abs.d(1e-6);
+    expect(beyond.kind).toBe("value");
+    if (beyond.kind === "value") expect(beyond.v).toBe(1);
   });
 });
 
@@ -171,86 +189,5 @@ describe("band properties on a 601-sample grid", () => {
       }
       expect(max).toBeLessThanOrEqual(2.5 + 1e-9);
     }
-  });
-});
-
-describe("curveSamples", () => {
-  it("returns 241 evenly spaced X over the domain and Z = scale * f(X)", () => {
-    const fn = FNS.square;
-    const { X, Z } = curveSamples(fn, 241);
-    expect(X.length).toBe(241);
-    expect(Z.length).toBe(241);
-    expect(X[0]).toBeCloseTo(DOMAIN[0], 9);
-    expect(X[240]).toBeCloseTo(DOMAIN[1], 9);
-    expect(X[120]).toBeCloseTo(0, 9);
-
-    for (let i = 0; i < 241; i++) {
-      expect(Z[i]).toBeCloseTo(fn.scale * fn.f(X[i] as number), 5);
-    }
-  });
-});
-
-describe("primeSamples", () => {
-  it("returns a single run for functions with no singularity", () => {
-    for (const key of FN_KEYS) {
-      if (FNS[key].singularAt !== null) continue;
-      const fn = FNS[key];
-      const runs = primeSamples(fn, 241);
-      expect(runs.length).toBe(1);
-      const { X, Z } = runs[0] as { X: Float32Array; Z: Float32Array };
-      for (let i = 0; i < X.length; i++) {
-        const d = fn.d(X[i] as number);
-        expect(d.kind).toBe("value");
-        if (d.kind !== "value") continue;
-        const expectedZ = Math.max(BAND[0], Math.min(BAND[1], Z0 + fn.primeScale * d.v));
-        expect(Z[i]).toBeCloseTo(expectedZ, 5);
-      }
-    }
-  });
-
-  it("splits into two runs at the singularity for abs and sqrtabs, omitting the singular sample", () => {
-    for (const key of ["abs", "sqrtabs"] as const) {
-      const fn = FNS[key];
-      const runs = primeSamples(fn, 241);
-      expect(runs.length).toBe(2);
-      for (const run of runs) {
-        for (const x of run.X) {
-          expect(Math.abs(x - (fn.singularAt ?? 0))).toBeGreaterThan(1e-9);
-        }
-      }
-    }
-  });
-});
-
-describe("zoomSamples", () => {
-  it("centers on the point and converges to the tangent as K grows", () => {
-    const fn = FNS.square;
-    const x = 1.5;
-    const n = 241;
-
-    function maxDev(K: number): number {
-      const { X, Z } = zoomSamples(fn, x, K, n);
-      expect(X[120]).toBeCloseTo(0, 9);
-      expect(Z[120]).toBeCloseTo(0, 9);
-      expect(X[0]).toBeGreaterThanOrEqual(-3 - 1e-6);
-      expect(X[n - 1]).toBeLessThanOrEqual(3 + 1e-6);
-
-      const d = fn.d(x);
-      expect(d.kind).toBe("value");
-      const slope = d.kind === "value" ? fn.scale * d.v : 0;
-
-      let max = 0;
-      for (let i = 0; i < n; i++) {
-        max = Math.max(max, Math.abs((Z[i] as number) - slope * (X[i] as number)));
-      }
-      return max;
-    }
-
-    const dev4 = maxDev(4);
-    const dev16 = maxDev(16);
-    const dev64 = maxDev(64);
-
-    expect(dev4).toBeGreaterThan(3 * dev16);
-    expect(dev16).toBeGreaterThan(3 * dev64);
   });
 });

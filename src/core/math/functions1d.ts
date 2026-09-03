@@ -147,5 +147,3 @@ export function effectiveH(x: number, h: number): number | null {
   const clipped = Math.min(h, room);
   return clipped < SINGULAR_EPS ? null : clipped;
 }
-
-export { curveSamples, primeSamples, zoomSamples } from "./functions1d-sampling";
