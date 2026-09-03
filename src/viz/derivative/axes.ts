@@ -1,6 +1,7 @@
-import { BufferAttribute, BufferGeometry, Group, LineBasicMaterial, LineSegments } from "three";
+import { Group } from "three";
 import { Z0 } from "../../core/math/functions1d";
 import type { ThemeColors } from "../types";
+import { CLIP, disposeLayers, lineLayer, writePoints } from "./layer";
 
 export interface Axes {
   readonly group: Group;
@@ -9,10 +10,8 @@ export interface Axes {
   dispose(): void;
 }
 
-/** Half-width of the drawn x axes, matching the display clip box. */
-const HALF_X = 3.5;
-/** Half-height of the main region's Z axis, matching the display clip box. */
-const HALF_Z = 3.4;
+/** Half-width of the drawn x axes and half-height of the main region's Z axis. */
+const [HALF_X, HALF_Z] = CLIP;
 /** Half-height of a unit tick on the main x axis. */
 const TICK = 0.08;
 /**
@@ -21,29 +20,6 @@ const TICK = 0.08;
  */
 const SEPARATOR_Z = -3.45;
 const ORDER = 1;
-
-/** One flat line layer over a buffer of (X, Z) endpoint pairs in the plane y = 0. */
-function lineLayer(points: readonly (readonly [number, number])[]): {
-  readonly object: LineSegments;
-  readonly geometry: BufferGeometry;
-  readonly material: LineBasicMaterial;
-} {
-  const positions = new Float32Array(points.length * 3);
-  for (let i = 0; i < points.length; i++) {
-    positions[i * 3] = points[i]![0];
-    positions[i * 3 + 2] = points[i]![1];
-  }
-  const geometry = new BufferGeometry();
-  geometry.setAttribute("position", new BufferAttribute(positions, 3));
-  const material = new LineBasicMaterial({
-    transparent: true,
-    depthTest: false,
-    depthWrite: false,
-  });
-  const object = new LineSegments(geometry, material);
-  object.renderOrder = ORDER;
-  return { object, geometry, material };
-}
 
 /** The unit ticks on the main x axis, skipping the origin where the Z axis already is. */
 function tickPoints(): (readonly [number, number])[] {
@@ -66,7 +42,8 @@ function tickPoints(): (readonly [number, number])[] {
  */
 export function createAxes(theme: ThemeColors): Axes {
   // Always drawn: the main region's own frame of reference.
-  const main = lineLayer([
+  const main = lineLayer(4, ORDER);
+  writePoints(main, [
     [-HALF_X, 0],
     [HALF_X, 0],
     [0, -HALF_Z],
@@ -74,13 +51,17 @@ export function createAxes(theme: ThemeColors): Axes {
   ]);
 
   // Domain-only: the band's axis and the unit ticks that scale the domain.
-  const band = lineLayer([[-HALF_X, Z0], [HALF_X, Z0], ...tickPoints()]);
+  const bandPoints: (readonly [number, number])[] = [[-HALF_X, Z0], [HALF_X, Z0], ...tickPoints()];
+  const band = lineLayer(bandPoints.length, ORDER);
+  writePoints(band, bandPoints);
 
-  const separator = lineLayer([
+  const separator = lineLayer(2, ORDER);
+  writePoints(separator, [
     [-HALF_X, SEPARATOR_Z],
     [HALF_X, SEPARATOR_Z],
   ]);
 
+  const layers = [main, band, separator];
   const group = new Group();
   group.add(main.object, band.object, separator.object);
 
@@ -91,8 +72,6 @@ export function createAxes(theme: ThemeColors): Axes {
   }
   applyTheme();
   theme.addEventListener("change", applyTheme);
-
-  const layers = [main, band, separator];
 
   return {
     group,
@@ -108,10 +87,7 @@ export function createAxes(theme: ThemeColors): Axes {
       // geometries and materials are not disposed a second time.
       group.removeFromParent();
       group.clear();
-      for (const layer of layers) {
-        layer.geometry.dispose();
-        layer.material.dispose();
-      }
+      disposeLayers(layers);
     },
   };
 }

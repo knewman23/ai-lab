@@ -8,6 +8,7 @@ import {
   SphereGeometry,
 } from "three";
 import type { ThemeColors } from "../types";
+import { CENTRE_Z } from "./frame-vertical";
 
 export interface Points {
   readonly group: Group;
@@ -27,9 +28,8 @@ const MAIN_RADIUS = 0.08;
 const SMALL_RADIUS = 0.06;
 const HIT_RADIUS = 0.2;
 const ORDER = 10;
-/** Covers X in [-3.5, 3.5] and, about its centre, Z in [-8.75, 3.25]. */
+/** Covers X in [-3.5, 3.5] and, about CENTRE_Z, Z in [-8.75, 3.25]. */
 const PLANE_SIZE: readonly [number, number] = [7, 12];
-const PLANE_CENTRE_Z = -2.75;
 
 /**
  * The three spheres in the scene, plus the two invisible targets the pointer
@@ -67,7 +67,7 @@ export function createPoints(theme: ThemeColors): Points {
   const clickPlane = new Mesh(planeGeometry, planeMaterial);
   // A PlaneGeometry stands in x/y; this lays it into the scene's y = 0 plane.
   clickPlane.rotation.x = Math.PI / 2;
-  clickPlane.position.set(0, 0, PLANE_CENTRE_Z);
+  clickPlane.position.set(0, 0, CENTRE_Z);
 
   const group = new Group();
   group.add(mainPoint, secantPoint, markerPoint, hitTarget, clickPlane);

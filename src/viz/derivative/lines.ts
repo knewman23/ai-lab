@@ -1,6 +1,7 @@
-import { BufferAttribute, BufferGeometry, Group, LineBasicMaterial, LineSegments } from "three";
+import { Group } from "three";
 import { clipSegment } from "../../core/math/matrix2";
 import type { ThemeColors } from "../types";
+import { CLIP, commit, disposeLayers, lineLayer, type Layer } from "./layer";
 
 /** The point and the two lines read off it, in display coordinates. */
 export interface LinesInput {
@@ -19,8 +20,6 @@ export interface TangentSecant {
   dispose(): void;
 }
 
-/** The display box both lines are clipped to; the zoomed curve uses the same one. */
-const CLIP: readonly [number, number] = [3.5, 3.4];
 /**
  * Half-length of the pre-clip secant, long enough to cross the box from any
  * point inside it whatever direction it runs.
@@ -32,28 +31,6 @@ const TANGENT_ORDER = 5;
 /** Below this the two secant points coincide and there is no direction to draw. */
 const ZERO = 1e-9;
 
-interface Layer {
-  readonly object: LineSegments;
-  readonly geometry: BufferGeometry;
-  readonly material: LineBasicMaterial;
-  readonly positions: Float32Array;
-}
-
-/** One flat two-endpoint line layer. */
-function lineLayer(renderOrder: number): Layer {
-  const positions = new Float32Array(6);
-  const geometry = new BufferGeometry();
-  geometry.setAttribute("position", new BufferAttribute(positions, 3));
-  const material = new LineBasicMaterial({
-    transparent: true,
-    depthTest: false,
-    depthWrite: false,
-  });
-  const object = new LineSegments(geometry, material);
-  object.renderOrder = renderOrder;
-  return { object, geometry, material, positions };
-}
-
 /**
  * The tangent at the point and the secant through it, each a single segment
  * clipped to the display box so a steep line stops at the separator instead of
@@ -64,9 +41,9 @@ function lineLayer(renderOrder: number): Layer {
  * a jump has no tangent, and a degenerate step has no secant.
  */
 export function createTangentSecant(theme: ThemeColors): TangentSecant {
-  const secant = lineLayer(SECANT_ORDER);
+  const secant = lineLayer(2, SECANT_ORDER);
   secant.material.opacity = SECANT_OPACITY;
-  const tangent = lineLayer(TANGENT_ORDER);
+  const tangent = lineLayer(2, TANGENT_ORDER);
 
   const group = new Group();
   group.add(secant.object, tangent.object);
@@ -93,8 +70,7 @@ export function createTangentSecant(theme: ThemeColors): TangentSecant {
     layer.positions[2] = az;
     layer.positions[3] = bx;
     layer.positions[5] = bz;
-    layer.geometry.getAttribute("position").needsUpdate = true;
-    layer.geometry.computeBoundingSphere();
+    commit(layer, 2);
   }
 
   /** Clips [a, b] to the display box and writes it; returns false if it misses. */
@@ -161,10 +137,7 @@ export function createTangentSecant(theme: ThemeColors): TangentSecant {
       // geometries and materials are not disposed a second time.
       group.removeFromParent();
       group.clear();
-      for (const layer of [secant, tangent]) {
-        layer.geometry.dispose();
-        layer.material.dispose();
-      }
+      disposeLayers([secant, tangent]);
     },
   };
 }
