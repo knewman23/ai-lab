@@ -1,7 +1,8 @@
 import { Group } from "three";
 import { clipSegment } from "../../core/math/matrix2";
 import type { ThemeColors } from "../types";
-import { CLIP, commit, disposeLayers, lineLayer, type Layer } from "./layer";
+import { commit, disposeLayers, lineLayer, type Layer } from "../shared/layer";
+import { CLIP } from "./clip";
 
 /** The point and the two lines read off it, in display coordinates. */
 export interface LinesInput {

@@ -1,7 +1,9 @@
 import { Group } from "three";
 import { Z0 } from "../../core/math/functions1d";
 import type { ThemeColors } from "../types";
-import { CLIP, disposeLayers, lineLayer, writePoints } from "./layer";
+import { disposeLayers, lineLayer } from "../shared/layer";
+import { writePoints } from "../shared/layer-write";
+import { CLIP } from "./clip";
 
 export interface Axes {
   readonly group: Group;

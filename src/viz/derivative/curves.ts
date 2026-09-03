@@ -2,15 +2,9 @@ import { Group } from "three";
 import type { Fn1D } from "../../core/math/functions1d";
 import { curveSamples, primeSamples, zoomSamples } from "../../core/math/sampling1d";
 import type { ThemeColors } from "../types";
-import {
-  CLIP,
-  commit,
-  disposeLayers,
-  lineLayer,
-  writeClippedPolyline,
-  writePoints,
-  writePolyline,
-} from "./layer";
+import { commit, disposeLayers, lineLayer } from "../shared/layer";
+import { writeClippedPolyline, writePoints, writePolyline } from "../shared/layer-write";
+import { CLIP } from "./clip";
 
 export interface Curves {
   readonly group: Group;
