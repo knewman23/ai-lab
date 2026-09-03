@@ -34,10 +34,12 @@ const NY = SEGMENTS + 1;
  * The loss surface: one 128x128 plane whose positions and vertex colours are
  * rewritten in place per surface, plus a faint wireframe sharing the geometry.
  *
- * PlaneGeometry lays vertices out row-major as `ix + NX * iy`, so grid index
- * `j * NX + i` addresses the same vertex. Mapping `j` to increasing y (the
- * plane maps it to decreasing y) reverses triangle winding, so the computed
- * normals are negated back to point up.
+ * PlaneGeometry lays vertices out row-major as `ix + NX * iy` with `iy`
+ * running along decreasing y, while the grid convention `j * NX + i` runs
+ * along increasing y. Positions are therefore written to the mirrored row
+ * `(NY - 1 - j) * NX + i`, which keeps the plane's index buffer front-facing
+ * and lets `computeVertexNormals` produce upward normals directly. Vertex
+ * colours use the same mirrored index.
  */
 export function createSurfaceMesh(theme: ThemeColors): SurfaceMesh {
   const geometry = new PlaneGeometry(1, 1, SEGMENTS, SEGMENTS);
@@ -71,8 +73,8 @@ export function createSurfaceMesh(theme: ThemeColors): SurfaceMesh {
   const group = new Group();
   group.add(surfaceMesh, wireMesh);
 
-  // Normalised heights in [0, 1], kept so a theme change recolours without
-  // re-evaluating f.
+  // Normalised heights in [0, 1], indexed by vertex (not grid) index, kept so
+  // a theme change recolours without re-evaluating f.
   const t = new Float32Array(count);
   const scratch = new Color();
 
@@ -113,23 +115,23 @@ export function createSurfaceMesh(theme: ThemeColors): SurfaceMesh {
         for (let i = 0; i < NX; i++) {
           const x = x0 + i * dx;
           const z = surface.scale * surface.f(x, y);
-          const v = j * NX + i;
-          heights[v] = z;
+          heights[j * NX + i] = z;
           if (z < min) min = z;
           if (z > max) max = z;
-          position.setXYZ(v, x, y, z);
+          position.setXYZ((NY - 1 - j) * NX + i, x, y, z);
         }
       }
 
       const span = max - min;
-      for (let v = 0; v < count; v++) t[v] = span > 0 ? (heights[v]! - min) / span : 0;
+      for (let j = 0; j < NY; j++) {
+        for (let i = 0; i < NX; i++) {
+          const z = heights[j * NX + i]!;
+          t[(NY - 1 - j) * NX + i] = span > 0 ? (z - min) / span : 0;
+        }
+      }
 
       position.needsUpdate = true;
       geometry.computeVertexNormals();
-      const normal = geometry.getAttribute("normal");
-      const normals = normal.array as Float32Array;
-      for (let n = 0; n < normals.length; n++) normals[n] = -normals[n]!;
-      normal.needsUpdate = true;
       geometry.computeBoundingSphere();
       recolour();
 
