@@ -65,7 +65,7 @@ the other index's value (equal), and `backward` accumulates both contributions, 
 
 | Key | Expression | Leaves (start, range) | Why |
 |---|---|---|---|
-| `neuron` (default) | o = tanh(x1·w1 + x2·w2 + b) | x1 2, x2 0, w1 −3, w2 1 (all [−4, 4]); b 6.8813735870195432 ([−8, 8]) | the notebook's neuron; 10 nodes, 14 steps |
+| `neuron` (default) | o = tanh(x1·w1 + x2·w2 + b) | x1 2, x2 0, w1 −3, w2 1 (all [−4, 4]); b 6.8813735870195432 ([−8, 8]) | the notebook's neuron; 10 nodes, 10 steps |
 | `product-sum` | d = a·b + c | a 2, b −3, c 10 (all [−10, 10]) | the smallest graph with both rules |
 | `shared-node` | L = e·e where e = a·b + c | a 2, b −3, c 10 | e has two consumers: its gradient accumulates from two paths |
 
