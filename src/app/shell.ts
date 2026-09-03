@@ -63,6 +63,10 @@ export function createShell(root: HTMLElement): void {
       header.setBreadcrumb([]);
       homePage = renderHome(REGISTRY);
       main.replaceChildren(homePage);
+      // `#/<topic>` lands on that topic's section; plain home starts at the top.
+      const target = route.topic ? homePage.querySelector(`#topic-${route.topic}`) : null;
+      if (target) target.scrollIntoView();
+      else window.scrollTo(0, 0);
       return;
     }
     homePage?.remove();

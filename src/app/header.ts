@@ -6,9 +6,12 @@ const THEME_BUTTON = `
     <span id="theme-text">Dark</span>
   </button>`;
 
+/** A breadcrumb part: plain text for the current page, or a link. */
+export type Crumb = string | { readonly text: string; readonly href: string };
+
 export interface Header {
   readonly el: HTMLElement;
-  setBreadcrumb(parts: readonly string[]): void;
+  setBreadcrumb(parts: readonly Crumb[]): void;
 }
 
 function homeLink(): HTMLAnchorElement {
@@ -57,12 +60,12 @@ export function renderHeader(): Header {
     el: band,
     setBreadcrumb(parts) {
       // `.lbl` uppercases; the separator matches the fixed part of the label.
-      // Topics have no page of their own in this release, so every crumb but
-      // the last links home; the last names the current page and stays text.
+      // Link crumbs navigate (e.g. `#/machine-learning` scrolls home to that
+      // topic); the last crumb names the current page and stays text.
       crumbs.replaceChildren(
-        ...parts.flatMap((part, i) => [
+        ...parts.flatMap((part) => [
           "\u00a0/\u00a0",
-          i < parts.length - 1 ? link("#/", part) : part,
+          typeof part === "string" ? part : link(part.href, part.text),
         ]),
       );
     },

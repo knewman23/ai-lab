@@ -304,6 +304,10 @@ a {
 .topic + .topic {
   margin-top: 48px;
 }
+.topic {
+  /* room for the sticky band when a topic crumb scrolls a section into view */
+  scroll-margin-top: 61px;
+}
 
 .topic h2 {
   margin: 0 0 18px;

@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { TOPICS } from "../../src/viz/types";
 import { describe, expect, it } from "vitest";
 import { renderHome } from "../../src/app/home";
 import type { RegistryEntry, VizInstance } from "../../src/viz/types";
@@ -45,6 +46,11 @@ describe("renderHome", () => {
     const card = el.querySelector<HTMLElement>(".card")!;
     expect(card.getAttribute("aria-disabled")).toBe("true");
     expect(card.querySelector(".visually-hidden")?.textContent).toBe("Coming soon");
+  });
+
+  it("gives each topic section an anchor id", () => {
+    const el = renderHome([]);
+    expect(sections(el).map((s) => s.id)).toEqual(TOPICS.map((t) => `topic-${t.slug}`));
   });
 
   it("renders one section per topic, in TOPICS order", () => {

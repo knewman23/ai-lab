@@ -19,6 +19,8 @@ describe("parseHash", () => {
     ],
     ["#/a/b/", { kind: "viz", topic: "a", id: "b" }],
     ["#/only-one", { kind: "home" }],
+    ["#/machine-learning", { kind: "home", topic: "machine-learning" }],
+    ["#/machine-learning/", { kind: "home", topic: "machine-learning" }],
     ["#/a/b/c", { kind: "home" }],
   ])("parses %s", (hash, expected) => {
     expect(parseHash(hash)).toEqual(expected);

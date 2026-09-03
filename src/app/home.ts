@@ -49,6 +49,7 @@ export function renderHome(entries: readonly RegistryEntry[]): HTMLElement {
 
   for (const topic of TOPICS) {
     const section = el("section", "topic");
+    section.id = `topic-${topic.slug}`;
     section.append(el("h2", undefined, topic.title));
 
     const inTopic = entries.filter((entry) => entry.topic === topic.slug);

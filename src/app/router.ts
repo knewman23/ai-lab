@@ -1,11 +1,12 @@
-import type { RegistryEntry, Visualization } from "../viz/types";
+import { TOPICS, type RegistryEntry, type TopicSlug, type Visualization } from "../viz/types";
 import { findEntry } from "./registry";
 
 export type Route =
-  { readonly kind: "home" } | { readonly kind: "viz"; readonly topic: string; readonly id: string };
+  | { readonly kind: "home"; readonly topic?: TopicSlug }
+  | { readonly kind: "viz"; readonly topic: string; readonly id: string };
 
 export type ResolvedRoute =
-  | { readonly kind: "home" }
+  | { readonly kind: "home"; readonly topic?: TopicSlug }
   | { readonly kind: "viz"; readonly entry: Visualization }
   | { readonly kind: "redirect" };
 
@@ -25,6 +26,12 @@ export function parseHash(hash: string): Route {
   }
 
   const segments = trimmed.split("/");
+  if (segments.length === 1) {
+    // `#/<topic>` is the home page scrolled to that topic; anything else is plain home.
+    const topic = decodeSegment(segments[0]!);
+    const known = TOPICS.find((t) => t.slug === topic);
+    return known ? { kind: "home", topic: known.slug } : { kind: "home" };
+  }
   if (segments.length !== 2) {
     return { kind: "home" };
   }
@@ -44,7 +51,7 @@ export function resolveRoute(
   find: (topic: string, id: string) => RegistryEntry | undefined,
 ): ResolvedRoute {
   if (route.kind === "home") {
-    return { kind: "home" };
+    return route.topic ? { kind: "home", topic: route.topic } : { kind: "home" };
   }
 
   const entry = find(route.topic, route.id);

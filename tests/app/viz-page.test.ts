@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import type { Crumb } from "../../src/app/header";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Loop } from "../../src/core/loop";
 import { createVizPage, type RendererResult } from "../../src/app/viz-page";
@@ -49,14 +50,14 @@ function viz(mount: Visualization["mount"], id = "one"): Visualization {
 
 interface Harness {
   main: HTMLElement;
-  crumbs: string[][];
+  crumbs: Crumb[][];
   loop: ReturnType<typeof fakeLoop>;
   page: ReturnType<typeof createVizPage>;
 }
 
 function harness(rendererReady: Promise<RendererResult>): Harness {
   const main = document.createElement("div");
-  const crumbs: string[][] = [];
+  const crumbs: Crumb[][] = [];
   const loop = fakeLoop();
   const page = createVizPage({
     main,
@@ -93,7 +94,7 @@ describe("createVizPage", () => {
 
     expect(mount).toHaveBeenCalledTimes(1);
     expect(loop.started).toBe(1);
-    expect(crumbs).toEqual([["Calculus", "One"]]);
+    expect(crumbs).toEqual([[{ text: "Calculus", href: "#/calculus" }, "One"]]);
     expect(main.querySelector(".viz-canvas canvas")).not.toBeNull();
     expect(main.querySelector(".notice")).toBeNull();
   });

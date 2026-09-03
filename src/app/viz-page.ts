@@ -96,7 +96,10 @@ export function createVizPage(deps: VizPageDeps): VizPage {
     current = token;
     const own = createVizFrame();
     frame = own;
-    deps.header.setBreadcrumb([topicTitle(entry.topic), entry.title]);
+    deps.header.setBreadcrumb([
+      { text: topicTitle(entry.topic), href: `#/${entry.topic}` },
+      entry.title,
+    ]);
     own.showLoading();
     deps.main.append(own.el);
 
