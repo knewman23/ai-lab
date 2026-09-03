@@ -61,7 +61,7 @@ function normalize(v: Vec2): Vec2 {
 function normalizeAndOrient(v: Vec2): Vec2 {
   const [nx, ny] = normalize(v);
   if (Math.abs(nx) < 1e-12) {
-    return ny < 0 ? [-nx, -ny] : [nx, ny];
+    return ny < 0 ? [0, -ny] : [nx, ny];
   }
   return nx < 0 ? [-nx, -ny] : [nx, ny];
 }
@@ -131,9 +131,10 @@ export function clipSegment(p: Vec2, q: Vec2, bound: number): readonly [Vec2, Ve
     return true;
   };
 
-  if (!clipEdge(-dx, p[0] - -bound)) return null;
+  // Left, right, bottom, top edges of [-bound, bound]^2, in that order.
+  if (!clipEdge(-dx, p[0] + bound)) return null;
   if (!clipEdge(dx, bound - p[0])) return null;
-  if (!clipEdge(-dy, p[1] - -bound)) return null;
+  if (!clipEdge(-dy, p[1] + bound)) return null;
   if (!clipEdge(dy, bound - p[1])) return null;
 
   const rp: Vec2 = [p[0] + t0 * dx, p[1] + t0 * dy];

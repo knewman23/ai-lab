@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { Vec2 } from "../../../src/core/math/numeric";
+import { magnitude, type Vec2 } from "../../../src/core/math/numeric";
 import {
   apply,
   clipSegment,
@@ -21,10 +21,6 @@ function makeLcg(seed: number): () => number {
     state = (Math.imul(1103515245, state) + 12345) & 0x7fffffff;
     return state / 0x7fffffff;
   };
-}
-
-function magnitude(v: Vec2): number {
-  return Math.hypot(v[0], v[1]);
 }
 
 describe("apply", () => {
@@ -149,6 +145,26 @@ describe("eigen", () => {
     expect(result.pairs[1]?.vector[1]).toBeCloseTo(1, 10);
   });
 
+  it("orients a diagonal-tie eigenvector as [0, 1] without emitting -0", () => {
+    const result = eigen([1, 0, 3, 1]);
+    if (result.kind !== "real") throw new Error("expected real");
+    const pair = result.pairs[0];
+    if (pair === undefined) throw new Error("expected a pair");
+    expect(pair.vector[0]).toBeCloseTo(0, 10);
+    expect(pair.vector[1]).toBeCloseTo(1, 10);
+    expect(Object.is(pair.vector[0], -0)).toBe(false);
+  });
+
+  it("orients a diagonal-tie eigenvector as [0, 1] without emitting -0 for a negated shear", () => {
+    const result = eigen([1, 0, -3, 1]);
+    if (result.kind !== "real") throw new Error("expected real");
+    const pair = result.pairs[0];
+    if (pair === undefined) throw new Error("expected a pair");
+    expect(pair.vector[0]).toBeCloseTo(0, 10);
+    expect(pair.vector[1]).toBeCloseTo(1, 10);
+    expect(Object.is(pair.vector[0], -0)).toBe(false);
+  });
+
   it("holds for 50 seeded random matrices with real distinct eigenvalues", () => {
     const rand = makeLcg(42);
     let checked = 0;
@@ -198,8 +214,8 @@ describe("clipSegment", () => {
     const p: Vec2 = [0, 0];
     const q: Vec2 = [10, 0];
     const result = clipSegment(p, q, bound);
-    expect(result).not.toBeNull();
-    const [rp, rq] = result as [Vec2, Vec2];
+    if (result === null) throw new Error("expected a clipped segment");
+    const [rp, rq] = result;
     expect(rp).toEqual([0, 0]);
     expect(rq[0]).toBeCloseTo(3, 10);
     expect(rq[1]).toBeCloseTo(0, 10);
@@ -209,8 +225,8 @@ describe("clipSegment", () => {
     const p: Vec2 = [-10, 0];
     const q: Vec2 = [10, 0];
     const result = clipSegment(p, q, bound);
-    expect(result).not.toBeNull();
-    const [rp, rq] = result as [Vec2, Vec2];
+    if (result === null) throw new Error("expected a clipped segment");
+    const [rp, rq] = result;
     expect(rp[0]).toBeCloseTo(-3, 10);
     expect(rp[1]).toBeCloseTo(0, 10);
     expect(rq[0]).toBeCloseTo(3, 10);
