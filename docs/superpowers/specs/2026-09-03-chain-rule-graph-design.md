@@ -263,7 +263,9 @@ README.md             a fourth "What's in it" paragraph (the roadmap never liste
 ```
 
 Testing beyond the unit tests above: the existing registry test covers the new entry; a
-mount/dispose test in the style of the other scenes (mock renderer) checks no geometry leaks;
+mount/dispose test in the style of the other scenes (mock renderer) checks the first frame renders,
+listeners are removed and the hint lifecycle works (geometry leaks are caught by the DEV check in
+the shell, not by scene tests);
 a manual pass (screenshot at the home framing, Δx at 2, 0.5 and 1e-3 on `sin3x`, each preset
 once, both drags, click-to-place, theme toggle) before merge.
 
