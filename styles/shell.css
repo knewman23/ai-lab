@@ -82,6 +82,15 @@ a {
   color: var(--band-ink);
   font-weight: 500;
 }
+/* ai-lab: the site name and topic crumbs link home. */
+.band .lbl a {
+  color: inherit;
+  text-decoration: none;
+}
+.band .lbl a:hover {
+  color: var(--band-ink);
+  text-decoration: underline;
+}
 .band nav {
   display: flex;
   align-items: center;

@@ -42,7 +42,7 @@ export function renderHeader(): Header {
   name.textContent = "KRYS NEWMAN";
   const crumbs = document.createElement("span");
   crumbs.className = "crumbs";
-  label.append(name, "\u00a0/\u00a0", "AI LAB", crumbs);
+  label.append(name, "\u00a0/\u00a0", link("#/", "AI LAB"), crumbs);
 
   const nav = document.createElement("nav");
   nav.setAttribute("aria-label", "Sections");
@@ -57,7 +57,14 @@ export function renderHeader(): Header {
     el: band,
     setBreadcrumb(parts) {
       // `.lbl` uppercases; the separator matches the fixed part of the label.
-      crumbs.textContent = parts.map((part) => `\u00a0/\u00a0${part}`).join("");
+      // Topics have no page of their own in this release, so every crumb but
+      // the last links home; the last names the current page and stays text.
+      crumbs.replaceChildren(
+        ...parts.flatMap((part, i) => [
+          "\u00a0/\u00a0",
+          i < parts.length - 1 ? link("#/", part) : part,
+        ]),
+      );
     },
   };
 }
