@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from "vitest";
-import { createReadout, fmt } from "../../src/ui/readout";
+import { createReadout, fmt, proseNum } from "../../src/ui/readout";
 
 describe("fmt", () => {
   it.each([
@@ -13,6 +13,16 @@ describe("fmt", () => {
     [2, "2"],
   ])("fmt(%p) === %p", (n, expected) => {
     expect(fmt(n)).toBe(expected);
+  });
+});
+
+describe("proseNum", () => {
+  it("spells a negative number with a typographic minus", () => {
+    expect(proseNum(-1.25)).toBe("\u22121.25");
+  });
+
+  it("leaves non-negative numbers as fmt does", () => {
+    expect(proseNum(6.40312)).toBe("6.403");
   });
 });
 

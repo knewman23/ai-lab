@@ -100,12 +100,20 @@ describe("createChainPanel", () => {
     const panel = mount({ ...handlers(), onShow });
     const inputs = toggles(panel.el);
     expect(inputs.length).toBe(4);
-    const keys = ["triangles", "secants", "tangents", "connectors"];
+    // Toggles start at initialState().show: triangles/secants/connectors on, tangents off.
+    const expected: [string, boolean][] = [
+      ["triangles", false],
+      ["secants", false],
+      ["tangents", true],
+      ["connectors", false],
+    ];
 
-    inputs.forEach((input, i) => {
+    expected.forEach(([key, on], i) => {
+      const input = inputs[i];
+      if (!input) throw new Error(`toggle ${key} not found`);
       input.checked = !input.checked;
       input.dispatchEvent(new Event("change"));
-      expect(onShow).toHaveBeenLastCalledWith(keys[i], input.checked);
+      expect(onShow).toHaveBeenLastCalledWith(key, on);
     });
   });
 

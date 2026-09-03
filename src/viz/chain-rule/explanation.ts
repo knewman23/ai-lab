@@ -1,5 +1,5 @@
 import { createEquation } from "../../ui/equation";
-import { fmt } from "../../ui/readout";
+import { fmt, proseNum } from "../../ui/readout";
 import type { ChainState, Derived } from "./state";
 
 /** The three prose sentences shown under the equations. */
@@ -19,16 +19,11 @@ export function derivativeText(v: number): string {
   return Number.isFinite(v) ? fmt(v) : "undefined";
 }
 
-/** Prose spells numbers with a typographic minus; the readouts keep `fmt`'s plain hyphen. */
-function prose(n: number): string {
-  return derivativeText(n).replace("-", "−");
-}
-
 function ruleText(state: ChainState, d: Derived): string {
   return (
-    `At x = ${prose(state.x)}: g′(x) = ${prose(d.dg)} on the front wall, ` +
-    `f′(u) = ${prose(d.df)} on the side wall, so the floor slope is ` +
-    `${prose(d.dg)} × ${prose(d.df)} = ${prose(d.dydx)}.`
+    `At x = ${proseNum(state.x)}: g′(x) = ${proseNum(d.dg)} on the front wall, ` +
+    `f′(u) = ${proseNum(d.df)} on the side wall, so the floor slope is ` +
+    `${proseNum(d.dg)} × ${proseNum(d.df)} = ${proseNum(d.dydx)}.`
   );
 }
 
@@ -37,12 +32,12 @@ function finiteText(d: Derived): string {
     return "Move x left of the edge to see the triangles.";
   }
   const { duDx, dyDu, dyDx } = d.deltas;
-  const lead = `With Δx = ${prose(d.dxEff)}: `;
+  const lead = `With Δx = ${proseNum(d.dxEff)}: `;
   if (dyDu === null) {
     return `${lead}Δu is 0 here, so the middle ratio is undefined, but Δy is 0 too and Δy/Δx = 0.`;
   }
   return (
-    `${lead}${prose(duDx)} × ${prose(dyDu)} = ${prose(dyDx)}. ` +
+    `${lead}${proseNum(duDx)} × ${proseNum(dyDu)} = ${proseNum(dyDx)}. ` +
     "The Δu leg is the same height on both walls; the Δy leg is the same depth on the side wall " +
     "and the floor. Shrink Δx and each ratio becomes its derivative."
   );

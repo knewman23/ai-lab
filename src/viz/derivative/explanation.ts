@@ -1,6 +1,6 @@
 import { FNS } from "../../core/math/functions1d";
 import { createEquation } from "../../ui/equation";
-import { fmt } from "../../ui/readout";
+import { fmt, proseNum } from "../../ui/readout";
 import type { DxState, derived } from "./state";
 
 export interface DxExplanation {
@@ -17,14 +17,9 @@ export function derivativeText(d: Derived["d"]): string {
   return fmt(d.v);
 }
 
-/** Prose spells numbers with a typographic minus; the readouts keep `fmt`'s plain hyphen. */
-function prose(n: number): string {
-  return fmt(n).replace("-", "\u2212");
-}
-
 function tangentText(state: DxState, d: Derived["d"]): string {
   if (d.kind === "jump") {
-    return `At x = ${fmt(state.x)} the left and right slopes differ (${prose(d.left)} and ${prose(d.right)}), so no tangent line is drawn.`;
+    return `At x = ${fmt(state.x)} the left and right slopes differ (${proseNum(d.left)} and ${proseNum(d.right)}), so no tangent line is drawn.`;
   }
   if (d.kind === "vertical") {
     return `At x = ${fmt(state.x)} the tangent is vertical, so f′(${fmt(state.x)}) is undefined.`;

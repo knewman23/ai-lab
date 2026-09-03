@@ -4,10 +4,10 @@ import { createPanel } from "../../ui/panel";
 import { fmt } from "../../ui/readout";
 import { createSelect } from "../../ui/select";
 import { createLogSlider } from "../../ui/slider";
-import { createToggle } from "../../ui/toggle";
+import { createToggle, type Toggle } from "../../ui/toggle";
 import { createExplanation } from "./explanation";
 import { createChainReadouts } from "./panel-readouts";
-import { DX_DEFAULT, type ChainState, type Derived, type ShowKey } from "./state";
+import { DX_DEFAULT, initialState, type ChainState, type Derived, type ShowKey } from "./state";
 
 export interface ChainPanelHandlers {
   onComp(key: CompKey): void;
@@ -71,11 +71,12 @@ export function createChainPanel(host: HTMLElement, handlers: ChainPanelHandlers
   panel.section("Run").append(runRow);
 
   const showSection = panel.section("Show");
-  const toggles = new Map<ShowKey, ReturnType<typeof createToggle>>();
+  const toggles = new Map<ShowKey, Toggle>();
+  const init = initialState().show;
   for (const { key, label } of SHOW_KEYS) {
     const toggle = createToggle({
       label,
-      checked: true,
+      checked: init[key],
       onChange: (on) => handlers.onShow(key, on),
     });
     toggles.set(key, toggle);

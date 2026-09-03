@@ -4,6 +4,11 @@ export function fmt(n: number, sig = 4): string {
   return Number(n.toPrecision(sig)).toString();
 }
 
+/** `fmt` for prose: spells the minus sign with a typographic minus. Readouts keep `fmt`'s plain hyphen. */
+export function proseNum(n: number): string {
+  return fmt(n).replaceAll("-", "\u2212");
+}
+
 export interface Readout {
   el: HTMLDListElement;
   set: (key: string, text: string) => void;
