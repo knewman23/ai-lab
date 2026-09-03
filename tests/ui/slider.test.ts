@@ -17,7 +17,13 @@ function output(el: HTMLElement): HTMLOutputElement {
 
 describe("createLogSlider", () => {
   it("positions the input at the log-mapped step for the initial value", () => {
-    const slider = createLogSlider({ label: "LR", min: 1e-3, max: 1, value: 0.1, onChange: () => {} });
+    const slider = createLogSlider({
+      label: "LR",
+      min: 1e-3,
+      max: 1,
+      value: 0.1,
+      onChange: () => {},
+    });
     expect(input(slider.el).value).toBe("667");
   });
 
@@ -42,7 +48,13 @@ describe("createLogSlider", () => {
   });
 
   it("shows the formatted value in the output element", () => {
-    const slider = createLogSlider({ label: "LR", min: 1e-3, max: 1, value: 0.1, onChange: () => {} });
+    const slider = createLogSlider({
+      label: "LR",
+      min: 1e-3,
+      max: 1,
+      value: 0.1,
+      onChange: () => {},
+    });
     expect(output(slider.el).textContent).toBe(formatLr(0.1));
   });
 
