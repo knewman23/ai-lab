@@ -1,7 +1,7 @@
 # Derivative and tangent explorer — a 1D function, its tangent, the secant limit and f′
 
 Date: 2026-09-03
-Status: owner delegated the design; spec under review (revision 2)
+Status: approved by spec review (revision 3)
 Parent: [AI Lab design](2026-09-03-ai-lab-design.md); sibling: [Matrix transformation](2026-09-03-matrix-transformation-design.md)
 Registry: replaces the `calculus` roadmap entry `derivative-tangent`
 
@@ -45,9 +45,15 @@ window [x − 3/K, x + 3/K] re-sampled with 241 points and drawn in display coor
 X = (x′ − x)·K, Z = s·(f(x′) − f(x))·K, so the point sits at (0, 0), the tangent keeps its display
 slope s·f′(x), and the curve converges to that line as K grows. The secant point at x + h is shown
 only if it lies inside the window. The derivative band, its axis, guides and marker are hidden
-while zoomed; the main axes show the window's edge x values as tick labels are out of scope, so
-the readout "Window: [x−w, x+w]" states it. Dragging is disabled while zoomed (`enabled` predicate)
-and the panel note says "Reset zoom to move the point"; click-to-place is disabled too.
+while zoomed. Tick labels are out of scope, so the readout "Window: [x−w, x+w]" states the window.
+The window may extend past the domain (at x = 3, zoom 1 it is [2.25, 3.75]); every f is defined on
+all of ℝ, so sampling there is safe. The zoomed main curve is clipped to the same display box as
+the lines (X ∈ [−3.5, 3.5], Z ∈ [−3.4, 3.4]) so a steep curve does not run through the hidden band.
+Dragging is disabled while zoomed (`enabled` predicate) and the panel note says "Reset zoom to
+move the point"; click-to-place is disabled too. The sampling is a pure function
+`zoomSamples(fn, x, K, n = 241): { X: Float32Array; Z: Float32Array }` in `functions1d.ts`, tested
+so that the maximum |Z − s·f′(x)·X| over the window falls by at least 3× per zoom step for
+`square` (it scales as 1/K).
 
 Flat layers (`transparent: true`, `depthTest: false`, `depthWrite: false`, explicit `renderOrder`,
 as in the matrix scene). All `Line`s are drawn as `LineSegments` from preallocated buffers so gaps
@@ -55,7 +61,7 @@ are possible:
 
 | Order | Layer | Colour | Notes |
 |---|---|---|---|
-| 1 | Axes | `--line` | x axis (Z = 0) and Z axis for the main region; x axis at z₀ for the derivative band; unit ticks (hidden when zoomed); a `--faint` separator at Z = −3.6 |
+| 1 | Axes | `--line` | x axis (Z = 0) and Z axis for the main region; x axis at z₀ for the derivative band; unit ticks (hidden when zoomed); a `--faint` separator at Z = −3.45 (above the band top −3.5 and clear of the ±3.4 tangent clip) |
 | 2 | Derivative curve | `--soft` | 241 samples; split into runs at the function's `singularAt` so a jump shows two flat runs with a gap and no riser, and √\|x\| shows two arms rising to the band clamp; toggleable |
 | 3 | Main curve | `--ink` | 241 samples over the domain or the zoom window |
 | 4 | Secant line | `--soft`, opacity .8 | through the point and the secant point, extended in display x to ±3.5 and clipped to Z ∈ [−3.4, 3.4] with `clipSegment`; hidden when the secant is degenerate (`secant === null`) or the secant point is outside the zoom window; toggleable |
@@ -132,8 +138,9 @@ unchanged). `derived(s)`: `fx`, `d: Derivative`, `hEff: number | null`, `secant:
 ## 6. Controls (side panel, in order)
 
 1. Function select (table order).
-2. h slider (log, 1e-3 … 2, default 1, readout `h = <fmt>`; when `hEff !== h` append
-   ` (clipped to <fmt>)`).
+2. h slider (log, 1e-3 … 2, default 1, readout `h = <fmt>`; when `hEff` is a number and differs
+   from h append ` (clipped to <fmt>)`; when `hEff` is null the readout reads `h = <fmt> (x is at
+   the right edge; no secant)`).
 3. Buttons: Zoom in (disabled at zoom 3), Reset zoom (disabled at zoom 0), Reset, Reset view.
 4. Toggles: Tangent, Secant, Derivative curve.
 
@@ -175,11 +182,12 @@ plain-text span updated on each render.
 
 ```
 src/core/math/functions1d.ts                         + tests/core/math/functions1d.test.ts
-src/viz/shared/drag.ts   add optional `plane?: { normal: Vector3; getOffset(index: number): number }`;
-                         when present it supersedes `getPlaneZ` (which becomes optional; exactly one
-                         of the two must be given) and sets `dragPlane.set(normal, -getOffset(index))`;
-                         `onDrag`/click-to-place keep reporting `[hit.x, hit.y]`. Tests: a vertical
-                         plane drag reports the world x of the hit; existing tests unchanged.
+src/viz/shared/drag.ts   make the drag-plane source a union so the compiler enforces exactly one:
+                         `{ getPlaneZ(index): number }` (existing, normal +Z) or
+                         `{ plane: { normal: Vector3; getOffset(index): number } }`, which sets
+                         `dragPlane.set(normal, -getOffset(index))`; `onDrag`/click-to-place keep
+                         reporting `[hit.x, hit.y]`. Tests: a vertical-plane drag reports the world x
+                         of the hit; existing tests unchanged.
 src/viz/derivative/
   index.ts          Visualization (mount/apply/update/resize/dispose mirroring matrix-transformation:
                     buildScene with unwind, panel declared before apply, theme "change" → dirty,
