@@ -25,18 +25,24 @@ export function createSceneKit(
 ): SceneKit {
   const scene = new Scene();
   // theme.bg is mutated in place by refresh(), so the background tracks the
-  // palette without a "change" listener here.
+  // palette without a "change" listener here. Do not mutate this Color: it is
+  // the shared palette, not a copy.
   scene.background = theme.bg;
 
   const camera = new PerspectiveCamera(45, 1, 0.1, 100);
+  // A sane default so a viz that forgets to frame its scene is not a black
+  // frame; every viz is expected to re-position the camera anyway.
+  camera.position.set(4, -5, 4);
+  camera.up.set(0, 0, 1);
+  camera.lookAt(0, 0, 0);
 
   const controls = new OrbitControls(camera, renderer.domElement);
   controls.enableDamping = !opts.reducedMotion;
 
   // Light colours are exempt from the no-hard-coded-colour rule: they shape the
   // shading, they are not part of the palette.
-  const hemisphere = new HemisphereLight(0xffffff, 0xffffff, 0.6);
-  const directional = new DirectionalLight(0xffffff, 1.4);
+  const hemisphere = new HemisphereLight(0xffffff, 0x404040, 0.4);
+  const directional = new DirectionalLight(0xffffff, 1.0);
   directional.position.set(3, 6, 4);
   scene.add(hemisphere, directional);
 
@@ -46,17 +52,27 @@ export function createSceneKit(
     controls,
     dispose() {
       controls.dispose();
+      scene.clear();
+      // Drop the shared palette Color so the scene holds nothing of the theme.
+      scene.background = null;
     },
   };
 }
 
 function disposeMaterial(material: Material): void {
-  const { map } = material as { map?: Texture | null };
-  if (map) map.dispose();
+  // Materials name their textures differently (map, normalMap, alphaMap, ...),
+  // so dispose whatever texture-valued properties this one happens to carry.
+  for (const value of Object.values(material) as unknown[]) {
+    const texture = value as Texture | null;
+    if (texture?.isTexture === true) texture.dispose();
+  }
   material.dispose();
 }
 
-/** Releases every geometry, material and material texture under `root`. */
+/**
+ * Releases every geometry, material and material texture under `root`.
+ * It does not remove `root` from its parent; detach it yourself if needed.
+ */
 export function disposeObject(root: Object3D): void {
   root.traverse((object) => {
     // Meshes, lines, points and sprites all carry these; Object3D does not declare them.

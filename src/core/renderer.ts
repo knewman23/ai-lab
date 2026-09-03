@@ -21,7 +21,14 @@ export async function createRenderer(container: HTMLElement): Promise<Renderer> 
   canvas.style.touchAction = "none";
   container.appendChild(canvas);
 
-  await renderer.init();
+  try {
+    await renderer.init();
+  } catch (error) {
+    // Leave nothing behind for the caller's fallback UI to fight with.
+    canvas.remove();
+    renderer.dispose();
+    throw error;
+  }
   return renderer;
 }
 

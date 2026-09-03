@@ -22,8 +22,12 @@ type Field = keyof typeof TOKENS;
 
 const FIELDS = Object.keys(TOKENS) as readonly Field[];
 
-/** Only hex values are used by the palette; anything else leaves the colour alone. */
-const HEX = /^#(?:[0-9a-f]{3}|[0-9a-f]{4}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
+/**
+ * Palette tokens are hex by policy, so anything else leaves the colour alone.
+ * Only 3- and 6-digit forms are accepted: three's Color.setStyle cannot parse
+ * 4- or 8-digit hex and would warn on every refresh.
+ */
+const HEX = /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i;
 
 function readToken(read: (token: string) => string, token: string): string | null {
   const value = read(token).trim();
@@ -64,10 +68,17 @@ class ThemeColorsImpl extends EventTarget implements ThemeHandle {
   }
 }
 
+function documentReader(): (token: string) => string {
+  // The declaration is live, so one lookup serves every token and every refresh.
+  let style: CSSStyleDeclaration | null = null;
+  return (token) => {
+    style ??= getComputedStyle(document.documentElement);
+    return style.getPropertyValue(token);
+  };
+}
+
 export function createThemeColors(read?: (token: string) => string): ThemeHandle {
-  const readValue =
-    read ?? ((token: string) => getComputedStyle(document.documentElement).getPropertyValue(token));
-  return new ThemeColorsImpl(readValue);
+  return new ThemeColorsImpl(read ?? documentReader());
 }
 
 /** Refreshes on explicit theme switches and on OS colour-scheme changes. */
@@ -82,11 +93,12 @@ export function watchTheme(colors: ThemeHandle): () => void {
     attributeFilter: ["data-theme"],
   });
 
-  const media = window.matchMedia("(prefers-color-scheme: dark)");
-  media.addEventListener("change", refresh);
+  const media =
+    typeof matchMedia === "function" ? matchMedia("(prefers-color-scheme: dark)") : null;
+  media?.addEventListener("change", refresh);
 
   return () => {
     observer.disconnect();
-    media.removeEventListener("change", refresh);
+    media?.removeEventListener("change", refresh);
   };
 }

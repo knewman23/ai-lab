@@ -13,7 +13,7 @@ export interface Loop {
   setTick(fn: (dt: number) => boolean): void;
   start(): void;
   stop(): void;
-  /** Wakes the loop from idle and resets the idle timer. */
+  /** Wakes the loop from idle and resets the idle timer; a no-op before start(). */
   poke(): void;
   isIdle(): boolean;
   dispose(): void;
@@ -41,6 +41,12 @@ function defaultDeps(): LoopDeps {
   };
 }
 
+/**
+ * Drives one tick per animation frame. Constructing a loop subscribes to
+ * visibilitychange; dispose() unsubscribes. A tick that throws stops the loop
+ * and the error propagates out of the frame callback, so a broken tick fails
+ * once rather than every frame.
+ */
 export function createLoop(deps?: Partial<LoopDeps>): Loop {
   const d: LoopDeps = { ...defaultDeps(), ...deps };
 
@@ -65,10 +71,18 @@ export function createLoop(deps?: Partial<LoopDeps>): Loop {
   function onFrame(): void {
     frame = null;
     const t = d.now();
-    const dt = Math.min((t - last) / 1000, MAX_DT);
+    const dt = Math.max(0, Math.min((t - last) / 1000, MAX_DT));
     last = t;
 
-    if (tick(dt)) lastRenderAt = t;
+    let rendered: boolean;
+    try {
+      rendered = tick(dt);
+    } catch (error) {
+      started = false;
+      throw error;
+    }
+
+    if (rendered) lastRenderAt = t;
     else if (t - lastRenderAt > IDLE_AFTER_MS) {
       idle = true;
       return;
@@ -78,7 +92,9 @@ export function createLoop(deps?: Partial<LoopDeps>): Loop {
 
   function wake(): void {
     const t = d.now();
-    last = t;
+    // A frame already in flight carries an accurate `last`; resetting it here
+    // would swallow the time that frame has been waiting.
+    if (frame === null || idle) last = t;
     lastRenderAt = t;
     idle = false;
     request();

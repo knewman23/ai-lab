@@ -192,4 +192,100 @@ describe("createLoop", () => {
     expect(h.pending()).toBe(0);
     expect(h.unsubscribeCalls()).toBe(1);
   });
+  it("leaves no pending frame when the tick throws", () => {
+    const h = harness();
+    h.loop.setTick(() => {
+      throw new Error("tick blew up");
+    });
+    h.loop.start();
+
+    expect(() => {
+      h.flush(16);
+    }).toThrow("tick blew up");
+    expect(h.pending()).toBe(0);
+  });
+
+  it("goes dead after the tick throws, so poke() does nothing until start()", () => {
+    const h = harness();
+    h.loop.setTick(() => {
+      throw new Error("tick blew up");
+    });
+    h.loop.start();
+    expect(() => {
+      h.flush(16);
+    }).toThrow();
+
+    h.loop.poke();
+    h.fireVisibility();
+
+    expect(h.pending()).toBe(0);
+  });
+
+  it("can be started again after the tick threw", () => {
+    const h = harness();
+    let explode = true;
+    let calls = 0;
+    h.loop.setTick(() => {
+      calls++;
+      if (explode) throw new Error("tick blew up");
+      return true;
+    });
+    h.loop.start();
+    expect(() => {
+      h.flush(16);
+    }).toThrow();
+
+    explode = false;
+    h.loop.start();
+    h.flush(16);
+
+    expect(calls).toBe(2);
+    expect(h.pending()).toBe(1);
+  });
+
+  it("ignores poke() before start()", () => {
+    const h = harness();
+    h.loop.setTick(() => true);
+    h.loop.poke();
+
+    expect(h.pending()).toBe(0);
+  });
+
+  it("requests exactly one frame when the tick pokes reentrantly", () => {
+    const h = harness();
+    h.loop.setTick(() => {
+      h.loop.poke();
+      return true;
+    });
+    h.loop.start();
+    h.flush(16);
+
+    expect(h.pending()).toBe(1);
+  });
+
+  it("keeps a single pending frame when poke() lands mid-frame", () => {
+    const h = harness();
+    h.loop.setTick(() => true);
+    h.loop.start();
+    h.loop.poke();
+    h.loop.poke();
+
+    expect(h.pending()).toBe(1);
+  });
+
+  it("runs again after stop() then start()", () => {
+    const h = harness();
+    let calls = 0;
+    h.loop.setTick(() => {
+      calls++;
+      return true;
+    });
+    h.loop.start();
+    h.loop.stop();
+    h.loop.start();
+    h.flush(16);
+
+    expect(calls).toBe(1);
+    expect(h.pending()).toBe(1);
+  });
 });
