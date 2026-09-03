@@ -133,8 +133,9 @@ export interface VizHost {
 }
 
 export interface VizInstance {
-  update(dt: number): void;       // called by the loop; the viz calls renderer.render itself
-  resize(w: number, h: number): void;
+  update(dt: number): boolean;    // called by the loop; the viz calls renderer.render itself
+                                  // and returns true if it rendered. Loop idles after 1 s of false.
+  resize(w: number, h: number): void;  // shell has already called renderer.setSize
   dispose(): void;                // must release all GPU resources and listeners
 }
 ```
@@ -177,11 +178,12 @@ the scene has a hard-coded colour.
   horizontal plane at the marker's current height, giving (x, y); z is then f(x, y) evaluated
   analytically, so the marker never leaves the surface under cursor jitter. Dragging resets
   the path and the optimizer state (see Interaction details). Orbit is disabled during a drag.
-- **Gradient arrow**: at the marker, arrow along (∂f/∂x, ∂f/∂y, 0) projected onto the surface
-  tangent, length scaled by |∇f| and clamped. Colour `--accent`. A second, dimmer arrow shows
-  −∇f, the direction the optimizer will actually step.
-- **Tangent plane**: a semi-transparent square at the marker, oriented by the normal
-  (−f_x, −f_y, 1). Toggleable.
+- **Gradient arrow**: at the marker, xy direction along the true ∇f, lifted to lie in the
+  drawn surface's tangent plane (see Surfaces for the display-space rule). Length is
+  0.15 × |∇f| in display units, clamped to [0.2, 1.5]. Colour `--accent`. A second, dimmer
+  arrow shows −∇f, the direction the optimizer will actually step.
+- **Tangent plane**: a semi-transparent square, side 1.2 display units, at the marker,
+  oriented by the display-space normal (−s·f_x, −s·f_y, 1). Toggleable.
 - **Path**: a polyline of all points visited since the last reset, with a small sphere at
   each step. Fades from `--faint` (old) to `--accent` (recent). Capacity 2,000 points, used
   as a ring buffer: the oldest point drops off once full. The step-count readout is not
@@ -224,7 +226,7 @@ drag), never per frame.
 - The update rule for the selected optimizer, with the current learning rate substituted,
   and one sentence on what to look for (e.g. for `elongated`: "raise the learning rate
   until the path overshoots the narrow axis"; for `saddle`: "the ball slides off along y
-  and leaves the domain: that's the optimizer escaping a saddle, not a bug").
+  until it leaves the domain: that's the optimizer escaping a saddle").
 
 ### Readouts
 
@@ -234,8 +236,9 @@ Position (x, y), loss f, gradient (f_x, f_y), |∇f|, step count. Monospace, tab
 
 - Pointer events (mouse + touch). Drag on the marker moves it; drag elsewhere orbits.
 - Marker is clamped to the domain while dragging. If an optimizer step leaves the domain, or
-  produces NaN or ±Infinity (large learning rate on `rosenbrock`), the run pauses, the readout
-  shows "diverged", and Step and Run are disabled until Reset or a drag.
+  produces NaN or ±Infinity (large learning rate on `rosenbrock`), the run pauses and Step and
+  Run are disabled until Reset or a drag. The readout says "left the domain" for a finite
+  point outside it and "diverged" for NaN or ±Infinity.
 - Optimizer state (momentum velocity; Adam m, v, t) and the step count reset to zero on: drag,
   Reset, surface change, optimizer change. Changing the learning rate mid-run keeps state.
   Reset returns the marker to the surface's start point.
@@ -249,8 +252,10 @@ Position (x, y), loss f, gradient (f_x, f_y), |∇f|, step count. Monospace, tab
 - Surface geometry is 128 × 128 segments (≈33k triangles), rebuilt only on surface change;
   height and colour attributes updated in place.
 - Path uses a single `BufferGeometry` with a preallocated capacity of 2,000 points.
-- Loop pauses when the tab is hidden and when nothing has changed for one second while not
-  running (orbit damping resumes it).
+- Loop pauses when the tab is hidden, and idles when `update` has returned false for one
+  second. Any pointer event or control change on the viz page resumes it; the viz returns
+  true while orbit damping is still settling.
+- On resize the shell calls `renderer.setSize` and `setPixelRatio`, then `viz.resize`.
 
 ## 7. Build, quality, deploy
 
