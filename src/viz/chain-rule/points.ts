@@ -1,4 +1,4 @@
-import { Group, Mesh, MeshBasicMaterial, SphereGeometry } from "three";
+import { Group, Mesh, MeshBasicMaterial, MeshStandardMaterial, SphereGeometry } from "three";
 import type { Vec3 } from "../shared/layer";
 import type { ThemeColors } from "../types";
 import type { MarkedPoints } from "./links-geometry";
@@ -40,11 +40,11 @@ export function createPoints(theme: ThemeColors): Points {
   const primedGeometry = new SphereGeometry(PRIMED_RADIUS, 16, 12);
   const hitGeometry = new SphereGeometry(HIT_RADIUS, 12, 8);
 
-  const inkMaterial = new MeshBasicMaterial({ transparent: true });
-  const softMaterial = new MeshBasicMaterial({ transparent: true });
+  const inkMaterial = new MeshStandardMaterial({ roughness: 0.5, transparent: true });
+  const softMaterial = new MeshStandardMaterial({ roughness: 0.5, transparent: true });
   const hitMaterial = new MeshBasicMaterial({ visible: false });
 
-  const makeSphere = (geometry: SphereGeometry, material: MeshBasicMaterial): Mesh => {
+  const makeSphere = (geometry: SphereGeometry, material: MeshStandardMaterial): Mesh => {
     const mesh = new Mesh(geometry, material);
     mesh.renderOrder = ORDER;
     return mesh;

@@ -1,4 +1,11 @@
-import { type Color, type Material, type Mesh, type SphereGeometry, Vector3 } from "three";
+import {
+  type Color,
+  type Material,
+  type Mesh,
+  MeshStandardMaterial,
+  type SphereGeometry,
+  Vector3,
+} from "three";
 import { describe, expect, it, vi } from "vitest";
 import { COMPOSITIONS } from "../../../src/core/math/compositions";
 import { createThemeColors } from "../../../src/core/theme";
@@ -87,6 +94,7 @@ describe("createPoints", () => {
     for (const m of byRadius(pts, 0.05)) expect(colour(m).equals(theme.soft)).toBe(true);
     for (const m of [...byRadius(pts, 0.08), ...byRadius(pts, 0.07), ...byRadius(pts, 0.05)]) {
       expect(m.renderOrder).toBe(10);
+      expect(m.material).toBeInstanceOf(MeshStandardMaterial);
       expect((m.material as Material).transparent).toBe(true);
       expect((m.material as Material).depthTest).toBe(true);
     }
