@@ -148,7 +148,7 @@ describe("createVizPage", () => {
 
   it("shows a notice when the renderer is unavailable", async () => {
     const { main, loop, page } = harness(
-      Promise.resolve({ ok: false, error: new Error("no gpu") }),
+      Promise.resolve({ ok: false, reason: "gpu", error: new Error("no gpu") }),
     );
     const mount = vi.fn(() => fakeInstance());
     await page.enter(lazy(mount), 1);
@@ -182,6 +182,23 @@ describe("createVizPage", () => {
     expect(() => {
       page.leave();
     }).not.toThrow();
+  });
+
+  it("shows the not-loaded notice when the renderer chunk fails to arrive", async () => {
+    const { main, loop, page } = harness(
+      Promise.resolve({ ok: false, reason: "load", error: new Error("offline") }),
+    );
+    const mount = vi.fn(() => fakeInstance());
+
+    await page.enter(lazy(mount), 1);
+
+    const heading = main.querySelector(".notice")?.querySelector("h2")?.textContent;
+    expect(heading).toBe("This visualization failed to start");
+    expect(main.querySelector(".notice")?.querySelector("p")?.textContent).toBe(
+      "This visualization could not be loaded.",
+    );
+    expect(mount).not.toHaveBeenCalled();
+    expect(loop.started).toBe(0);
   });
 
   it("shows a notice when the visualization chunk fails to load", async () => {

@@ -65,10 +65,11 @@ structure reads as a curriculum, not a single demo (default pending the owner's 
 index.html                <head> carries the portfolio's inline theme script verbatim
 public/theme.js           the portfolio's toggle script, copied verbatim
 src/
-  main.ts                 boot: theme, shell, router first; the renderer loads on the first viz route
+  main.ts                 boot: theme, then the shell, then the router
   app/
     router.ts             hash → route object; emits on change
-    shell.ts              header (title, breadcrumb, theme toggle), home page, viz page frame
+    shell.ts              header (title, breadcrumb, theme toggle), home page, viz page frame;
+                          owns the gate that loads renderer.ts on the first viz route
     registry.ts           card metadata + a per-scene chunk loader, grouped by topic
   core/
     renderer.ts           createRenderer(): WebGPURenderer or WebGL fallback, resize, DPR cap

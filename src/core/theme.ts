@@ -1,6 +1,18 @@
-// Deep import (an official "three/src/*" export): the theme boots on the home
-// page, and pulling Color from "three" would drag all 210 kB of three.core into
-// the entry chunk. This is the same class, from source, with only its own maths.
+/*
+ * Deep import, through the official "three/src/*" export in three's package.json.
+ * The theme boots on the home page, and importing Color from "three" pulls in
+ * three.core, which is a prebuilt bundle and so cannot be tree-shaken: measured
+ * at roughly 210 kB added to the entry chunk. From source it is the same class
+ * with only its own maths, about 14 kB. (The on-demand three chunk, which the
+ * scenes load, is 775 kB.)
+ *
+ * These Color objects therefore come from a different module instance than the
+ * one inside three/webgpu. That is safe because three duck-types on the isColor
+ * flag and never uses `instanceof Color`, and because both copies of
+ * ColorManagement start from the same defaults. Do not change
+ * ColorManagement.enabled or the working colour space anywhere in this app:
+ * setting it on one copy would leave the other converting differently.
+ */
 import { Color } from "three/src/math/Color.js";
 import type { ThemeColors } from "../viz/types";
 

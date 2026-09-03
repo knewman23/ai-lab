@@ -13,6 +13,10 @@ import { createVizFrame, type VizFrame } from "./viz-frame";
  * The renderer boot result; `getRenderer()` never rejects, so a viz route can
  * explain itself. `applySize` rides along because it lives in the same module as
  * the `three/webgpu` import, which must stay out of the shell's static graph.
+ *
+ * A failure says which half failed: "load" is the renderer chunk not arriving,
+ * which reads to the visitor exactly like a scene chunk not arriving, and "gpu"
+ * is the machine having neither WebGPU nor WebGL 2.
  */
 export type RendererResult =
   | {
@@ -20,7 +24,7 @@ export type RendererResult =
       readonly renderer: Renderer;
       readonly applySize: (renderer: Renderer, w: number, h: number) => void;
     }
-  | { readonly ok: false; readonly error: unknown };
+  | { readonly ok: false; readonly reason: "load" | "gpu"; readonly error: unknown };
 
 export interface VizPageDeps {
   readonly main: HTMLElement;
@@ -50,6 +54,11 @@ function notice(heading: string, body: string): HTMLElement {
   link.textContent = "Read the notebook version on GitHub";
   wrapper.append(title, text, link);
   return wrapper;
+}
+
+/** Shown when a chunk did not arrive, whichever chunk it was. */
+function notLoadedNotice(): HTMLElement {
+  return notice("This visualization failed to start", "This visualization could not be loaded.");
 }
 
 const POKE_EVENTS = [
@@ -134,9 +143,7 @@ export function createVizPage(deps: VizPageDeps): VizPage {
     } catch (error) {
       // Only load() can reject here; getRenderer() reports failure in its result.
       if (current !== token) return;
-      own.showNotice(
-        notice("This visualization failed to start", "This visualization could not be loaded."),
-      );
+      own.showNotice(notLoadedNotice());
       if (import.meta.env.DEV) console.error("visualization chunk failed to load", error);
       return;
     }
@@ -145,12 +152,14 @@ export function createVizPage(deps: VizPageDeps): VizPage {
 
     if (!result.ok) {
       own.showNotice(
-        notice(
-          "This visualization needs WebGPU or WebGL 2",
-          "This browser or GPU did not provide either, so the scene cannot be drawn here.",
-        ),
+        result.reason === "load"
+          ? notLoadedNotice()
+          : notice(
+              "This visualization needs WebGPU or WebGL 2",
+              "This browser or GPU did not provide either, so the scene cannot be drawn here.",
+            ),
       );
-      if (import.meta.env.DEV) console.warn("renderer unavailable", result.error);
+      if (import.meta.env.DEV) console.warn("renderer unavailable", result.reason, result.error);
       return;
     }
 

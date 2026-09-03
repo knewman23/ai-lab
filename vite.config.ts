@@ -5,14 +5,18 @@ export default defineConfig({
   build: {
     target: "es2022",
     sourcemap: false,
-    // three/webgpu is the renderer library, loaded on demand by the first
-    // visualization route and never by the home page, so it is allowed to be
-    // large. Everything the entry chunk loads is far under the default limit.
-    chunkSizeWarningLimit: 800,
+    // Only the three chunk is over the default 500 kB, and it is the renderer
+    // library: no visualization can run without it, and no page loads it until
+    // a visualization route asks for one. The limit is set above it so it stays
+    // a tripwire on the entry chunk and the per-scene chunks, which are the ones
+    // that must stay small.
+    chunkSizeWarningLimit: 1000,
     rollupOptions: {
       output: {
         // Vite 8 bundles with Rolldown; manualChunks is deprecated. Grouping
         // keeps three and katex as shared chunks across the three scenes.
+        // Rolldown adds one more shared chunk on its own, holding what the
+        // scenes have in common: OrbitControls, the scene kit and the UI kit.
         codeSplitting: {
           groups: [
             { name: "three", test: /node_modules\/three\/build\// },
