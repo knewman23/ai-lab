@@ -32,9 +32,13 @@ let nextId = 0;
  * A `<input type="range">` mapped log-uniformly onto [min, max], with a
  * visible `<output>`. Interactive input fires `onChange`; setting `.value`
  * programmatically updates the control without firing it.
+ * `min` and `max` must both be > 0, since the mapping is a log scale.
  */
 export function createLogSlider(opts: LogSliderOptions): LogSlider {
   const { min, max, onChange } = opts;
+  if (min <= 0 || max <= 0) {
+    throw new RangeError("createLogSlider: min and max must be > 0 (log scale)");
+  }
   const format = opts.format ?? formatLr;
   const id = `log-slider-${++nextId}`;
   let current = opts.value;

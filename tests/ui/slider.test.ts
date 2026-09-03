@@ -79,4 +79,16 @@ describe("createLogSlider", () => {
     expect(onChange).not.toHaveBeenCalled();
     expect(slider.value).toBeCloseTo(0.5, 12);
   });
+
+  it("throws a RangeError when min is not > 0", () => {
+    expect(() =>
+      createLogSlider({ label: "LR", min: 0, max: 1, value: 0.1, onChange: () => {} }),
+    ).toThrow(RangeError);
+  });
+
+  it("throws a RangeError when max is not > 0", () => {
+    expect(() =>
+      createLogSlider({ label: "LR", min: 1e-3, max: -1, value: 0.1, onChange: () => {} }),
+    ).toThrow(RangeError);
+  });
 });

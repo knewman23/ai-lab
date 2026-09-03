@@ -17,7 +17,9 @@ export function createToggle(opts: ToggleOptions): Toggle {
 
   const input = document.createElement("input");
   input.type = "checkbox";
+  input.setAttribute("role", "switch");
   input.checked = opts.checked;
+  input.setAttribute("aria-checked", String(opts.checked));
 
   const track = document.createElement("span");
   track.className = "switch-track";
@@ -28,6 +30,7 @@ export function createToggle(opts: ToggleOptions): Toggle {
   text.textContent = opts.label;
 
   input.addEventListener("change", () => {
+    input.setAttribute("aria-checked", String(input.checked));
     opts.onChange(input.checked);
   });
 
@@ -40,6 +43,7 @@ export function createToggle(opts: ToggleOptions): Toggle {
     },
     set checked(v: boolean) {
       input.checked = v;
+      input.setAttribute("aria-checked", String(v));
     },
   };
 }
