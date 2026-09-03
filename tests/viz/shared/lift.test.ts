@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { FACES } from "../../../src/viz/shared/layer";
-import { LIFT_FLOOR, LIFT_FRONT, LIFT_SIDE, liftOf, segment } from "../../../src/viz/shared/lift";
+import {
+  faceToWorld,
+  LIFT_FLOOR,
+  LIFT_FRONT,
+  LIFT_SIDE,
+  liftOf,
+  segment,
+} from "../../../src/viz/shared/lift";
 
 describe("liftOf", () => {
   it("puts the face's lift on its fixed axis and nothing elsewhere", () => {
@@ -13,6 +20,20 @@ describe("liftOf", () => {
     expect(LIFT_FRONT).toEqual(liftOf(FACES.front));
     expect(LIFT_SIDE).toEqual(liftOf(FACES.side));
     expect(LIFT_FLOOR).toEqual(liftOf(FACES.floor));
+  });
+});
+
+describe("faceToWorld", () => {
+  it("places (a, b) on the front wall at (a, lift, 3 + b)", () => {
+    expect(faceToWorld(FACES.front, 1, 2)).toEqual([1, 0.01, 5]);
+  });
+
+  it("places (a, b) on the side wall at (-3 + lift, 3 + a, 3 + b)", () => {
+    expect(faceToWorld(FACES.side, 1, 2)).toEqual([-3 + 0.01, 4, 5]);
+  });
+
+  it("places (a, b) on the floor at (a, 3 + b, lift)", () => {
+    expect(faceToWorld(FACES.floor, 1, 2)).toEqual([1, 5, 0.01]);
   });
 });
 

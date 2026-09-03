@@ -1,5 +1,6 @@
 import { clipSegment } from "../../core/math/matrix2";
 import { commit, type Layer, type Segment } from "./layer";
+import { faceToWorld } from "./lift";
 
 /**
  * Appends a sampled polyline to a buffer as consecutive segments, starting at
@@ -40,9 +41,7 @@ function setEndpoint(layer: Layer, n: number, a: number, b: number): void {
     layer.positions[at + 2] = b;
     return;
   }
-  layer.positions[at + face.axes[0]] = face.centre[0] + a;
-  layer.positions[at + face.axes[1]] = face.centre[1] + b;
-  layer.positions[at + face.fixedAxis] = face.offset + face.lift;
+  layer.positions.set(faceToWorld(face, a, b), at);
 }
 
 /** A clipped segment shorter than this has collapsed to a point. */

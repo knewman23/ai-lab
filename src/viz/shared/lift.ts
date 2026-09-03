@@ -7,6 +7,19 @@ export function liftOf(face: Face): Vec3 {
   return v;
 }
 
+/**
+ * Where centred face-local (a, b) lands in the world: the face centre plus
+ * (a, b) along `face.axes`, with the fixed axis lifted just off the face.
+ * The one function every on-face point is placed with.
+ */
+export function faceToWorld(face: Face, a: number, b: number): Vec3 {
+  const v: [number, number, number] = [0, 0, 0];
+  v[face.axes[0]] = face.centre[0] + a;
+  v[face.axes[1]] = face.centre[1] + b;
+  v[face.fixedAxis] = face.offset + face.lift;
+  return v;
+}
+
 /** Lift off the front wall (+y). */
 export const LIFT_FRONT: Vec3 = liftOf(FACES.front);
 /** Lift off the side wall (+x). */

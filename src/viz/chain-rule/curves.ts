@@ -1,5 +1,5 @@
 import { Group } from "three";
-import { type Composition, DOMAIN } from "../../core/math/compositions";
+import { type Composition, DOMAIN, FACE } from "../../core/math/compositions";
 import { sampleOn } from "../../core/math/sampling1d";
 import type { ThemeColors } from "../types";
 import { disposeLayers, FACES, type Layer, lineLayer } from "../shared/layer";
@@ -7,9 +7,9 @@ import { writeClippedPolyline } from "../shared/layer-write";
 
 export interface Curves {
   readonly group: Group;
-  /** The face layers, in the order the curves are drawn; exposed for tests. */
+  /** The face layers, keyed by face; read by tests. */
   readonly layers: { readonly front: Layer; readonly side: Layer; readonly floor: Layer };
-  /** Redraws all three curves for a composition. */
+  /** Redraws all three curves for a composition; a repeat of the last one is a no-op. */
   setComposition(c: Composition): void;
   dispose(): void;
 }
@@ -19,8 +19,10 @@ const SAMPLES = 241;
 const CURVE_ENDPOINTS = (SAMPLES - 1) * 2;
 /** Above the faces' outline and axes, below points and links. */
 const CURVE_ORDER = 2;
+/** Half-edge of a face: the display extent of u and y on either side of their axes. */
+const HALF = FACE / 2;
 /** Half-extents of every face, in centred face-local coordinates. */
-const BOUND: readonly [number, number] = [3, 3];
+const BOUND: readonly [number, number] = [HALF, HALF];
 
 /** A copy of `values` with every entry multiplied by `scale`; NaN passes through. */
 function scaled(values: Float32Array, scale: number): Float32Array {
@@ -51,21 +53,26 @@ export function createCurves(theme: ThemeColors): Curves {
   applyTheme();
   theme.addEventListener("change", applyTheme);
 
+  let last: Composition | null = null;
+
   return {
     group,
     layers,
 
     setComposition(c: Composition): void {
-      // Front wall: X = x, Z = 3 + su * g(x).
+      if (c === last) return;
+      last = c;
+
+      // Front wall: X = x, Z = HALF + su * g(x).
       const inner = sampleOn(c.g, DOMAIN, SAMPLES);
       writeClippedPolyline(front, inner.T, scaled(inner.V, c.su), BOUND);
 
-      // Side wall: depth Y = 3 + sy * f(u), height Z = 3 + su * u, over the u
-      // range the wall spans.
-      const outer = sampleOn(c.f, [-3 / c.su, 3 / c.su], SAMPLES);
+      // Side wall: depth Y = HALF + sy * f(u), height Z = HALF + su * u, over
+      // the u range the wall spans.
+      const outer = sampleOn(c.f, [-HALF / c.su, HALF / c.su], SAMPLES);
       writeClippedPolyline(side, scaled(outer.V, c.sy), scaled(outer.T, c.su), BOUND);
 
-      // Floor: X = x, Y = 3 + sy * f(g(x)).
+      // Floor: X = x, Y = HALF + sy * f(g(x)).
       const composite = sampleOn((x) => c.f(c.g(x)), DOMAIN, SAMPLES);
       writeClippedPolyline(floor, composite.T, scaled(composite.V, c.sy), BOUND);
     },
