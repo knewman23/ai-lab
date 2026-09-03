@@ -159,6 +159,10 @@ describe("effectiveDx", () => {
   it("returns dx unchanged when there is room", () => {
     expect(effectiveDx(0, 1)).toBe(1);
   });
+
+  it("returns null when x is not finite", () => {
+    expect(effectiveDx(NaN, 1)).toBeNull();
+  });
 });
 
 describe("deltas", () => {

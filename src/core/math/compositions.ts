@@ -32,6 +32,9 @@ export const DX_RANGE = [1e-3, 2] as const satisfies readonly [number, number];
 /** Side length of the cube's faces (the u and y axes each span [-3, 3]). */
 export const FACE = 6;
 
+/** Below this, a remaining Δx or a |Δu| is treated as zero. */
+const EPS = 1e-9;
+
 /** Ordered as in the spec's composition table. */
 export const COMP_KEYS = [
   "sin3x",
@@ -125,34 +128,40 @@ export const COMPOSITIONS: Readonly<Record<CompKey, Composition>> = {
 };
 
 /** Everything the scene reads at a single x: the inner and outer values, both derivatives, and their product. */
-export function evaluate(
-  c: Composition,
-  x: number,
-): { u: number; y: number; dg: number; df: number; dydx: number } {
+export interface Evaluation {
+  readonly u: number;
+  readonly y: number;
+  readonly dg: number;
+  readonly df: number;
+  readonly dydx: number;
+}
+
+/** Finite differences over one step Δx: the changes Δu, Δy and the three difference quotients. */
+export interface Deltas {
+  readonly du: number;
+  readonly dy: number;
+  readonly duDx: number;
+  /** Δy/Δu, or null when |Δu| < EPS. */
+  readonly dyDu: number | null;
+  readonly dyDx: number;
+}
+
+/** Evaluates the composition and both derivatives at x; `dydx = df(u) * dg(x)`. */
+export function evaluate(c: Composition, x: number): Evaluation {
   const u = c.g(x);
   const dg = c.dg(x);
   const df = c.df(u);
   return { u, y: c.f(u), dg, df, dydx: df * dg };
 }
 
-/** Below this remaining room, effectiveDx reports no secant is possible. */
-const MIN_DX = 1e-9;
-
-/** Clips Δx so x + Δx stays within the domain's right edge; null when no room remains. */
+/** Clips Δx so x + Δx stays within the domain's right edge; null when no room remains or the inputs are not finite. */
 export function effectiveDx(x: number, dx: number): number | null {
   const clipped = Math.min(dx, DOMAIN[1] - x);
-  return clipped < MIN_DX ? null : clipped;
+  return !Number.isFinite(clipped) || clipped < EPS ? null : clipped;
 }
 
-/** Below this |Δu|, the ratio Δy/Δu is reported as null rather than blowing up. */
-const MIN_DU = 1e-9;
-
-/** Finite differences over one step Δx: the changes Δu, Δy and the three difference quotients. */
-export function deltas(
-  c: Composition,
-  x: number,
-  dxEff: number,
-): { du: number; dy: number; duDx: number; dyDu: number | null; dyDx: number } {
+/** Finite differences over one step Δx. `dxEff` must be a non-null result of `effectiveDx`. */
+export function deltas(c: Composition, x: number, dxEff: number): Deltas {
   const u0 = c.g(x);
   const u1 = c.g(x + dxEff);
   const du = u1 - u0;
@@ -161,7 +170,7 @@ export function deltas(
     du,
     dy,
     duDx: du / dxEff,
-    dyDu: Math.abs(du) < MIN_DU ? null : dy / du,
+    dyDu: Math.abs(du) < EPS ? null : dy / du,
     dyDx: dy / dxEff,
   };
 }
