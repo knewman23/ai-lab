@@ -95,6 +95,22 @@ a {
   color: var(--band-ink);
   font-weight: 500;
 }
+/* ai-lab: the label truncates instead of wrapping under the nav. */
+.band .lbl {
+  flex: 1 1 auto;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.band nav {
+  flex-shrink: 0;
+}
+@media (max-width: 760px) {
+  .band .lbl .owner {
+    display: none;
+  }
+}
 /* ai-lab: the site name and topic crumbs link home. */
 .band .lbl a {
   color: inherit;

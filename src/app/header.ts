@@ -43,9 +43,13 @@ export function renderHeader(): Header {
   label.className = "lbl";
   const name = document.createElement("b");
   name.textContent = "KRYS NEWMAN";
+  // The owner's name and its separator hide on narrow screens so the crumbs fit.
+  const owner = document.createElement("span");
+  owner.className = "owner";
+  owner.append(name, "\u00a0/\u00a0");
   const crumbs = document.createElement("span");
   crumbs.className = "crumbs";
-  label.append(name, "\u00a0/\u00a0", link("#/", "AI LAB"), crumbs);
+  label.append(owner, link("#/", "AI LAB"), crumbs);
 
   const nav = document.createElement("nav");
   nav.setAttribute("aria-label", "Sections");
