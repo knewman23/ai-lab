@@ -1,9 +1,11 @@
 import { Group } from "three";
-import { type Composition, DOMAIN, FACE } from "../../core/math/compositions";
+import { type Composition, DOMAIN } from "../../core/math/compositions";
+import type { Vec2 } from "../../core/math/numeric";
 import { sampleOn } from "../../core/math/sampling1d";
 import type { ThemeColors } from "../types";
 import { disposeLayers, FACES, type Layer, lineLayer } from "../shared/layer";
 import { writeClippedPolyline } from "../shared/layer-write";
+import { BOUND, floorLocal, frontLocal, HALF, sideLocal } from "./display";
 
 export interface Curves {
   readonly group: Group;
@@ -19,16 +21,16 @@ const SAMPLES = 241;
 const CURVE_ENDPOINTS = (SAMPLES - 1) * 2;
 /** Above the faces' outline and axes, below points and links. */
 const CURVE_ORDER = 2;
-/** Half-edge of a face: the display extent of u and y on either side of their axes. */
-const HALF = FACE / 2;
-/** Half-extents of every face, in centred face-local coordinates. */
-const BOUND: readonly [number, number] = [HALF, HALF];
-
-/** A copy of `values` with every entry multiplied by `scale`; NaN passes through. */
-function scaled(values: Float32Array, scale: number): Float32Array {
-  const out = new Float32Array(values.length);
-  for (let i = 0; i < values.length; i++) out[i] = scale * values[i]!;
-  return out;
+/** Face-local (a, b) of the pairs (T[i], V[i]) under `local`, as two arrays; NaN passes through. */
+function localArrays(
+  T: Float32Array,
+  V: Float32Array,
+  local: (t: number, v: number) => Vec2,
+): [Float32Array, Float32Array] {
+  const A = new Float32Array(T.length);
+  const B = new Float32Array(T.length);
+  for (let i = 0; i < T.length; i++) [A[i], B[i]] = local(T[i]!, V[i]!);
+  return [A, B];
 }
 
 /**
@@ -63,18 +65,29 @@ export function createCurves(theme: ThemeColors): Curves {
       if (c === last) return;
       last = c;
 
-      // Front wall: X = x, Z = HALF + su * g(x).
+      // Front wall: u = g(x) over the domain.
       const inner = sampleOn(c.g, DOMAIN, SAMPLES);
-      writeClippedPolyline(front, inner.T, scaled(inner.V, c.su), BOUND);
+      writeClippedPolyline(
+        front,
+        ...localArrays(inner.T, inner.V, (x, u) => frontLocal(c, x, u)),
+        BOUND,
+      );
 
-      // Side wall: depth Y = HALF + sy * f(u), height Z = HALF + su * u, over
-      // the u range the wall spans.
+      // Side wall: y = f(u) over the u range the wall spans.
       const outer = sampleOn(c.f, [-HALF / c.su, HALF / c.su], SAMPLES);
-      writeClippedPolyline(side, scaled(outer.V, c.sy), scaled(outer.T, c.su), BOUND);
+      writeClippedPolyline(
+        side,
+        ...localArrays(outer.T, outer.V, (u, y) => sideLocal(c, u, y)),
+        BOUND,
+      );
 
-      // Floor: X = x, Y = HALF + sy * f(g(x)).
+      // Floor: the composite y = f(g(x)) over the domain.
       const composite = sampleOn((x) => c.f(c.g(x)), DOMAIN, SAMPLES);
-      writeClippedPolyline(floor, composite.T, scaled(composite.V, c.sy), BOUND);
+      writeClippedPolyline(
+        floor,
+        ...localArrays(composite.T, composite.V, (x, y) => floorLocal(c, x, y)),
+        BOUND,
+      );
     },
 
     dispose(): void {

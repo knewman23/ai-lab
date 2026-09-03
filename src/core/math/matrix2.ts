@@ -151,3 +151,33 @@ export function clipSegment(
   const rq: Vec2 = [p[0] + t1 * dx, p[1] + t1 * dy];
   return [rp, rq];
 }
+
+/** How far `extendAndClip` walks along a unit direction on either side of its point. */
+const EXTEND_FAR = 20;
+/** Below this length a direction has no direction. */
+const EXTEND_EPS = 1e-12;
+
+/**
+ * The line through (a0, b0) with direction (da, db), extended and clipped to
+ * the box `clipSegment` accepts. The direction is normalised first, then the
+ * line is taken as the segment ±20 units either side of the point, so a tiny
+ * direction (a secant over a small step) reaches the box edge just as a large
+ * one does; 20 exceeds any box diagonal the scenes use. Null when the
+ * direction is degenerate or not finite, the point is not finite, or the line
+ * misses the box.
+ */
+export function extendAndClip(
+  a0: number,
+  b0: number,
+  da: number,
+  db: number,
+  bound: number | readonly [number, number],
+): readonly [Vec2, Vec2] | null {
+  const len = Math.hypot(da, db);
+  if (!Number.isFinite(len) || len < EXTEND_EPS || !Number.isFinite(a0) || !Number.isFinite(b0)) {
+    return null;
+  }
+  const ua = (EXTEND_FAR * da) / len;
+  const ub = (EXTEND_FAR * db) / len;
+  return clipSegment([a0 - ua, b0 - ub], [a0 + ua, b0 + ub], bound);
+}

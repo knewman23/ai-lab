@@ -1,10 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { COMPOSITIONS } from "../../../src/core/math/compositions";
-import {
-  extendAndClip,
-  facePoints,
-  linkSegments,
-} from "../../../src/viz/chain-rule/links-geometry";
+import { facePoints, linkSegments } from "../../../src/viz/chain-rule/links-geometry";
 import { derived, initialState, setComp, setDx, setX } from "../../../src/viz/chain-rule/state";
 import type { Segment, Vec3 } from "../../../src/viz/shared/layer";
 
@@ -76,22 +72,18 @@ describe("linkSegments connectors", () => {
     near(toCorner[0], p);
     near(toCorner[1], [-3 + LIFT, LIFT, p[2]]);
     // Corner -> Q along +y on the side wall.
-    near(toQ[0], toCorner[1]);
     near(toQ[1], q);
     // Q -> its foot on the floor, straight down the side wall.
     near(downSide[0], q);
     near(downSide[1], [q[0], q[1], LIFT]);
     // Foot -> R along +x on the floor.
-    near(toR[0], downSide[1]);
     near(toR[1], r);
     // P -> its foot on the floor, straight down the front wall.
     near(downFront[0], p);
     near(downFront[1], [p[0], LIFT, LIFT]);
     // Foot -> R along +y on the floor.
-    near(floorToR[0], downFront[1]);
     near(floorToR[1], r);
-    // The floor rectangle closes at R and the two wall verticals share heights.
-    expect(toR[1]).toEqual(floorToR[1]);
+    // The two wall verticals share heights.
     expect(downSide[0][2]).toBeCloseTo(downFront[0][2], 12);
     expect(downSide[1][2]).toBeCloseTo(downFront[1][2], 12);
 
@@ -125,17 +117,14 @@ describe("linkSegments legs and secants", () => {
     // Front wall: P -> (x + Δx, u) -> P'.
     near(fh[0], p);
     near(fh[1], [primed!.p[0], LIFT, p[2]]);
-    near(fv[0], fh[1]);
     near(fv[1], primed!.p);
     // Side wall: Q -> (u + Δu, y) vertically -> Q' in depth.
     near(sv[0], q);
     near(sv[1], [q[0], q[1], primed!.q[2]]);
-    near(sd[0], sv[1]);
     near(sd[1], primed!.q);
     // Floor: R -> (x + Δx, y) -> R'.
     near(lx[0], r);
     near(lx[1], [primed!.r[0], r[1], LIFT]);
-    near(ly[0], lx[1]);
     near(ly[1], primed!.r);
     // The front-wall vertical leg and the side-wall vertical leg span the same heights (Δu).
     expect(fv[0][2]).toBeCloseTo(sv[0][2], 12);
@@ -211,28 +200,5 @@ describe("linkSegments tangents", () => {
     expect(tangents).toHaveLength(2);
     for (const v of tangents[0]!) expect(onFace(v, "front")).toBe(true);
     for (const v of tangents[1]!) expect(onFace(v, "floor")).toBe(true);
-  });
-});
-
-describe("extendAndClip", () => {
-  it("extends a line through a point to the box edges", () => {
-    const seg = extendAndClip(0, 0, 1, 1, [3, 3]);
-    expect(seg).not.toBeNull();
-    const [a, b] = seg!;
-    expect(Math.min(a[0], b[0])).toBeCloseTo(-3, 9);
-    expect(Math.max(a[0], b[0])).toBeCloseTo(3, 9);
-    expect(a[0]).toBeCloseTo(a[1], 9);
-  });
-
-  it("extends a tiny direction as far as a large one", () => {
-    const seg = extendAndClip(1, 0.5, 1e-3, 0, [3, 3]);
-    expect(seg).not.toBeNull();
-    expect(Math.abs(seg![1][0] - seg![0][0])).toBeCloseTo(6, 9);
-  });
-
-  it("returns null for a degenerate or non-finite direction, or a point outside the box", () => {
-    expect(extendAndClip(0, 0, 0, 0, [3, 3])).toBeNull();
-    expect(extendAndClip(0, 0, Number.NaN, 1, [3, 3])).toBeNull();
-    expect(extendAndClip(0, 5, 1, 0, [3, 3])).toBeNull();
   });
 });

@@ -1,15 +1,13 @@
 import type { Composition } from "../../core/math/compositions";
-import { FACE } from "../../core/math/compositions";
+import { extendAndClip } from "../../core/math/matrix2";
 import type { Vec2 } from "../../core/math/numeric";
 import { type Face, FACES, type Segment, type Vec3 } from "../shared/layer";
-import { LIFT_FLOOR, LIFT_FRONT, LIFT_SIDE, faceToWorld } from "../shared/lift";
-import { faceLine, push } from "./links-lines";
+import { faceToWorld } from "../shared/lift";
+import { BOUND, floorLocal, frontLocal, sideLocal } from "./display";
 import type { Derived } from "./state";
 
-export { extendAndClip } from "./links-lines";
-
-/** The three marked points, one per face, as lifted world coordinates. */
-export interface FacePoints {
+/** P on the front wall, Q on the side wall and R on the floor, as lifted world coordinates. */
+export interface MarkedPoints {
   readonly p: Vec3;
   readonly q: Vec3;
   readonly r: Vec3;
@@ -25,17 +23,15 @@ export interface LinkSegments {
   readonly tangents: Segment[];
 }
 
-/** Centred face-local (a, b) of the front wall point (x, u): a = x, b = su·u. */
-function front(c: Composition, x: number, u: number): Vec2 {
-  return [x, c.su * u];
-}
-/** Centred face-local (a, b) of the side wall point (u, y): a = sy·y in depth, b = su·u in height. */
-function side(c: Composition, u: number, y: number): Vec2 {
-  return [c.sy * y, c.su * u];
-}
-/** Centred face-local (a, b) of the floor point (x, y): a = x, b = sy·y. */
-function floor(c: Composition, x: number, y: number): Vec2 {
-  return [x, c.sy * y];
+/** One Δx step, with the values at x + Δx; present only when the step exists. */
+interface Step {
+  readonly dx: number;
+  readonly x1: number;
+  readonly u1: number;
+  readonly y1: number;
+  readonly du: number;
+  readonly dy: number;
+  readonly dyDu: number | null;
 }
 
 /** Face-local (a, b) lifted onto its face in the world. */
@@ -44,12 +40,19 @@ function lift(face: Face, ab: Vec2): Vec3 {
 }
 
 /** P, Q, R for (x, u, y), each lifted off its face. */
-function points(c: Composition, x: number, u: number, y: number): FacePoints {
+function points(c: Composition, x: number, u: number, y: number): MarkedPoints {
   return {
-    p: lift(FACES.front, front(c, x, u)),
-    q: lift(FACES.side, side(c, u, y)),
-    r: lift(FACES.floor, floor(c, x, y)),
+    p: lift(FACES.front, frontLocal(c, x, u)),
+    q: lift(FACES.side, sideLocal(c, u, y)),
+    r: lift(FACES.floor, floorLocal(c, x, y)),
   };
+}
+
+/** The Δx step of a derived state, or null at the domain's right edge. */
+function stepOf(x: number, d: Derived): Step | null {
+  if (d.dxEff === null || d.deltas === null) return null;
+  const { du, dy, dyDu } = d.deltas;
+  return { dx: d.dxEff, x1: x + d.dxEff, u1: d.u + du, y1: d.y + dy, du, dy, dyDu };
 }
 
 /**
@@ -61,11 +64,9 @@ export function facePoints(
   c: Composition,
   x: number,
   d: Derived,
-): FacePoints & { readonly primed: FacePoints | null } {
-  const primed =
-    d.dxEff === null || d.deltas === null
-      ? null
-      : points(c, x + d.dxEff, d.u + d.deltas.du, d.y + d.deltas.dy);
+): MarkedPoints & { readonly primed: MarkedPoints | null } {
+  const step = stepOf(x, d);
+  const primed = step === null ? null : points(c, step.x1, step.u1, step.y1);
   return { ...points(c, x, d.u, d.y), primed };
 }
 
@@ -75,10 +76,13 @@ export function facePoints(
  * to the floor, then along +x to R; P straight down the front wall to the
  * floor, then along +y to R. Points on two faces carry both lifts.
  */
-function connectorsOf({ p, q, r }: FacePoints): Segment[] {
-  const corner: Vec3 = [-FACE / 2 + LIFT_SIDE[0], LIFT_FRONT[1], p[2]];
-  const sideFoot: Vec3 = [q[0], q[1], LIFT_FLOOR[2]];
-  const frontFoot: Vec3 = [p[0], LIFT_FRONT[1], LIFT_FLOOR[2]];
+function connectorsOf({ p, q, r }: MarkedPoints): Segment[] {
+  const wallX = FACES.side.offset + FACES.side.lift;
+  const wallY = FACES.front.offset + FACES.front.lift;
+  const floorZ = FACES.floor.offset + FACES.floor.lift;
+  const corner: Vec3 = [wallX, wallY, p[2]];
+  const sideFoot: Vec3 = [q[0], q[1], floorZ];
+  const frontFoot: Vec3 = [p[0], wallY, floorZ];
   return [
     [p, corner],
     [corner, q],
@@ -86,6 +90,38 @@ function connectorsOf({ p, q, r }: FacePoints): Segment[] {
     [sideFoot, r],
     [p, frontFoot],
     [frontFoot, r],
+  ];
+}
+
+/** The clipped line through face-local `at` along `dir`, lifted onto `face`; null when there is none. */
+function faceLine(face: Face, at: Vec2, dir: Vec2): Segment | null {
+  const clipped = extendAndClip(at[0], at[1], dir[0], dir[1], BOUND);
+  return clipped === null ? null : [lift(face, clipped[0]), lift(face, clipped[1])];
+}
+
+/** Appends `line` to `out` when it exists. */
+function push(out: Segment[], line: Segment | null): void {
+  if (line !== null) out.push(line);
+}
+
+/** The two legs per face of the Δ triangles: P → (x + Δx, u) → P′, Q → (u + Δu, y) → Q′, R → (x + Δx, y) → R′. */
+function legsOf(
+  c: Composition,
+  d: Derived,
+  s: Step,
+  pts: MarkedPoints,
+  primed: MarkedPoints,
+): Segment[] {
+  const frontCorner = lift(FACES.front, frontLocal(c, s.x1, d.u));
+  const sideCorner = lift(FACES.side, sideLocal(c, s.u1, d.y));
+  const floorCorner = lift(FACES.floor, floorLocal(c, s.x1, d.y));
+  return [
+    [pts.p, frontCorner],
+    [frontCorner, primed.p],
+    [pts.q, sideCorner],
+    [sideCorner, primed.q],
+    [pts.r, floorCorner],
+    [floorCorner, primed.r],
   ];
 }
 
@@ -100,12 +136,15 @@ function connectorsOf({ p, q, r }: FacePoints): Segment[] {
 export function linkSegments(c: Composition, x: number, d: Derived): LinkSegments {
   const { u, y } = d;
   const pts = facePoints(c, x, d);
+  const step = stepOf(x, d);
+  const atP = frontLocal(c, x, u);
+  const atQ = sideLocal(c, u, y);
+  const atR = floorLocal(c, x, y);
+
   const tangents: Segment[] = [];
-  push(tangents, faceLine(FACES.front, front(c, x, u), [1, c.su * d.dg]));
-  if (d.sideSlope !== null) {
-    push(tangents, faceLine(FACES.side, side(c, u, y), [d.sideSlope, 1]));
-  }
-  push(tangents, faceLine(FACES.floor, floor(c, x, y), [1, c.sy * d.dydx]));
+  push(tangents, faceLine(FACES.front, atP, [1, c.su * d.dg]));
+  if (d.sideSlope !== null) push(tangents, faceLine(FACES.side, atQ, [d.sideSlope, 1]));
+  push(tangents, faceLine(FACES.floor, atR, [1, c.sy * d.dydx]));
 
   const out: LinkSegments = {
     connectors: connectorsOf(pts),
@@ -114,33 +153,13 @@ export function linkSegments(c: Composition, x: number, d: Derived): LinkSegment
     secants: [],
     tangents,
   };
-  if (pts.primed === null || d.dxEff === null || d.deltas === null) return out;
+  if (step === null || pts.primed === null) return out;
 
-  const { du, dy, dyDu } = d.deltas;
-  const x1 = x + d.dxEff;
-  const u1 = u + du;
   out.primed.push(...connectorsOf(pts.primed));
-
-  const { p, q, r } = pts;
-  const p1 = pts.primed.p;
-  const q1 = pts.primed.q;
-  const r1 = pts.primed.r;
-  const frontCorner = lift(FACES.front, front(c, x1, u));
-  const sideCorner = lift(FACES.side, side(c, u1, y));
-  const floorCorner = lift(FACES.floor, floor(c, x1, y));
-  out.legs.push(
-    [p, frontCorner],
-    [frontCorner, p1],
-    [q, sideCorner],
-    [sideCorner, q1],
-    [r, floorCorner],
-    [floorCorner, r1],
-  );
-
-  push(out.secants, faceLine(FACES.front, front(c, x, u), [d.dxEff, c.su * du]));
-  if (dyDu !== null) {
-    push(out.secants, faceLine(FACES.side, side(c, u, y), [c.sy * dy, c.su * du]));
-  }
-  push(out.secants, faceLine(FACES.floor, floor(c, x, y), [d.dxEff, c.sy * dy]));
+  out.legs.push(...legsOf(c, d, step, pts, pts.primed));
+  push(out.secants, faceLine(FACES.front, atP, [step.dx, c.su * step.du]));
+  if (step.dyDu !== null)
+    push(out.secants, faceLine(FACES.side, atQ, [c.sy * step.dy, c.su * step.du]));
+  push(out.secants, faceLine(FACES.floor, atR, [step.dx, c.sy * step.dy]));
   return out;
 }

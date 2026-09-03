@@ -3,6 +3,7 @@ import { magnitude, type Vec2 } from "../../../src/core/math/numeric";
 import {
   apply,
   clipSegment,
+  extendAndClip,
   columns,
   det,
   eigen,
@@ -270,6 +271,35 @@ describe("clipSegment", () => {
       const p: Vec2 = [-3, 3.5];
       const q: Vec2 = [3, 3.5];
       expect(clipSegment(p, q, box)).toBeNull();
+    });
+  });
+
+  describe("extendAndClip", () => {
+    it("extends a line through a point to the box edges", () => {
+      const seg = extendAndClip(0, 0, 1, 1, [3, 3]);
+      if (seg === null) throw new Error("expected a clipped segment");
+      const [a, b] = seg;
+      expect(Math.min(a[0], b[0])).toBeCloseTo(-3, 9);
+      expect(Math.max(a[0], b[0])).toBeCloseTo(3, 9);
+      expect(a[0]).toBeCloseTo(a[1], 9);
+    });
+
+    it("extends a tiny direction as far as a large one", () => {
+      const seg = extendAndClip(1, 0.5, 1e-3, 0, [3, 3]);
+      if (seg === null) throw new Error("expected a clipped segment");
+      expect(Math.abs(seg[1][0] - seg[0][0])).toBeCloseTo(6, 9);
+    });
+
+    it("accepts a scalar bound", () => {
+      const seg = extendAndClip(0, 0, 0, 1, 2);
+      if (seg === null) throw new Error("expected a clipped segment");
+      expect(Math.abs(seg[1][1] - seg[0][1])).toBeCloseTo(4, 9);
+    });
+
+    it("returns null for a degenerate or non-finite direction, or a point outside the box", () => {
+      expect(extendAndClip(0, 0, 0, 0, [3, 3])).toBeNull();
+      expect(extendAndClip(0, 0, Number.NaN, 1, [3, 3])).toBeNull();
+      expect(extendAndClip(0, 5, 1, 0, [3, 3])).toBeNull();
     });
   });
 });

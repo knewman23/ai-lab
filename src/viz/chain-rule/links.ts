@@ -3,19 +3,15 @@ import type { Composition } from "../../core/math/compositions";
 import type { ThemeColors } from "../types";
 import { disposeLayers, type Layer, lineLayer } from "../shared/layer";
 import { writeWorldSegments } from "../shared/layer-write";
-import { linkSegments } from "./links-geometry";
+import { linkSegments, type LinkSegments } from "./links-geometry";
 import type { Derived, ShowKey } from "./state";
+
+type LinkKey = keyof LinkSegments;
 
 export interface Links {
   readonly group: Group;
   /** The five world layers, keyed by what they draw; read by tests. */
-  readonly layers: {
-    readonly connectors: Layer;
-    readonly primed: Layer;
-    readonly legs: Layer;
-    readonly secants: Layer;
-    readonly tangents: Layer;
-  };
+  readonly layers: Readonly<Record<LinkKey, Layer>>;
   /** Rewrites every layer for a state. */
   set(c: Composition, x: number, d: Derived): void;
   /** Shows or hides layers by overlay toggle; "connectors" covers both connector layers. */
@@ -23,10 +19,25 @@ export interface Links {
   dispose(): void;
 }
 
-/** Endpoint capacities: six segments of connectors and legs, three of secants and tangents. */
-const CONNECTOR_ENDPOINTS = 12;
-const LEG_ENDPOINTS = 12;
-const LINE_ENDPOINTS = 6;
+/** How each layer is drawn: buffer size in endpoints, render order, opacity, theme colour, and the toggle that shows it. */
+interface LayerSpec {
+  readonly endpoints: number;
+  readonly order: number;
+  readonly opacity: number;
+  readonly colour: "soft" | "faint" | "accent";
+  readonly show: ShowKey;
+}
+
+/** Six segments of connectors and legs, three of secants and tangents; orders per spec §3.2. */
+const SPECS: Readonly<Record<LinkKey, LayerSpec>> = {
+  connectors: { endpoints: 12, order: 3, opacity: 0.8, colour: "soft", show: "connectors" },
+  primed: { endpoints: 12, order: 4, opacity: 0.6, colour: "faint", show: "connectors" },
+  legs: { endpoints: 12, order: 5, opacity: 0.9, colour: "soft", show: "triangles" },
+  secants: { endpoints: 6, order: 5, opacity: 0.9, colour: "soft", show: "secants" },
+  tangents: { endpoints: 6, order: 6, opacity: 1, colour: "accent", show: "tangents" },
+};
+
+const KEYS = Object.keys(SPECS) as LinkKey[];
 
 /**
  * The lines that tie the three faces together: connectors from P to Q to R
@@ -35,28 +46,20 @@ const LINE_ENDPOINTS = 6;
  * geometry module lifts each endpoint off the face it lies on.
  */
 export function createLinks(theme: ThemeColors): Links {
-  const connectors = lineLayer(CONNECTOR_ENDPOINTS, 3, { depth: true });
-  const primed = lineLayer(CONNECTOR_ENDPOINTS, 4, { depth: true });
-  const legs = lineLayer(LEG_ENDPOINTS, 5, { depth: true });
-  const secants = lineLayer(LINE_ENDPOINTS, 5, { depth: true });
-  const tangents = lineLayer(LINE_ENDPOINTS, 6, { depth: true });
-  const layers = { connectors, primed, legs, secants, tangents };
-  const all = [connectors, primed, legs, secants, tangents];
-
-  connectors.material.opacity = 0.8;
-  primed.material.opacity = 0.6;
-  legs.material.opacity = 0.9;
-  secants.material.opacity = 0.9;
+  const layers = {} as Record<LinkKey, Layer>;
+  for (const key of KEYS) {
+    const spec = SPECS[key];
+    const layer = lineLayer(spec.endpoints, spec.order, { depth: true });
+    layer.material.opacity = spec.opacity;
+    layers[key] = layer;
+  }
+  const all = KEYS.map((key) => layers[key]);
 
   const group = new Group();
   group.add(...all.map((layer) => layer.object));
 
   function applyTheme(): void {
-    connectors.material.color.copy(theme.soft);
-    primed.material.color.copy(theme.faint);
-    legs.material.color.copy(theme.soft);
-    secants.material.color.copy(theme.soft);
-    tangents.material.color.copy(theme.accent);
+    for (const key of KEYS) layers[key].material.color.copy(theme[SPECS[key].colour]);
   }
   applyTheme();
   theme.addEventListener("change", applyTheme);
@@ -67,19 +70,11 @@ export function createLinks(theme: ThemeColors): Links {
 
     set(c: Composition, x: number, d: Derived): void {
       const segments = linkSegments(c, x, d);
-      writeWorldSegments(connectors, segments.connectors);
-      writeWorldSegments(primed, segments.primed);
-      writeWorldSegments(legs, segments.legs);
-      writeWorldSegments(secants, segments.secants);
-      writeWorldSegments(tangents, segments.tangents);
+      for (const key of KEYS) writeWorldSegments(layers[key], segments[key]);
     },
 
     setShow(show: Readonly<Record<ShowKey, boolean>>): void {
-      connectors.object.visible = show.connectors;
-      primed.object.visible = show.connectors;
-      legs.object.visible = show.triangles;
-      secants.object.visible = show.secants;
-      tangents.object.visible = show.tangents;
+      for (const key of KEYS) layers[key].object.visible = show[SPECS[key].show];
     },
 
     dispose(): void {
