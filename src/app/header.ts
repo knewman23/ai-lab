@@ -42,7 +42,7 @@ export function renderHeader(): Header {
   const label = document.createElement("span");
   label.className = "lbl";
   const name = document.createElement("b");
-  name.textContent = "KRYS NEWMAN";
+  name.append(link("https://knewman23.github.io/", "KRYS NEWMAN"));
   // The owner's name and its separator hide on narrow screens so the crumbs fit.
   const owner = document.createElement("span");
   owner.className = "owner";
