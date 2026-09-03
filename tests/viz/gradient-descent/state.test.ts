@@ -155,6 +155,30 @@ describe("setOptimizer", () => {
     expect(s1.status).toBe("ok");
     expect(s1.running).toBe(false);
   });
+
+  it("resets pos to the surface start when switching optimizer after divergence", () => {
+    let s = setLr(setOptimizer(setSurface(initialState(), "rosenbrock"), "sgd"), 1e307);
+    for (let i = 0; i < 50 && s.status === "ok"; i++) {
+      s = step(s);
+    }
+    expect(s.status).toBe("diverged");
+    const s1 = setOptimizer(s, "adam");
+    expect(s1.pos).toEqual(SURFACES.rosenbrock.start);
+    expect(s1.status).toBe("ok");
+    expect(derived(s1).canStep).toBe(true);
+  });
+
+  it("resets pos to the surface start when switching optimizer after leaving the domain", () => {
+    let s = setLr(setOptimizer(setSurface(initialState(), "saddle"), "sgd"), 0.1);
+    for (let i = 0; i < 100 && s.status === "ok"; i++) {
+      s = step(s);
+    }
+    expect(s.status).toBe("left-domain");
+    const s1 = setOptimizer(s, "adam");
+    expect(s1.pos).toEqual(SURFACES.saddle.start);
+    expect(s1.status).toBe("ok");
+    expect(derived(s1).canStep).toBe(true);
+  });
 });
 
 describe("setLr", () => {
@@ -211,8 +235,8 @@ describe("path capacity", () => {
 describe("purity", () => {
   it("step does not mutate the input state's scalar fields", () => {
     const s0 = initialState();
-    const frozen = Object.freeze({ ...s0 });
-    expect(() => step(frozen)).not.toThrow();
+    Object.freeze(s0);
+    expect(() => step(s0)).not.toThrow();
     const s1 = step(s0);
     expect(s1).not.toBe(s0);
   });

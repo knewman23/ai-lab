@@ -138,14 +138,23 @@ export function setSurface(s: GdState, key: SurfaceKey): GdState {
 }
 
 export function setOptimizer(s: GdState, key: OptimizerKey): GdState {
+  // Optimizer change keeps the marker in place per spec, but only when the
+  // marker is at a valid position. If the prior run had already diverged or
+  // left the domain, `s.pos` is non-finite or out of bounds, and carrying it
+  // forward here would silently resurrect it as a fresh "ok" position (with
+  // canStep true) even though it's still invalid. Fall back to the surface's
+  // start point in that case, matching `reset`'s pos.
+  const surface = SURFACES[s.surface];
+  const pos = s.status === "ok" ? s.pos : surface.start;
   return {
     ...s,
     optimizer: key,
+    pos,
     optState: getOptimizer(key).init(),
     steps: 0,
     status: "ok",
     running: false,
-    path: freshPath(s.pos),
+    path: freshPath(pos),
   };
 }
 
@@ -162,6 +171,7 @@ export function setShow(s: GdState, key: ShowKey, on: boolean): GdState {
   return { ...s, show: { ...s.show, [key]: on } };
 }
 
+/** Allocates a new object each call; call once per state change (e.g. per render), not in a hot loop. */
 export function derived(s: GdState): {
   readonly loss: number;
   readonly grad: Vec2;
