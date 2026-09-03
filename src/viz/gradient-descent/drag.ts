@@ -78,6 +78,14 @@ export function attachDrag(opts: DragOptions): () => void {
     canvas.removeEventListener("pointermove", onPointerMove);
     canvas.removeEventListener("pointerup", endDrag);
     canvas.removeEventListener("pointercancel", endDrag);
+    if (activePointer !== null) {
+      // The pointer may already be gone (element detached, capture lost).
+      try {
+        canvas.releasePointerCapture(activePointer);
+      } catch {
+        // Nothing to release.
+      }
+    }
     activePointer = null;
     controls.enabled = true;
   };
