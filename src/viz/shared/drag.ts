@@ -2,14 +2,13 @@ import { Plane, Raycaster, Vector2, Vector3, type Camera, type Object3D } from "
 import type { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import type { Vec2 } from "../../core/math/numeric";
 
-export interface DragOptions {
+/** Everything a drag needs apart from the plane it happens on. */
+export interface DragBase {
   canvas: HTMLElement;
   camera: Camera;
   controls: OrbitControls;
   /** The grabbable objects, in the order the caller wants them indexed. */
   hitTargets: readonly Object3D[];
-  /** Display height of the object at `index`, which fixes the plane it drags on. */
-  getPlaneZ(index: number): number;
   /** Keeps a dragged or placed point inside the scene; identity by default. */
   clamp?: (pos: Vec2) => Vec2;
   /**
@@ -23,6 +22,30 @@ export interface DragOptions {
   onDrag(index: number, pos: Vec2): void;
 }
 
+/**
+ * A drag happens on exactly one plane, given either way round: `getPlaneZ` for
+ * the horizontal case, where the plane's normal is +Z and only the height
+ * varies, or `plane` for any other orientation. The union — with each key
+ * barred from the other arm — makes the compiler insist on exactly one.
+ */
+export type DragOptions = DragBase &
+  (
+    | {
+        /** Display height of the object at `index`, which fixes the plane it drags on. */
+        getPlaneZ(index: number): number;
+        plane?: never;
+      }
+    | {
+        /**
+         * The plane the object at `index` drags on: `normal` is its direction,
+         * and `getOffset` the signed distance from the origin along it. The
+         * normal is copied and normalised, so the caller may reuse the vector.
+         */
+        plane: { normal: Vector3; getOffset(index: number): number };
+        getPlaneZ?: never;
+      }
+  );
+
 /** A pointerdown that missed the targets counts as a click, not an orbit, within these bounds. */
 const CLICK_SLOP_PX = 6;
 const CLICK_MS = 400;
@@ -31,11 +54,16 @@ const HOVER_STEP_PX = 4;
 
 const identity = (pos: Vec2): Vec2 => pos;
 
+/** The fixed normal of the horizontal `getPlaneZ` case, shared and never mutated. */
+const PLANE_Z_NORMAL = new Vector3(0, 0, 1);
+
 /**
- * Makes one or more objects draggable: the pointer ray meets a horizontal plane
- * at the grabbed object's current height, which gives (x, y) alone. The caller
- * decides where the object goes from there, so cursor jitter can never lift it
- * off the surface it belongs to. Orbit is suspended for the duration of a drag.
+ * Makes one or more objects draggable: the pointer ray meets the plane the
+ * caller named — horizontal at the grabbed object's current height, or any
+ * other orientation — and the world x and y of that hit are reported. The
+ * caller decides where the object goes from there, so cursor jitter can never
+ * lift it off the surface it belongs to. Orbit is suspended for the duration of
+ * a drag.
  *
  * A press that misses every target still orbits, but if it ends quickly and
  * near where it began it is treated as a click, and — when the caller gave a
@@ -53,7 +81,7 @@ export function attachDrag(opts: DragOptions): () => void {
 
   const raycaster = new Raycaster();
   const ndc = new Vector2();
-  const dragPlane = new Plane(new Vector3(0, 0, 1), 0);
+  const dragPlane = new Plane(PLANE_Z_NORMAL.clone(), 0);
   const hit = new Vector3();
   let activePointer: number | null = null;
   let activeIndex = -1;
@@ -77,6 +105,19 @@ export function attachDrag(opts: DragOptions): () => void {
     return object ? hitTargets.indexOf(object) : -1;
   }
 
+  /** Re-aims the drag plane at whichever source the caller gave, for this target. */
+  function setDragPlane(index: number): void {
+    if ("plane" in opts) {
+      dragPlane.set(opts.plane.normal, -opts.plane.getOffset(index));
+      // set() copies the normal as given; the offset only reads as a world
+      // distance once that copy is a unit vector.
+      dragPlane.normal.normalize();
+      return;
+    }
+    // Plane through the object's height at drag start: constant is -z for normal +Z.
+    dragPlane.set(PLANE_Z_NORMAL, -opts.getPlaneZ(index));
+  }
+
   function setCursor(value: string): void {
     canvas.style.cursor = value;
   }
@@ -96,8 +137,7 @@ export function attachDrag(opts: DragOptions): () => void {
       return;
     }
 
-    // Plane through the object's height at drag start: constant is -z for normal +Z.
-    dragPlane.constant = -opts.getPlaneZ(index);
+    setDragPlane(index);
 
     candidate = null;
     activePointer = event.pointerId;

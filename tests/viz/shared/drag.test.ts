@@ -6,11 +6,12 @@ import {
   PerspectiveCamera,
   PlaneGeometry,
   SphereGeometry,
+  Vector3,
 } from "three";
 import type { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { describe, expect, it, vi } from "vitest";
 import type { Vec2 } from "../../../src/core/math/numeric";
-import { attachDrag, type DragOptions } from "../../../src/viz/shared/drag";
+import { attachDrag, type DragBase, type DragOptions } from "../../../src/viz/shared/drag";
 
 /**
  * A 200x200 canvas viewed by a 90-degree camera one unit in front of the z = 0
@@ -45,7 +46,8 @@ function ball(x: number): Mesh {
   return mesh;
 }
 
-type Overrides = Partial<Pick<DragOptions, "hitTargets" | "getPlaneZ" | "enabled">> & {
+type Overrides = Partial<Pick<DragBase, "hitTargets" | "enabled">> & {
+  getPlaneZ?: (index: number) => number;
   surfaceTarget?: Object3D | null;
 };
 
@@ -91,6 +93,72 @@ function harness(overrides: Overrides = {}) {
 
   return { canvas, controls, onDrag, getPlaneZ, detach, send };
 }
+
+/**
+ * The same 200x200 rect seen by a Z-up camera one unit along -y, so the drag
+ * plane is the vertical y = 0 slice: screen x 0..200 still spans world x -1..1
+ * and screen y 0..200 spans world z 1..-1.
+ */
+function verticalHarness() {
+  const canvas = document.createElement("div");
+  vi.spyOn(canvas, "getBoundingClientRect").mockReturnValue({
+    left: 0,
+    top: 0,
+    width: SIZE,
+    height: SIZE,
+  } as DOMRect);
+  canvas.setPointerCapture = vi.fn();
+  canvas.releasePointerCapture = vi.fn();
+  canvas.hasPointerCapture = vi.fn(() => false);
+
+  const camera = new PerspectiveCamera(90, 1, 0.1, 100);
+  camera.position.set(0, -1, 0);
+  // Without a Z-up camera, looking straight along +y from -y is degenerate.
+  camera.up.set(0, 0, 1);
+  camera.lookAt(0, 0, 0);
+  camera.updateMatrixWorld();
+
+  // On the plane at world (0.5, 0, 0.5), which is screen (150, 50).
+  const target = new Mesh(new SphereGeometry(0.2, 8, 8));
+  target.position.set(BALL_X, 0, 0.5);
+  target.updateMatrixWorld();
+
+  const controls = { enabled: true } as OrbitControls;
+  const onDrag = vi.fn<(index: number, pos: Vec2) => void>();
+
+  const detach = attachDrag({
+    canvas,
+    camera,
+    controls,
+    hitTargets: [target],
+    plane: { normal: new Vector3(0, 1, 0), getOffset: () => 0 },
+    onDrag,
+  });
+
+  const send = (type: string, [x, y]: readonly [number, number], id = 1): void => {
+    canvas.dispatchEvent(pointer(type, x, y, id));
+  };
+
+  return { canvas, controls, onDrag, detach, send };
+}
+
+/**
+ * Type-level only, never called: the plane source is a union, so the compiler
+ * has to reject options that give both sources or neither.
+ */
+const typecheckOnly = (base: DragBase): void => {
+  // @ts-expect-error - getPlaneZ and plane are mutually exclusive
+  const both: DragOptions = {
+    ...base,
+    getPlaneZ: () => 0,
+    plane: { normal: new Vector3(0, 1, 0), getOffset: () => 0 },
+  };
+  // @ts-expect-error - one of getPlaneZ and plane is required
+  const neither: DragOptions = { ...base };
+  void both;
+  void neither;
+};
+void typecheckOnly;
 
 /** The single (index, Vec2) pair a single onDrag call received. */
 function only(onDrag: ReturnType<typeof harness>["onDrag"]): [number, Vec2] {
@@ -225,6 +293,22 @@ describe("attachDrag", () => {
     send("pointerup", OFF_BALL);
 
     expect(onDrag).not.toHaveBeenCalled();
+
+    detach();
+  });
+
+  it("drags on a vertical plane when one is given instead of getPlaneZ", () => {
+    const { onDrag, detach, send } = verticalHarness();
+
+    send("pointerdown", [150, 50]);
+    // Screen x 70 is world x -0.3 on the y = 0 plane, one unit from the camera.
+    send("pointermove", [70, 120]);
+
+    const [index, [x, y]] = only(onDrag);
+    expect(index).toBe(0);
+    expect(x).toBeCloseTo(-0.3, 6);
+    // The hit's world y: the drag plane itself, reported unchanged.
+    expect(y).toBeCloseTo(0, 6);
 
     detach();
   });
