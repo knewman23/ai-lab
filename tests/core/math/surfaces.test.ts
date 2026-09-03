@@ -6,7 +6,7 @@ import { SURFACE_KEYS, SURFACES, clampToDomain, isInDomain } from "../../../src/
 function makeLcg(seed: number): () => number {
   let state = seed >>> 0;
   return (): number => {
-    state = (1103515245 * state + 12345) & 0x7fffffff;
+    state = (Math.imul(1103515245, state) + 12345) & 0x7fffffff;
     return state / 0x7fffffff;
   };
 }

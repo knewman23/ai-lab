@@ -3,28 +3,28 @@ import type { Vec2 } from "./numeric";
 export type SurfaceKey = "bowl" | "elongated" | "saddle" | "himmelblau" | "rosenbrock";
 
 export interface Surface {
-  key: SurfaceKey;
-  title: string;
-  f(x: number, y: number): number;
-  grad(x: number, y: number): Vec2;
-  domain: { x: [number, number]; y: [number, number] };
+  readonly key: SurfaceKey;
+  readonly title: string;
+  readonly f: (x: number, y: number) => number;
+  readonly grad: (x: number, y: number) => Vec2;
+  readonly domain: { readonly x: readonly [number, number]; readonly y: readonly [number, number] };
   /** Display scale applied when mapping f(x, y) into scene units. */
-  scale: number;
-  start: Vec2;
+  readonly scale: number;
+  readonly start: Vec2;
   /** "What to look for" sentence shown in the explanation panel. */
-  hint: string;
+  readonly hint: string;
 }
 
 /** Ordered as in the spec's surface table. */
-export const SURFACE_KEYS: readonly SurfaceKey[] = [
+export const SURFACE_KEYS = [
   "bowl",
   "elongated",
   "saddle",
   "himmelblau",
   "rosenbrock",
-];
+] as const satisfies readonly SurfaceKey[];
 
-export const SURFACES: Record<SurfaceKey, Surface> = {
+export const SURFACES: Readonly<Record<SurfaceKey, Surface>> = {
   bowl: {
     key: "bowl",
     title: "Bowl",
