@@ -180,3 +180,25 @@ input[type="range"]::-moz-range-track {
   text-align: right;
   color: var(--ink);
 }
+
+/* explanation panel */
+.explain p {
+  margin: 0 0 12px;
+  color: var(--soft);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.explain h3 {
+  margin: 20px 0 10px;
+}
+.hint {
+  font-style: italic;
+}
+.readout-inline {
+  display: block;
+  margin: 0 0 10px;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+}
