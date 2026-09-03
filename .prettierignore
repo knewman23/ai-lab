@@ -1,0 +1,4 @@
+dist/
+pnpm-lock.yaml
+public/fonts/
+docs/
