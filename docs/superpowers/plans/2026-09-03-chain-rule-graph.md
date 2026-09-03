@@ -78,6 +78,8 @@ README.md, docs/screenshots/chain-rule-light.png, -dark.png
 
 ### Task 4: Framing and faces
 
+> **As built:** the camera offset below was changed after the browser check to `OFFSET = [-1.5, -1.6, 1.3]` (position (−9.75, −7.4, 11.45), the −x, −y, +z octant) so the two walls do not overlap on screen. See spec §3.3 revision 3; do not restore the +x camera.
+
 **Files:** create `src/viz/chain-rule/frame-corner.ts`, `src/viz/chain-rule/faces.ts`; test `tests/viz/chain-rule/frame-corner.test.ts`.
 
 - [ ] **Step 1: Failing test:** `frameCorner()` → target `[0, 3, 3]`; position = TARGET + 6.5·OFFSET per spec §3.3, i.e. `toBeCloseTo` (8.775, −7.4, 8.85); position.x > 0, position.y < 0, position.z > target z (the +x, −y, +z octant).

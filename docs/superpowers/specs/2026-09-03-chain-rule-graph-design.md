@@ -1,7 +1,7 @@
 # Chain rule graph — a three-wall corner where slopes multiply
 
 Date: 2026-09-03
-Status: approved by spec review (revision 3: camera octant changed after the browser check)
+Status: approved by spec review (revision 4: as-built file list; camera octant changed after the browser check in revision 3)
 Parent: [AI Lab design](2026-09-03-ai-lab-design.md); siblings: [Derivative explorer](2026-09-03-derivative-explorer-design.md), [Matrix transformation](2026-09-03-matrix-transformation-design.md)
 Registry: replaces the `calculus` roadmap entry `chain-rule-graph`
 
@@ -82,8 +82,9 @@ Faces: three `PlaneGeometry(6, 6)` meshes, `MeshBasicMaterial({ color: --faint, 
 true, opacity: 0.35, side: DoubleSide, depthWrite: false })`, `renderOrder 0`. Outlines: one
 `LineSegments` layer of the nine corner edges in `--line`.
 
-Axes (`--line`, order 1): front wall x axis (Z = 3, u = 0) and the shared vertical edge at
-(−3, 0); side wall y axis (Z = 3); floor x axis (Y = 3) and y axis (X = −3). Unit ticks (length
+Axes (`--line`, order 1): front wall x axis (Z = 3, u = 0); side wall y axis (Z = 3); floor x axis
+(Y = 3). The shared vertical edge at (−3, 0) and the floor's y axis at X = −3 coincide with outline
+edges and are drawn once, as outline. Unit ticks (length
 0.12) on the front wall x axis and the floor x axis only; the u and y axes are scaled per preset
 so ticks there would mislead. Labels are out of scope; the panel names the axes.
 
@@ -239,12 +240,20 @@ Explanation (`createEquation` for structure, plain spans for numbers):
 ```
 src/core/math/compositions.ts                       + tests
 src/core/math/sampling1d.ts   + sampleOn            + tests
-src/viz/shared/layer.ts       moved from viz/derivative/layer.ts; gains the optional Face
+src/viz/shared/layer.ts       moved from viz/derivative/layer.ts (writers in layer-write.ts, CLIP
+                              stays in viz/derivative/clip.ts); gains the optional Face
                               (§3.1) and a `depth` option; NaN-safe clipping; derivative
                               imports updated, its tests unchanged         + test (face → world)
+src/viz/shared/lift.ts        faceToWorld, liftOf, segment and the lift constants
+src/core/math/matrix2.ts      extendAndClip next to clipSegment
+src/ui/readout.ts             proseNum (typographic minus for prose), shared with the derivative scene
 src/viz/shared/drag.ts        `plane.normal` may be a function of the hit index (−1 for a
                               surface click); existing callers unchanged           + test
-src/viz/chain-rule/
+src/viz/chain-rule/   (as built: pure geometry modules are split from their three.js wrappers)
+  display.ts        HALF, BOUND and the three face-local mappers frontLocal/sideLocal/floorLocal
+  faces-geometry.ts outline, axis and tick segment lists (pure)      + tests
+  links-geometry.ts facePoints, linkSegments (pure)                  + tests
+  panel-readouts.ts the Values / Derivatives / Ratios readout sections
   index.ts          Visualization (mirrors derivative/index.ts: buildScene with unwind, panel
                     declared before apply, theme "change" → dirty, one attachDrag call, dispose
                     order theme listener → drag → hint → scene objects (reverse build order) →
