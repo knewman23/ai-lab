@@ -1,6 +1,7 @@
 import "../styles/fonts.css";
 import "../styles/tokens.css";
 import "../styles/shell.css";
+import "../styles/panel.css";
 import { createShell } from "./app/shell";
 
 const app = document.querySelector<HTMLDivElement>("#app");
