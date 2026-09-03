@@ -8,12 +8,12 @@ import {
   PlaneGeometry,
   SphereGeometry,
   Vector3,
-  type Material,
 } from "three";
 import { magnitude } from "../../core/math/numeric";
 import type { Vec2 } from "../../core/math/numeric";
 import type { Surface } from "../../core/math/surfaces";
 import type { ThemeColors } from "../types";
+import { disposeArrow, fadeArrow, overlayArrow } from "../shared/arrow";
 
 export interface Marker {
   readonly group: Group;
@@ -33,46 +33,6 @@ const MAX_LENGTH = 1.5;
 const FLAT = 1e-9;
 const BALL_ORDER = 9;
 const ARROW_ORDER = 10;
-
-/** Runs `apply` over whatever material(s) a helper part carries. */
-function eachMaterial(material: Material | Material[], apply: (m: Material) => void): void {
-  for (const m of Array.isArray(material) ? material : [material]) apply(m);
-}
-
-function fade(material: Material | Material[], opacity: number): void {
-  eachMaterial(material, (m) => {
-    m.transparent = true;
-    m.opacity = opacity;
-  });
-}
-
-/**
- * Draws an arrow over the surface instead of inside it. The arrows lie in the
- * tangent plane, so at the default camera the mesh buries most of their length.
- *
- * `renderOrder` goes on the line and cone rather than the ArrowHelper: three
- * sorts renderable objects individually and a Group's own order is not
- * inherited by its children.
- */
-function overlay(arrow: ArrowHelper): void {
-  for (const part of [arrow.line, arrow.cone]) {
-    part.renderOrder = ARROW_ORDER;
-    eachMaterial(part.material, (m) => {
-      m.depthTest = false;
-      m.depthWrite = false;
-    });
-  }
-}
-
-/**
- * Releases an arrow's own materials. Not `ArrowHelper.dispose()`: that also
- * disposes the line and cone geometries, which three shares across every
- * ArrowHelper in the app, so one disposal would break all the others.
- */
-function disposeArrow(arrow: ArrowHelper): void {
-  eachMaterial(arrow.line.material, (m) => m.dispose());
-  eachMaterial(arrow.cone.material, (m) => m.dispose());
-}
 
 /**
  * The draggable ball on the surface, with the gradient and negative-gradient
@@ -98,10 +58,17 @@ export function createMarker(theme: ThemeColors): Marker {
   const up = new Vector3(0, 0, 1);
   const gradArrow = new ArrowHelper(up, new Vector3(), 1);
   const descentArrow = new ArrowHelper(up, new Vector3(), 1);
-  fade(descentArrow.line.material, 0.45);
-  fade(descentArrow.cone.material, 0.45);
-  overlay(gradArrow);
-  overlay(descentArrow);
+  // The arrows lie in the tangent plane, so at the default camera the surface
+  // mesh buries most of their length: draw them over it instead of inside it.
+  for (const arrow of [gradArrow, descentArrow]) {
+    overlayArrow(arrow, {
+      renderOrder: ARROW_ORDER,
+      depthTest: false,
+      depthWrite: false,
+      transparent: false,
+    });
+  }
+  fadeArrow(descentArrow, 0.45);
 
   const planeGeometry = new PlaneGeometry(PLANE_SIDE, PLANE_SIDE);
   const planeMaterial = new MeshBasicMaterial({

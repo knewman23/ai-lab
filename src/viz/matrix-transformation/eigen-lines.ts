@@ -58,7 +58,10 @@ export function createEigenLines(theme: ThemeColors, bound = 5): EigenLines {
   const lines: readonly [Line, Line] = [makeLine(lineGeometries[0]), makeLine(lineGeometries[1])];
 
   const sphereGeometry = new SphereGeometry(SPHERE_RADIUS, 16, 12);
-  const sphereMaterial = new MeshStandardMaterial({ roughness: 0.5 });
+  // `transparent` puts the spheres in the same sort group as the flat layers
+  // below them, so renderOrder decides: without it the unit-square fill, which
+  // is transparent, would paint over them.
+  const sphereMaterial = new MeshStandardMaterial({ roughness: 0.5, transparent: true });
   const makeSphere = (): Mesh => {
     const sphere = new Mesh(sphereGeometry, sphereMaterial);
     sphere.renderOrder = SPHERE_ORDER;

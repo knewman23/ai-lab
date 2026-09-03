@@ -6,11 +6,11 @@ import {
   MeshStandardMaterial,
   SphereGeometry,
   Vector3,
-  type Material,
 } from "three";
 import type { Mat2 } from "../../core/math/matrix2";
 import { columns } from "../../core/math/matrix2";
 import type { ThemeColors } from "../types";
+import { disposeArrow, overlayArrow } from "../shared/arrow";
 
 export interface Basis {
   readonly group: Group;
@@ -31,37 +31,6 @@ const ZERO = 1e-6;
 const ORDER = 10;
 const INDICES = [0, 1] as const;
 
-/** Runs `apply` over whatever material(s) a helper part carries. */
-function eachMaterial(material: Material | Material[], apply: (m: Material) => void): void {
-  for (const m of Array.isArray(material) ? material : [material]) apply(m);
-}
-
-/**
- * `renderOrder` goes on the line and cone rather than the ArrowHelper: three
- * sorts renderable objects individually and a Group's own order is not
- * inherited by its children. `transparent` puts the arrows in the same sort
- * group as the flat layers below them, so `renderOrder` alone decides the
- * order; depth testing stays on because these are solid bodies.
- */
-function overlay(arrow: ArrowHelper): void {
-  for (const part of [arrow.line, arrow.cone]) {
-    part.renderOrder = ORDER;
-    eachMaterial(part.material, (m) => {
-      m.transparent = true;
-    });
-  }
-}
-
-/**
- * Releases an arrow's own materials. Not `ArrowHelper.dispose()`: that also
- * disposes the line and cone geometries, which three shares across every
- * ArrowHelper in the app, so one disposal would break all the others.
- */
-function disposeArrow(arrow: ArrowHelper): void {
-  eachMaterial(arrow.line.material, (m) => m.dispose());
-  eachMaterial(arrow.cone.material, (m) => m.dispose());
-}
-
 /**
  * The two basis vectors M(t)·e₁ and M(t)·e₂, each an arrow from the origin with
  * a draggable tip ball.
@@ -77,7 +46,9 @@ export function createBasis(theme: ThemeColors): Basis {
     new ArrowHelper(new Vector3(1, 0, 0), new Vector3(), 1),
     new ArrowHelper(new Vector3(0, 1, 0), new Vector3(), 1),
   ];
-  for (const arrow of arrows) overlay(arrow);
+  // Depth testing stays on: these are solid bodies in a scene of flat layers,
+  // and `transparent` alone is enough to sort them above the fill.
+  for (const arrow of arrows) overlayArrow(arrow, { renderOrder: ORDER });
 
   const ballGeometry = new SphereGeometry(BALL_RADIUS, 24, 16);
   const ballMaterials: readonly [MeshStandardMaterial, MeshStandardMaterial] = [
