@@ -92,7 +92,9 @@ function commit(layer: Layer, endpoints: number): void {
  *
  * The domain curve is kept in a cache buffer so leaving zoom is a copy rather
  * than a resample, and every layer draws from a buffer sized for the worst case
- * with `setDrawRange` deciding how much of it is live.
+ * with `setDrawRange` deciding how much of it is live. `setZoom` is called every
+ * frame of a drag, almost always at K = 1, so it memoises on (fn, x, K) and does
+ * nothing at all unless one of them moved.
  */
 export function createCurves(theme: ThemeColors): Curves {
   const prime = lineLayer(RUN_ENDPOINTS, PRIME_ORDER);
@@ -108,6 +110,10 @@ export function createCurves(theme: ThemeColors): Curves {
   let domainEndpoints = 0;
 
   let zoomed = false;
+  // Last (fn, x, K) drawn, so the per-frame setZoom during a drag is a no-op.
+  let lastFn: Fn1D | null = null;
+  let lastX = Number.NaN;
+  let lastK = Number.NaN;
   let showDerivative = true;
   let showGuides = true;
   let hasMarker = false;
@@ -173,15 +179,25 @@ export function createCurves(theme: ThemeColors): Curves {
       commit(prime, n);
 
       zoomed = false;
+      // A new curve invalidates whatever the zoom memo last drew.
+      lastFn = null;
       applyVisibility();
     },
 
     setZoom(fn: Fn1D, x: number, K: number): void {
-      zoomed = K > 1;
-      if (zoomed) {
+      if (fn === lastFn && x === lastX && K === lastK) return;
+      lastFn = fn;
+      lastX = x;
+      lastK = K;
+
+      if (K > 1) {
         writeZoomWindow(fn, x, K);
+        zoomed = true;
       } else {
-        restoreDomainCurve();
+        // At K = 1 the curve is already the domain one unless we are leaving
+        // zoom, so the common case (a drag, which never zooms) copies nothing.
+        if (zoomed) restoreDomainCurve();
+        zoomed = false;
       }
       applyVisibility();
     },
