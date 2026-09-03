@@ -1,7 +1,7 @@
 # Derivative and tangent explorer — a 1D function, its tangent, the secant limit and f′
 
 Date: 2026-09-03
-Status: owner delegated the design; spec under review
+Status: owner delegated the design; spec under review (revision 2)
 Parent: [AI Lab design](2026-09-03-ai-lab-design.md); sibling: [Matrix transformation](2026-09-03-matrix-transformation-design.md)
 Registry: replaces the `calculus` roadmap entry `derivative-tangent`
 
@@ -9,148 +9,200 @@ Registry: replaces the `calculus` roadmap entry `derivative-tangent`
 
 Make the derivative visible three ways at once: as the slope of the tangent at a draggable point,
 as the limit of secant slopes as h shrinks, and as the height of a second curve f′(x) drawn
-underneath that tracks the same x. A "zoom to point" camera move shows the curve straightening into
-its tangent, which is what differentiability means. Two functions are deliberately not
-differentiable somewhere so the failure modes are shown, not just described.
+underneath that tracks the same x. A "Zoom in" control re-samples the function in a shrinking
+window around the point so the curve visibly becomes its tangent, which is what differentiability
+means. Two functions are deliberately not differentiable at one point so the failure modes are
+shown, not just described.
 
 Success criteria: two clicks from the home page; 60 fps while dragging; every readout matches an
-independent calculation; secant slope visibly converges to f′ as h → 0; at x = 0 on |x| the panel
-says why there is no tangent.
+independent calculation; secant slope visibly converges to f′ as h → 0; at x = 0 on |x| (reachable
+by snapping) the panel says why there is no tangent; three zoom steps on x² make the curve
+indistinguishable from its tangent.
 
-Out of scope: user-typed functions, higher derivatives, integrals, parametric curves.
+Out of scope: user-typed functions, higher derivatives, integrals, parametric curves, left-hand
+secants (h is positive; the corner is explained in text).
 
 ## 2. Decisions
 
 | Question | Decision | Alternatives |
 |---|---|---|
-| Layout | Curve on the vertical plane y = 0 (x → world x, f → world z); f′ curve on the same plane below it | Two planes at different depths (harder to read); 2D canvas (loses the shared shell) |
-| Secant control | Log slider for h, 1e-3 … 2, default 1 | Animated h → 0 button (roadmap: add later if wanted) |
-| Non-differentiable points | Explicit classification: value, jump (|x| at 0), vertical (√|x| at 0) | Silently show a numeric derivative |
-| Zoom | "Zoom to point" moves the camera to the point over 0.6 s (instant under reduced motion); "Reset view" restores | Scroll only |
-| Dragging | Reuse the shared drag with a vertical drag plane (new option) | Bespoke pointer code |
+| Layout | Curve on the vertical plane y = 0 (x → world x, f → world z); f′ curve on the same plane below it; camera on the −y side like every scene | Two planes at different depths; a 2D canvas |
+| Secant control | Log slider for h, 1e-3 … 2, default 1, positive only | Signed h (roadmap if the corner demo needs it) |
+| Non-differentiable points | Explicit classification (value, jump, vertical) plus snapping to the singular x when dragged within 0.02 | Silent numeric derivative |
+| Zoom | Domain rescale about the point by ×4 per step, up to 3 steps (×64); camera does not move | Camera fly-in (cannot get close enough within the near plane; foreshortens) |
+| Dragging | Shared drag with a new drag-plane option (vertical plane, normal +y) | Bespoke pointer code |
 
 ## 3. Scene
 
-Shared Z-up scene; everything lies on the plane y = 0. Display space: the main curve is
-z = s·f(x) with a per-function scale s so the curve fits z ∈ [−3, 3]; the derivative curve is
-z = z₀ + s′·f′(x) with z₀ = −6 and its own scale s′ so it fits z ∈ [−8.5, −3.5]. Domain x ∈ [−3, 3]
-for every function. Framing: the shared `frameFor` over x ∈ [−3, 3], "y" ∈ [−8.5, 3] (the helper is
-axis-agnostic: pass the two spans; see §8), viewed from the +y side so the plane faces the camera.
+Shared Z-up scene; everything lies on the plane y = 0 and the camera sits on the −y side. Display
+space: the main curve is Z = s·f(x) with a per-function scale s so |Z| ≤ 3 on the domain; the
+derivative curve is Z = z₀ + s′·f′(x) with z₀ = −6 and its own scale s′ so it fits the band
+[−8.5, −3.5]. Domain x ∈ [−3, 3]. Framing is local to the scene (`frame-vertical.ts`, five lines):
+target (0, 0, −2.75), camera (0, −D, −2.75) with D = max(5.75, 3) / tan(22.5°) × 1.15 ≈ 16, up +Z.
+
+**Zoom.** State holds `zoom ∈ {0, 1, 2, 3}`, K = 4^zoom. When zoom > 0 the main region shows the
+window [x − 3/K, x + 3/K] re-sampled with 241 points and drawn in display coordinates
+X = (x′ − x)·K, Z = s·(f(x′) − f(x))·K, so the point sits at (0, 0), the tangent keeps its display
+slope s·f′(x), and the curve converges to that line as K grows. The secant point at x + h is shown
+only if it lies inside the window. The derivative band, its axis, guides and marker are hidden
+while zoomed; the main axes show the window's edge x values as tick labels are out of scope, so
+the readout "Window: [x−w, x+w]" states it. Dragging is disabled while zoomed (`enabled` predicate)
+and the panel note says "Reset zoom to move the point"; click-to-place is disabled too.
 
 Flat layers (`transparent: true`, `depthTest: false`, `depthWrite: false`, explicit `renderOrder`,
-as in the matrix scene):
+as in the matrix scene). All `Line`s are drawn as `LineSegments` from preallocated buffers so gaps
+are possible:
 
 | Order | Layer | Colour | Notes |
 |---|---|---|---|
-| 1 | Axes and ticks | `--line` | x axis (z = 0) and z axis for the main curve; x axis at z₀ for the derivative curve; unit ticks; a faint `--faint` horizontal at z = −3.5 separating the two |
-| 2 | Derivative curve | `--soft` | 241 samples over [−3, 3]; drawn as a `Line`; toggleable; breaks (gaps) where f′ is undefined (|x|: none, it jumps; √|x|: skip the sample at 0) |
-| 3 | Main curve | `--ink` | 241 samples, `Line`, width via colour only |
-| 4 | Secant line | `--soft`, opacity .8 | through (x, s·f(x)) and (x+h, s·f(x+h)), extended to the display bound [−3.5, 3.5] in x and clipped to z ∈ [−3.5, 3.5] with `clipSegment`; toggleable |
-| 5 | Tangent line | `--accent` | through (x, s·f(x)) with display slope s·f′(x), extended and clipped like the secant; hidden for a jump; vertical (x = const) for a vertical tangent |
-| 6 | Guides | `--faint`, opacity .6 | a dashed-looking (two-segment) vertical from the point down to the derivative curve, and a small horizontal tick at the derivative curve's height, so the eye links slope above to height below |
-| 10 | Points | 3D, depth on, `transparent: true` | main point: sphere r 0.08 `--ink` (draggable, hit sphere r 0.2); secant point at x+h: sphere r 0.06 `--soft`; derivative marker: sphere r 0.06 `--accent` at (x, z₀ + s′·f′(x)), hidden when f′ is undefined |
+| 1 | Axes | `--line` | x axis (Z = 0) and Z axis for the main region; x axis at z₀ for the derivative band; unit ticks (hidden when zoomed); a `--faint` separator at Z = −3.6 |
+| 2 | Derivative curve | `--soft` | 241 samples; split into runs at the function's `singularAt` so a jump shows two flat runs with a gap and no riser, and √\|x\| shows two arms rising to the band clamp; toggleable |
+| 3 | Main curve | `--ink` | 241 samples over the domain or the zoom window |
+| 4 | Secant line | `--soft`, opacity .8 | through the point and the secant point, extended in display x to ±3.5 and clipped to Z ∈ [−3.4, 3.4] with `clipSegment`; hidden when the secant is degenerate (`secant === null`) or the secant point is outside the zoom window; toggleable |
+| 5 | Tangent line | `--accent` | through the point with display slope s·f′(x), extended and clipped the same way; hidden for a jump; for a vertical tangent a vertical segment X = const spanning the clip box |
+| 6 | Guides | `--faint`, opacity .6 | a vertical from the point down to the derivative marker and a short horizontal at the marker's height; hidden when the derivative curve is hidden, f′ is undefined, or zoomed |
+| 10 | Points | 3D, depth on, `transparent: true` | main point r 0.08 `--ink` (draggable; hit sphere r 0.2 with an invisible material); secant point r 0.06 `--soft` (hidden with the secant); derivative marker r 0.06 `--accent` at (x, z₀ + s′·f′(x)), hidden when f′ is undefined or zoomed |
 
-Colours from `ThemeColors`; no new tokens needed.
+Click-to-place target: `PlaneGeometry(7, 12)` rotated with `rotation.x = π/2` so it lies in y = 0,
+positioned at (0, 0, −2.75) so it covers Z ∈ [−8.75, 3.25], `MeshBasicMaterial({ visible: false,
+side: DoubleSide })` (material invisibility keeps it raycastable), disposed with the scene.
+
+Colours from `ThemeColors`; no new tokens.
 
 ## 4. Math (`core/math/functions1d.ts`, pure, unit-tested)
 
 ```ts
-type Derivative = { kind: "value"; v: number } | { kind: "jump"; left: number; right: number } | { kind: "vertical" };
-interface Fn1D { key; title; tex: string /* KaTeX for f */; texPrime: string /* KaTeX for f′ */;
-  f(x): number; d(x): Derivative; scale: number; primeScale: number; start: number; hint: string; }
+export type Derivative =
+  | { kind: "value"; v: number }
+  | { kind: "jump"; left: number; right: number }
+  | { kind: "vertical" };
+export interface Fn1D {
+  readonly key: FnKey; readonly title: string;
+  readonly tex: string;        // KaTeX for f(x)
+  readonly texPrime: string;   // KaTeX for f′(x)
+  readonly f: (x: number) => number;
+  readonly d: (x: number) => Derivative;
+  readonly scale: number;      // s
+  readonly primeScale: number; // s′
+  readonly start: number;
+  readonly singularAt: number | null;  // snap target for dragging
+  readonly hint: string;
+}
+export const FNS: Readonly<Record<FnKey, Fn1D>>; export const FN_KEYS;
 ```
 
-| Key | f | f′ | s | s′ | start | Why |
-|---|---|---|---|---|---|---|
-| `square` | x² | 2x | 1/3 | 1/2.4 | 1.5 | the first derivative everyone meets |
-| `cubic` | x³ − 3x | 3x² − 3 | 1/6 | 1/9.6 | 0.8 | turning points where f′ = 0; inflection at 0 |
-| `sine` | sin x | cos x | 2 | 2 | 1 | f′ is another familiar curve |
-| `exp` | eˣ⁄4 | eˣ⁄4 | 0.6 | 0.6 | 1 | f′ = f |
-| `abs` | \|x\| | sign(x); jump at 0 | 1 | 2 | 1.2 | no tangent at the corner |
-| `sqrtabs` | √\|x\| | sign(x)/(2√\|x\|); vertical at 0 | 1.5 | 1/2.4 clamped | 1 | vertical tangent, f′ → ±∞ |
+| Key | f | f′ | s | s′ | start | singularAt | Why |
+|---|---|---|---|---|---|---|---|
+| `square` | x² | 2x | 1/3 | 1/2.4 | 1.5 | null | the first derivative everyone meets |
+| `cubic` | x³ − 3x | 3x² − 3 | 1/6 | 1/9.6 | 0.8 | null | turning points where f′ = 0 |
+| `sine` | sin x | cos x | 2 | 2 | 1 | null | f′ is another familiar curve |
+| `exp` | eˣ⁄5 | eˣ⁄5 | 0.59 | 0.59 | 1 | null | f′ = f (e³/5 = 4.017; ×0.59 = 2.37) |
+| `abs` | \|x\| | sign(x); jump at 0 | 1 | 2 | 1.2 | 0 | no tangent at the corner |
+| `sqrtabs` | √\|x\| | sign(x)/(2√\|x\|); vertical at 0 | 1.5 | 1 | 1 | 0 | vertical tangent, f′ → ±∞ (display clamped to the band) |
 
-`d(x)` returns `jump` for `abs` when |x| < 1e-9 (left −1, right 1) and `vertical` for `sqrtabs` when
-|x| < 1e-9; otherwise `value`. `s′` is chosen so |s′·f′| ≤ 2.5 over the domain except near the
-`sqrtabs` singularity, where the derivative curve is clamped to the band [−8.5, −3.5] (clamp the
-display z, note it in a comment). `secantSlope(fn, x, h)` = (f(x+h) − f(x))/h; when x + h leaves the
-domain, h is reduced so x + h = 3 (the panel shows the effective h).
+`d(x)` returns `jump {left: −1, right: 1}` for `abs` when |x| < 1e-9, `vertical` for `sqrtabs` when
+|x| < 1e-9, otherwise `value`. Because 1e-9 is unreachable by dragging, the state reducer snaps x
+to `singularAt` when |x − singularAt| < 0.02 (§5). `secantSlope(fn, x, h)` = (f(x+h) − f(x))/h.
+`effectiveH(x, h)` = min(h, 3 − x) (so x + h stays in the domain); `null` when that is < 1e-9.
+Display clamping of the derivative curve for `sqrtabs` is done by the scene (clamp Z to the band).
 
-Tests: every `value` derivative matches central differences at 25 seeded points (rel 1e-4) away
-from the singularities (|x| > 0.05); `abs.d(0)` is `jump {−1, 1}`; `sqrtabs.d(0)` is `vertical`;
-`secantSlope(square, 1, h)` equals 2 + h exactly for h in {1, 0.1, 0.001}; the table's scale/start
-values; the display band property: max |s·f| ≤ 3 and, for all but `sqrtabs`, max |s′·f′| ≤ 2.5 on
-a 601-sample grid.
+Tests: every `value` derivative matches central differences (rel 1e-4) at 25 seeded points with
+|x| > 0.05; `FNS.abs.d(0)` is `jump {−1, 1}`; `FNS.sqrtabs.d(0)` is `vertical`;
+`secantSlope(FNS.square, 1, h)` is close to 2 + h (`toBeCloseTo(2 + h, 9)`) for h in {1, 0.1,
+0.001}; `effectiveH(2.5, 1)` = 0.5 and `effectiveH(3, 1)` = null; the table's scale/start/singular
+values; band properties on a 601-sample grid: max |s·f| ≤ 3 + 1e-9 for every function, and
+max |s′·f′| ≤ 2.5 + 1e-9 for every function except `sqrtabs` (where the scene clamps).
 
 ## 5. State (`viz/derivative/state.ts`, pure, unit-tested)
 
 ```ts
-interface DxState { readonly fn: FnKey; readonly x: number; readonly h: number;
-  readonly show: { secant: boolean; tangent: boolean; derivative: boolean; guides: boolean }; }
+interface DxState {
+  readonly fn: FnKey; readonly x: number; readonly h: number; readonly zoom: 0 | 1 | 2 | 3;
+  readonly show: { tangent: boolean; secant: boolean; derivative: boolean };
+}
 ```
-`initialState()`: `square`, x = start, h = 1, all shown. Reducers: `setFn(s, key)` (x → that
-function's start, h unchanged), `setX(s, x)` (clamped to [−3, 3]), `setH(s, h)` (clamped to
-[1e-3, 2]), `setShow`, `reset(s)` (x → start, h → 1, show unchanged). `derived(s)`: `fx`, `d:
-Derivative`, `hEff` (h reduced so x + hEff ≤ 3), `secant` (slope or `null` when hEff < 1e-9),
-`gap` (secant − f′ when both are numbers, else `null`).
+`initialState()`: `square`, x = start, h = 1, zoom 0, all shown. Reducers: `setFn(s, key)` (x →
+that function's start, h unchanged, zoom → 0), `setX(s, x)` (clamp to [−3, 3], then snap
+to `singularAt` within 0.02; no-op when zoom > 0), `setH(s, h)` (clamp [1e-3, 2]), `zoomIn(s)`
+(zoom + 1, max 3), `resetZoom(s)`, `setShow`, `reset(s)` (x → start, h → 1, zoom 0, show
+unchanged). `derived(s)`: `fx`, `d: Derivative`, `hEff: number | null`, `secant: number | null`,
+`gap: number | null` (secant − f′ when both numeric), `K = 4^zoom`, `window: [x − 3/K, x + 3/K]`
+(the full domain at zoom 0), `secantInWindow: boolean`.
 
 ## 6. Controls (side panel, in order)
 
 1. Function select (table order).
-2. h slider (log, 1e-3 … 2, default 1, readout `h = <fmt>` and, when reduced, `(clipped to <fmt>)`).
-3. Buttons: Zoom to point, Reset view, Reset.
-4. Toggles: Tangent, Secant, Derivative curve, Guides.
+2. h slider (log, 1e-3 … 2, default 1, readout `h = <fmt>`; when `hEff !== h` append
+   ` (clipped to <fmt>)`).
+3. Buttons: Zoom in (disabled at zoom 3), Reset zoom (disabled at zoom 0), Reset, Reset view.
+4. Toggles: Tangent, Secant, Derivative curve.
 
-Readouts: x; f(x); f′(x) (a number, "undefined (left −1, right 1)" for a jump, "∞ (vertical
-tangent)" for vertical); secant slope; secant − f′ (or "—").
+Readouts: x; f(x); f′(x) (number; "undefined: left −1, right 1" for a jump; "∞ (vertical
+tangent)" for vertical); secant slope (or "—"); secant − f′ (or "—"); Window (`[a, b]`, shown
+only when zoomed). Note under the buttons when zoomed: "Reset zoom to move the point".
 
-Explanation (three paragraphs, KaTeX re-rendered only when the function changes):
+Explanation. KaTeX carries only structure and is set through `createEquation` (which no-ops on an
+unchanged string), so it re-renders only when the function changes; every live number is a
+plain-text span updated on each render.
 
-- Tangent: `f'(x) = \lim_{h \to 0} \frac{f(x+h) - f(x)}{h}` with the current function's `tex`,
-  then the current numbers: f′(x) and the slope of the drawn tangent.
-- Secant: the same quotient with the live h substituted and its value; one sentence: shrink h and
-  watch the grey line rotate onto the blue one; for `abs` at 0: "from the left the secants tilt to
-  −1, from the right to +1, so no single line fits"; for `sqrtabs` at 0: "the secant slopes grow
-  without bound, so the tangent is vertical".
-- The lower curve: `f'(x) = <texPrime>`; "the height of the lower marker is the slope of the
-  upper tangent". Function `hint` sentence.
+- Tangent: `f'(x) = \lim_{h \to 0} \frac{f(x+h) - f(x)}{h}` and the function's `tex`; text: "At x =
+  <x>, f′(x) = <f′>, the slope of the blue line."
+- Secant: text only (numbers): "With h = <hEff>, the secant slope is <secant>, off by <gap>. Shrink
+  h and the grey line rotates onto the blue one." For `abs` at 0: "Right-hand secants all have
+  slope 1 while the curve to the left has slope −1, so no single line fits: |x| has no derivative at
+  0." For `sqrtabs` at 0: "The secant slopes grow without bound as h shrinks, so the tangent is
+  vertical and f′(0) is undefined."
+- The lower curve: `f'(x) = <texPrime>`; text: "The height of the lower marker is the slope of the
+  upper tangent." plus the function's `hint`. When zoomed, an extra sentence: "Zoomed ×<K>: the
+  curve is nearly its tangent, which is what differentiable means."
 
 ## 7. Interaction details
 
-- Drag the main point along the curve: the shared drag with a vertical drag plane (normal +y,
-  offset 0); the hit gives (x, z); only x is used, clamped to [−3, 3]; z is recomputed as s·f(x).
-  Click anywhere on the plane (an invisible `PlaneGeometry(7, 12)` mesh at y = 0 as
-  `surfaceTarget`) places the point at that x. Orbit elsewhere; grab cursor over the point.
-- Zoom to point: animate camera position from its current pose to `point + (0, −1.6, 0.5)` and
-  the controls target to the point over 0.6 s with an ease-out cubic, driven inside `update`
-  (returns true while animating); instant under `prefers-reduced-motion`. Orbit stays enabled.
-  Reset view restores the home framing (also animated).
-- Hint (shared): "Drag the black point along the curve, or click the plane to move it.";
-  "Shrink h to watch the secant become the tangent."; "Zoom to point to see the curve straighten
-  into its tangent."; key `ai-lab.hint.derivative`.
+- Drag the main point: shared drag with `plane: { normal: (0, 1, 0), getOffset: () => 0 }`. The hit
+  arrives as `[x, 0]` (the drag module reports the world x and y components; only `pos[0]` is used,
+  `clamp` passes the second through). `onDrag` → `setX`. Click anywhere on the invisible plane
+  (`surfaceTarget`) places the point at that x (index −1, same handler). Orbit elsewhere; grab
+  cursor over the point. `enabled: () => state.zoom === 0`.
+- Zoom in / Reset zoom re-sample the curve; nothing animates, so there is no reduced-motion branch
+  beyond the shared camera damping. The loop is poked by the shell on `click`, and `apply` sets
+  `dirty`, so one frame renders.
+- Hint (shared): "Drag the black point along the curve, or click the plane to move it."; "Shrink h
+  to watch the secant become the tangent."; "Zoom in to see the curve straighten into its
+  tangent."; key `ai-lab.hint.derivative`.
+- Reset view restores the home framing (instant, as in the other scenes).
 
 ## 8. Files and shared changes
 
 ```
-src/core/math/functions1d.ts                         + tests
-src/viz/shared/drag.ts        add optional `plane?: { normal: Vector3; getOffset(index): number }`
-                              (default normal +Z with the existing getPlaneZ); tests
-src/viz/shared/framing.ts     already domain-based; the derivative scene maps its z span to the
-                              helper's y span and rotates the result about x so the camera sits on
-                              the +y side (a tiny `frameVertical` wrapper in the viz folder)
-src/viz/shared/camera-tween.ts  createCameraTween(camera, controls): { to(position, target, ms), advance(dt): boolean, cancel() }  + tests (pure easing)
+src/core/math/functions1d.ts                         + tests/core/math/functions1d.test.ts
+src/viz/shared/drag.ts   add optional `plane?: { normal: Vector3; getOffset(index: number): number }`;
+                         when present it supersedes `getPlaneZ` (which becomes optional; exactly one
+                         of the two must be given) and sets `dragPlane.set(normal, -getOffset(index))`;
+                         `onDrag`/click-to-place keep reporting `[hit.x, hit.y]`. Tests: a vertical
+                         plane drag reports the world x of the hit; existing tests unchanged.
 src/viz/derivative/
-  index.ts  state.ts  curves.ts (axes, main + derivative curves, guides)  lines.ts (tangent, secant)
-  points.ts (three spheres + hit target)  panel.ts  explanation.ts  frame-vertical.ts
+  index.ts          Visualization (mount/apply/update/resize/dispose mirroring matrix-transformation:
+                    buildScene with unwind, panel declared before apply, theme "change" → dirty,
+                    dispose order hint → panel → scene objects → disposeObject → kit, hit plane disposed)
+  state.ts          reducers above                              + tests
+  frame-vertical.ts five-line local framing helper
+  curves.ts         axes, separator, main curve, derivative curve (runs split at singularAt), guides
+  lines.ts          tangent and secant segments (clipSegment against the display box)
+  points.ts         three spheres, hit sphere, invisible click plane
+  panel.ts, explanation.ts                                       + panel tests
 src/app/registry.ts, parent spec §9 item 5, README (roadmap + screenshot)
 ```
 
 ## 9. Verification
 
-Vitest: functions1d (§4), state (reducers, clamps, hEff), camera-tween (easing endpoints, done
-flag, cancel), panel (readouts for `square` at 1.5: f 2.25, f′ 3, secant 4 at h 1; `abs` at 0
-readout text; `sqrtabs` at 0 readout text; h readout shows clipping when x = 2.5, h = 1).
+Vitest: functions1d (§4); state (each reducer, clamps, snapping at 0.019 vs 0.021, zoom bounds,
+setX no-op while zoomed, hEff/secant/gap/window/secantInWindow); drag plane option; panel
+(readouts for `square` at 1.5: f 2.25, f′ 3, secant 4 at h 1, gap 1; `abs` at 0 jump text; `sqrtabs`
+at 0 vertical text; h clipping text at x 2.5, h 1; Zoom in disables at 3 and shows the Window
+readout and the note; Reset zoom hides them).
 
-Chrome: drag the point along `sine`, tangent follows and the lower marker rides on cos x; slide h
-from 1 to 0.001 on `square` at x = 1.5 and watch secant − f′ go from 1 to 0.001; `abs` at 0 hides
-the tangent and shows the jump text; `sqrtabs` at 0 draws a vertical tangent; Zoom to point shows
-the curve as a straight line, Reset view returns; theme toggle; no leak warning; screenshots.
+Chrome (screenshots in `docs/screenshots/`): drag along `sine`, tangent follows and the lower
+marker rides on cos x; on `square` at x = 1.5 slide h from 1 to 0.001 and watch secant − f′ go
+from 1 to 0.001; drag to x ≈ 0 on `abs` snaps to 0, hides the tangent and shows the jump text;
+`sqrtabs` at 0 draws a vertical tangent; Zoom in three times on `square` makes the curve and
+tangent coincide and disables dragging; Reset zoom restores; theme toggle; leaving logs no leak.
