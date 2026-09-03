@@ -65,7 +65,7 @@ structure reads as a curriculum, not a single demo (default pending the owner's 
 index.html                <head> carries the portfolio's inline theme script verbatim
 public/theme.js           the portfolio's toggle script, copied verbatim
 src/
-  main.ts                 async boot: await createRenderer(), then theme, router, shell
+  main.ts                 boot: theme, shell, router first; then await createRenderer()
   app/
     router.ts             hash → route object; emits on change
     shell.ts              header (title, breadcrumb, theme toggle), home page, viz page frame
@@ -121,7 +121,7 @@ export type RegistryEntry = Visualization | RoadmapEntry;
 export type Renderer = import("three/webgpu").WebGPURenderer;
 
 export interface ThemeColors extends EventTarget {   // dispatches "change" on toggle
-  bg: Color; card: Color; ink: Color; soft: Color; faint: Color;
+  bg: Color; card: Color; sunken: Color; ink: Color; soft: Color; faint: Color;
   line: Color; accent: Color;
 }
 
@@ -145,11 +145,16 @@ helpers in `core/scene.ts`, and renders itself inside `update`. That gives the v
 access to the controls it needs (reset view, disable orbit while dragging, damping off under
 reduced motion) without widening `VizHost`.
 
-Routing to a viz: shell clears the frame, calls `mount`, starts the loop. Leaving:
-calls `dispose`, asserts `renderer.info.memory.geometries` returned to baseline in dev mode.
-If `createRenderer()` rejects (no WebGPU and no WebGL 2), the shell renders a plain-HTML
-notice in place of the scene naming the requirement and linking to the ai-frontier notebook
-for the same topic; the panel and home page still work.
+Boot order: theme, shell and router come up first and never depend on the renderer. The
+shell then awaits `createRenderer()` once. If it resolves, viz routes mount normally. If it
+rejects (no WebGPU and no WebGL 2), the shell never calls `mount`; a viz route instead shows
+a plain-HTML notice in place of the whole viz frame naming the requirement and linking to the
+ai-frontier notebook for the same topic. The home page still works. `VizHost.renderer` stays
+a required `Renderer`.
+
+Routing to a viz: shell clears the frame, calls `mount`, starts the loop, and attaches a
+`ResizeObserver` to `canvasContainer` that calls `resize`. Leaving: calls `dispose`, asserts
+`renderer.info.memory.geometries` returned to baseline in dev mode.
 
 ### Theme flow
 
@@ -179,14 +184,17 @@ the scene has a hard-coded colour.
   (−f_x, −f_y, 1). Toggleable.
 - **Path**: a polyline of all points visited since the last reset, with a small sphere at
   each step. Fades from `--faint` (old) to `--accent` (recent). Capacity 2,000 points, used
-  as a ring buffer: the oldest point drops off once full.
+  as a ring buffer: the oldest point drops off once full. The step-count readout is not
+  bounded by path capacity.
 - **Camera**: OrbitControls with damping. A "reset view" button.
 
 ### Surfaces (all with analytic gradients, all unit-tested against finite differences)
 
-Readouts, gradient arrows and optimizer steps always use the true f and ∇f. Only the rendered
-height and colour ramp are multiplied by the display scale, so the surface fits in the same
-camera framing. Each surface has a default start point that shows off its behaviour.
+Readouts and optimizer steps always use the true f and ∇f. Scene geometry lives in display
+space: with scale s, the drawn surface is z = s·f(x, y), so the marker height, contour heights,
+colour ramp, tangent plane normal (−s·f_x, −s·f_y, 1) and the gradient arrow's vertical lift
+all use s·f. The arrow's direction in the xy plane is the true ∇f; only its z component is
+scaled to stay tangent to the drawn surface. Each surface has a default start point that shows off its behaviour.
 
 | Key | f(x, y) | Domain | Display scale | Start | Why |
 |---|---|---|---|---|---|
@@ -198,9 +206,9 @@ camera framing. Each surface has a default start point that shows off its behavi
 
 ### Controls (side panel)
 
-1. Surface select.
-2. Optimizer select: SGD, SGD + momentum (β = 0.9), Adam (β₁ 0.9, β₂ 0.999, ε 1e-8).
-3. Learning rate slider, log scale 1e-3 … 1.
+1. Surface select (default `bowl`).
+2. Optimizer select: SGD (default), SGD + momentum (β = 0.9), Adam (β₁ 0.9, β₂ 0.999, ε 1e-8).
+3. Learning rate slider, log scale 1e-3 … 1, default 0.1.
 4. Step button, Run/Pause toggle (steps at a fixed 10 Hz so the path is watchable), Reset.
 5. Toggles: tangent plane, contours, path.
 
@@ -215,7 +223,8 @@ drag), never per frame.
   gradient and its magnitude in a monospace readout.
 - The update rule for the selected optimizer, with the current learning rate substituted,
   and one sentence on what to look for (e.g. for `elongated`: "raise the learning rate
-  until the path overshoots the narrow axis").
+  until the path overshoots the narrow axis"; for `saddle`: "the ball slides off along y
+  and leaves the domain: that's the optimizer escaping a saddle, not a bug").
 
 ### Readouts
 
@@ -247,6 +256,8 @@ Position (x, y), loss f, gradient (f_x, f_y), |∇f|, step count. Monospace, tab
 
 - `pnpm` with `vite`, `typescript` (strict, `noUncheckedIndexedAccess`), `three`,
   `@types/three`, `katex`, `vitest`, `eslint` + `typescript-eslint`, `prettier`.
+  KaTeX's CSS and fonts are bundled from the npm package, not loaded from a CDN, matching
+  the portfolio's self-hosted fonts.
 - Tests: Vitest for `core/math/*` — every surface's analytic gradient vs finite differences
   at 25 random points in its domain (relative tolerance 1e-4); each optimizer reaches
   |∇f| < 1e-3 on `bowl` from (2.5, 2) within 200 steps at learning rate 0.1;
