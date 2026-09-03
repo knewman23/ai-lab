@@ -19,7 +19,7 @@ export interface DragOptions {
 const CLICK_SLOP_PX = 6;
 const CLICK_MS = 400;
 /** Re-testing the hover raycast on every pointermove is wasted work at 60 Hz. */
-const HOVER_STEP_PX = 2;
+const HOVER_STEP_PX = 4;
 
 /**
  * Makes the marker draggable: the pointer ray meets a horizontal plane at the
@@ -102,7 +102,11 @@ export function attachDrag(opts: DragOptions): () => void {
     setCursor(raycaster.intersectObject(hitTarget, false).length > 0 ? "grab" : "");
   }
 
-  /** True if the release was close enough in space and time to read as a click. */
+  /**
+   * True if the release was close enough in space and time to read as a click.
+   * An orbit nudge under the slop counts as one too, by design: it barely moved
+   * the camera, so placing the marker is the reading the visitor meant.
+   */
   function wasClick(event: PointerEvent): boolean {
     if (candidate === null || candidate.id !== event.pointerId) return false;
     const dx = event.clientX - candidate.x;
