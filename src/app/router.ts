@@ -55,15 +55,42 @@ export function resolveRoute(
   return { kind: "viz", entry };
 }
 
+export interface RouterDeps {
+  readonly getHash: () => string;
+  readonly setHash: (hash: string) => void;
+  readonly addListener: (callback: () => void) => () => void;
+}
+
+const defaultDeps: RouterDeps = {
+  getHash: () => location.hash,
+  setHash: (hash: string) => {
+    location.hash = hash;
+  },
+  addListener: (callback: () => void) => {
+    window.addEventListener("hashchange", callback);
+    return () => {
+      window.removeEventListener("hashchange", callback);
+    };
+  },
+};
+
+/**
+ * On an unknown or "soon" hash, `start()` sets the hash to "#/"; the home
+ * render happens on the resulting hashchange, not synchronously.
+ */
 export function createRouter(
   onChange: (route: ResolvedRoute) => void,
   find: (topic: string, id: string) => RegistryEntry | undefined = findEntry,
+  deps: RouterDeps = defaultDeps,
 ): { start(): void; stop(): void } {
+  let started = false;
+  let removeListener: (() => void) | undefined;
+
   const handleChange = (): void => {
-    const route = parseHash(location.hash);
+    const route = parseHash(deps.getHash());
     const resolved = resolveRoute(route, find);
     if (resolved.kind === "redirect") {
-      location.hash = "#/";
+      deps.setHash("#/");
       return;
     }
     onChange(resolved);
@@ -71,11 +98,17 @@ export function createRouter(
 
   return {
     start(): void {
-      window.addEventListener("hashchange", handleChange);
+      if (started) {
+        return;
+      }
+      started = true;
+      removeListener = deps.addListener(handleChange);
       handleChange();
     },
     stop(): void {
-      window.removeEventListener("hashchange", handleChange);
+      removeListener?.();
+      removeListener = undefined;
+      started = false;
     },
   };
 }

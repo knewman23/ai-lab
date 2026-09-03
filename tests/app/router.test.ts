@@ -1,5 +1,11 @@
-import { describe, expect, it } from "vitest";
-import { parseHash, resolveRoute, type Route } from "../../src/app/router";
+import { describe, expect, it, vi } from "vitest";
+import {
+  createRouter,
+  parseHash,
+  resolveRoute,
+  type Route,
+  type RouterDeps,
+} from "../../src/app/router";
 import type { RegistryEntry, Visualization } from "../../src/viz/types";
 
 describe("parseHash", () => {
@@ -78,5 +84,121 @@ describe("resolveRoute", () => {
     expect(resolveRoute({ kind: "viz", topic: "nope", id: "nope" }, find)).toEqual({
       kind: "redirect",
     });
+  });
+});
+
+describe("createRouter", () => {
+  const readyEntry: Visualization = {
+    id: "gradient-descent",
+    topic: "machine-learning",
+    title: "Gradient descent",
+    summary: "A visualization.",
+    status: "ready",
+    mount: () => ({
+      update: () => false,
+      resize: () => {},
+      dispose: () => {},
+    }),
+  };
+
+  function makeStubDeps(initialHash: string): RouterDeps & {
+    listeners: Array<() => void>;
+    setHashCalls: string[];
+    setHashDirectly(h: string): void;
+    fire(): void;
+  } {
+    let hash = initialHash;
+    const listeners: Array<() => void> = [];
+    const setHashCalls: string[] = [];
+    return {
+      listeners,
+      setHashCalls,
+      getHash: () => hash,
+      setHash: (h: string) => {
+        setHashCalls.push(h);
+        hash = h;
+      },
+      addListener: (callback: () => void) => {
+        listeners.push(callback);
+        return () => {
+          const index = listeners.indexOf(callback);
+          if (index !== -1) {
+            listeners.splice(index, 1);
+          }
+        };
+      },
+      setHashDirectly(h: string): void {
+        hash = h;
+      },
+      fire(): void {
+        for (const listener of listeners) {
+          listener();
+        }
+      },
+    };
+  }
+
+  it("starting on an unknown hash writes #/ exactly once and does not call onChange", () => {
+    const deps = makeStubDeps("#/not-a-topic/not-an-id");
+    const onChange = vi.fn();
+    const find = (): RegistryEntry | undefined => undefined;
+    const router = createRouter(onChange, find, deps);
+
+    router.start();
+
+    expect(deps.setHashCalls).toEqual(["#/"]);
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it("calls onChange with home when the listener then fires with hash #/", () => {
+    const deps = makeStubDeps("#/not-a-topic/not-an-id");
+    const onChange = vi.fn();
+    const find = (): RegistryEntry | undefined => undefined;
+    const router = createRouter(onChange, find, deps);
+
+    router.start();
+    deps.setHashDirectly("#/");
+    deps.fire();
+
+    expect(onChange).toHaveBeenCalledTimes(1);
+    expect(onChange).toHaveBeenCalledWith({ kind: "home" });
+  });
+
+  it("starting on a ready route calls onChange once with the entry", () => {
+    const deps = makeStubDeps("#/machine-learning/gradient-descent");
+    const onChange = vi.fn();
+    const find = (): RegistryEntry | undefined => readyEntry;
+    const router = createRouter(onChange, find, deps);
+
+    router.start();
+
+    expect(onChange).toHaveBeenCalledTimes(1);
+    expect(onChange).toHaveBeenCalledWith({ kind: "viz", entry: readyEntry });
+  });
+
+  it("double start() dispatches only once", () => {
+    const deps = makeStubDeps("#/machine-learning/gradient-descent");
+    const onChange = vi.fn();
+    const find = (): RegistryEntry | undefined => readyEntry;
+    const router = createRouter(onChange, find, deps);
+
+    router.start();
+    router.start();
+
+    expect(onChange).toHaveBeenCalledTimes(1);
+    expect(deps.listeners).toHaveLength(1);
+  });
+
+  it("stop() invokes the remove function", () => {
+    const deps = makeStubDeps("#/machine-learning/gradient-descent");
+    const onChange = vi.fn();
+    const find = (): RegistryEntry | undefined => readyEntry;
+    const router = createRouter(onChange, find, deps);
+
+    router.start();
+    expect(deps.listeners).toHaveLength(1);
+
+    router.stop();
+    expect(deps.listeners).toHaveLength(0);
   });
 });
