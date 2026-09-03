@@ -7,10 +7,11 @@ a study tool and a portfolio piece. Live at
 ![Gradient descent on a loss surface](docs/screenshots/gradient-descent-light.png)
 ![Matrix transformation](docs/screenshots/matrix-transformation-light.png)
 ![Derivative and tangent explorer](docs/screenshots/derivative-light.png)
+![Chain rule graph](docs/screenshots/chain-rule-light.png)
 
 ## What's in it
 
-Three scenes so far.
+Four scenes so far.
 
 **Gradient descent** on a draggable 3D loss surface. Drag the ball anywhere on the surface
 and watch the gradient arrow and tangent plane follow it, pick SGD, momentum or Adam and
@@ -28,6 +29,12 @@ follow it, shrink h to see the secant rotate onto the tangent while the readouts
 read the derivative as the height of a second curve drawn underneath. Two curves are not
 differentiable at zero: |x| shows the corner, √|x| the vertical tangent. Zoom in three times to
 see any smooth curve become its tangent.
+
+**Chain rule graph.** Three graphs meet in a corner: u = g(x) on the front wall, y = f(u) on the
+side wall and the composite y = f(g(x)) on the floor. Drag x along the floor and set a Δx with the
+slider; the Δu leg is shared by both walls and the Δy leg by the side wall and the floor, so
+Δy/Δx = (Δy/Δu)(Δu/Δx) is there to be read off the picture. Shrink Δx and the three secants become
+tangents while the readouts converge on the product of the derivatives. Five presets of f and g.
 
 ## Run it
 

@@ -19,8 +19,9 @@ export const REGISTRY: readonly RegistryEntry[] = [
     topic: "calculus",
     title: "Chain rule graph",
     summary:
-      "Follow how a change at the input of a composed function propagates through each nested layer.",
-    status: "soon",
+      "Drag x along a composed function and watch a small Δx become Δu on the front wall, then Δy on the side wall and the floor: the three slopes multiply.",
+    status: "ready",
+    load: () => import("../viz/chain-rule").then((m) => m.chainRuleGraph),
   },
   {
     id: "matrix-transformation",

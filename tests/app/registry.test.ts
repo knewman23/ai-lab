@@ -29,7 +29,6 @@ describe("registry", () => {
     id: string;
     topic: string;
   }> = [
-    { id: "chain-rule-graph", topic: "calculus" },
     { id: "backprop-graph", topic: "machine-learning" },
     { id: "neural-network", topic: "machine-learning" },
     { id: "gpt-transformer", topic: "machine-learning" },
@@ -57,6 +56,13 @@ describe("registry", () => {
   it("loads the derivative explorer from its own chunk", async () => {
     await loadReady("calculus", "derivative-tangent");
     const summary = findEntry("calculus", "derivative-tangent")?.summary;
+    expect(summary).not.toContain("roadmap");
+    expect(summary).not.toContain("soon");
+  });
+
+  it("loads the chain rule graph from its own chunk", async () => {
+    await loadReady("calculus", "chain-rule-graph");
+    const summary = findEntry("calculus", "chain-rule-graph")?.summary;
     expect(summary).not.toContain("roadmap");
     expect(summary).not.toContain("soon");
   });
