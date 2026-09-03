@@ -271,7 +271,9 @@ Position (x, y), loss f, gradient (f_x, f_y), |∇f|, step count. Monospace, tab
   |∇f| < 1e-3 on `bowl` from (2.5, 2) within 200 steps at learning rate 0.1 (Adam oscillates
   near a quadratic minimum; loosen its budget rather than "fix" the optimizer if it misses);
   Adam bias correction matches the paper's closed form for the first three steps;
-  a diverging run (rosenbrock, SGD, lr 1) is reported as diverged, not thrown.
+  a run that leaves the domain (rosenbrock, SGD, lr 1 exits on the first step while still
+  finite) is reported as "left the domain", and a run whose step produces NaN or ±Infinity is
+  reported as "diverged"; neither throws.
   Rendering is verified manually in Chrome during development (screenshots in the PR).
 - CI (`.github/workflows/ci.yml`): typecheck, lint, test on every push and PR.
 - Deploy (`.github/workflows/pages.yml`): build with `base: "/ai-lab/"` and publish `dist/`
