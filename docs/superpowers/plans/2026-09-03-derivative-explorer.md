@@ -15,7 +15,7 @@
 **Files:**
 
 ```
-src/core/math/functions1d.ts                   + tests/core/math/functions1d.test.ts
+src/core/math/functions1d.ts, sampling1d.ts    + tests/core/math/{functions1d,sampling1d}.test.ts
 src/viz/shared/drag.ts                         drag-plane union option   (tests/viz/shared/drag.test.ts)
 src/viz/derivative/
   state.ts  frame-vertical.ts  curves.ts  lines.ts  points.ts  panel.ts  explanation.ts  index.ts
@@ -34,26 +34,32 @@ README.md, docs/screenshots/derivative-light.png, -dark.png
 **Files:** create `src/core/math/functions1d.ts`; test `tests/core/math/functions1d.test.ts`.
 
 - [ ] **Step 1:** `git checkout -b derivative-explorer main`.
-- [ ] **Step 2: Failing tests** (spec §4): `FN_KEYS` order square, cubic, sine, exp, abs, sqrtabs; the table's `scale`, `primeScale`, `start`, `singularAt`; every `value` derivative vs central differences (rel 1e-4, abs floor 1e-6) at 25 seeded points with |x| > 0.05; `FNS.abs.d(0)` → `{ kind: "jump", left: −1, right: 1 }`; `FNS.sqrtabs.d(0)` → `{ kind: "vertical" }`; `FNS.abs.d(0.5)` → value 1, `FNS.abs.d(−0.5)` → value −1; `secantSlope(FNS.square, 1, h)` ≈ 2 + h (`toBeCloseTo(…, 9)`) for h ∈ {1, 0.1, 0.001}; `effectiveH(2.5, 1)` = 0.5, `effectiveH(3, 1)` = null, `effectiveH(0, 1)` = 1; band properties on a 601-point grid: max |s·f| ≤ 3 + 1e-9 for all six, max |s′·f′| ≤ 2.5 + 1e-9 for all but sqrtabs; `zoomSamples(FNS.square, 1.5, K, 241)` returns 241 X in [−3, 3] with X[120] = 0 and Z[120] = 0, and `maxDev(K) = max |Z − s·f′(x)·X|` satisfies `maxDev(4) > 3·maxDev(16) > 9·maxDev(64)`; `zoomSamples(fn, x, 1)` at zoom 0 covers the full domain [−3, 3] in X and Z = s·f(x′) − 0 … (define: at K = 1 the mapping is X = x′ − x? No: spec says zoom 0 shows the domain. Test instead that the scene uses `curveSamples(fn)` for zoom 0 (below) and `zoomSamples` only for K > 1.) Also `curveSamples(fn, n = 241)` → `{ X, Z }` with X over [−3, 3] and Z = s·f(X) and `primeSamples(fn, n)` → runs: an array of `{ X, Z }` split at `singularAt` (two runs for abs/sqrtabs, one otherwise), Z = z₀ + s′·f′ clamped to [−8.5, −3.5], the sample at the singularity omitted.
+- [ ] **Step 2: Failing tests** (spec §4). `tests/core/math/functions1d.test.ts`: `FN_KEYS` order square, cubic, sine, exp, abs, sqrtabs; the table's `scale`, `primeScale`, `start`, `singularAt`; the six `title`/`tex`/`texPrime` strings; every `value` derivative vs a local 1D central difference `(f(x+h) − f(x−h))/2h`, h 1e-5 (rel 1e-4, abs floor 1e-6) at a fixed literal array of 25 x values in [−3, 3] with |x| > 0.05; `FNS.abs.d(0)` → `{ kind: "jump", left: −1, right: 1 }`, `FNS.abs.d(1e-12)` jump, `FNS.abs.d(1e-6)` value; `FNS.sqrtabs.d(0)` → `{ kind: "vertical" }`; `FNS.abs.d(±0.5)` → value ±1; `secantSlope(FNS.square, 1, h)` ≈ 2 + h (`toBeCloseTo(…, 9)`) for h ∈ {1, 0.1, 0.001}; `effectiveH(2.5, 1)` = 0.5, `effectiveH(3, 1)` = null, `effectiveH(0, 1)` = 1; band properties on a 601-point grid: max |s·f| ≤ 3 + 1e-9 for all six, max |s′·f′| ≤ 2.5 + 1e-9 for all but sqrtabs.
+  `tests/core/math/sampling1d.test.ts`: `curveSamples(fn, 241)` → `{ X, Z }` with X evenly over [−3, 3] and Z = s·f(X); `primeSamples(fn, 241)` → runs split at `singularAt` (one run for null, two for abs/sqrtabs with the singular sample omitted), Z = Z0 + s′·f′ clamped to BAND; `zoomSamples(FNS.square, 1.5, K, 241)` → X[120] = 0, Z[120] = 0, X spans [−3, 3]; at K = 1 the identity Z = s·(f(x + X) − f(x)) holds; `maxDev(K) = max |Z − s·f′(x)·X|` with two separate expects `maxDev(4) > 3·maxDev(16)` and `maxDev(16) > 3·maxDev(64)` (for x² the deviation is exactly s·X²/K, so a factor of 4 per step).
+
 - [ ] **Step 3:** Run, confirm fail.
-- [ ] **Step 4: Implement** `Derivative`, `Fn1D`, `FNS`, `FN_KEYS`, `secantSlope`, `effectiveH`, `curveSamples`, `primeSamples`, `zoomSamples`, and the display constants `Z0 = -6`, `BAND = [-8.5, -3.5]`, `DOMAIN = [-3, 3]` exported from this file. KaTeX strings: `x^2`, `x^3 - 3x`, `\sin x`, `e^{x}/5`, `|x|`, `\sqrt{|x|}` and primes `2x`, `3x^2 - 3`, `\cos x`, `e^{x}/5`, `\operatorname{sign}(x)`, `\frac{\operatorname{sign}(x)}{2\sqrt{|x|}}`. One-sentence hints per function.
-- [ ] **Step 5:** Run, confirm pass; `pnpm check`; commit "Add 1D functions with derivatives, secant helpers and curve sampling".
+
+- [ ] **Step 4: Implement** `src/core/math/functions1d.ts` (`Derivative`, `Fn1D`, `FNS`, `FN_KEYS`, `secantSlope`, `effectiveH`, constants `DOMAIN = [-3, 3]`, `Z0 = -6`, `BAND = [-8.5, -3.5]`; under ~160 lines) and `src/core/math/sampling1d.ts` (`curveSamples`, `primeSamples` incl. the band clamp, `zoomSamples` with X = (x′ − x)·K, Z = s·(f(x′) − f(x))·K over [x − 3/K, x + 3/K]). KaTeX strings: `x^2`, `x^3 - 3x`, `\sin x`, `e^{x}/5`, `|x|`, `\sqrt{|x|}`; primes `2x`, `3x^2 - 3`, `\cos x`, `e^{x}/5`, `\operatorname{sign}(x)`, `\frac{\operatorname{sign}(x)}{2\sqrt{|x|}}`. One-sentence hints.
+
+- [ ] **Step 5:** Run, confirm pass; `pnpm check`; commit "Add 1D functions with derivatives, secant helpers and curve sampling" (both source files and both test files).
 
 ### Task 2: Drag-plane option
 
 **Files:** modify `src/viz/shared/drag.ts`; test `tests/viz/shared/drag.test.ts`.
 
-- [ ] **Step 1: Failing test** — with `plane: { normal: new Vector3(0, 1, 0), getOffset: () => 0 }`, a camera on the −y axis looking at the origin, a hit sphere at (0.5, 0, 0.5): pressing on the ball then moving reports `onDrag(0, [x, y])` where `x` is the world x of the ray ∩ plane and `y` is 0 (the hit's world y); existing `getPlaneZ` tests unchanged.
+- [ ] **Step 1: Failing test** — a second harness with `plane: { normal: new Vector3(0, 1, 0), getOffset: () => 0 }`, a camera at (0, −1, 0) with `camera.up.set(0, 0, 1)` then `lookAt(0, 0, 0)` (Z-up, as the real scene; without the `up` change `lookAt` is degenerate), 90° fov over a 200×200 stubbed rect so screen x 0..200 maps to world x −1..1 and screen y to world z; a hit sphere at (0.5, 0, 0.5): pressing on the ball then moving to a known screen point reports `onDrag(0, [x, 0])` with the derived world x. Existing `getPlaneZ` assertions unchanged, but the file's `Overrides = Partial<Pick<DragOptions, …>>` must be rewritten in terms of an exported `DragBase` (the union has no common `getPlaneZ` key). Add `// @ts-expect-error` cases passing both `getPlaneZ` and `plane`, and neither.
 - [ ] **Step 2:** Run, confirm fail.
-- [ ] **Step 3: Implement** — `DragOptions` becomes `DragBase & ({ getPlaneZ(index): number } | { plane: { normal: Vector3; getOffset(index): number } })`; in the pointerdown path `dragPlane.set(normal, -getOffset(index))` or the existing `+Z`/`-getPlaneZ` form. Hover, click-to-place and clamp unchanged. Keep the file coherent (a small `planeFor(index)` helper).
+- [ ] **Step 3: Implement** — export `DragBase`; `DragOptions = DragBase & ({ getPlaneZ(index): number } | { plane: { normal: Vector3; getOffset(index): number } })`; a `setDragPlane(index)` helper narrows with `"plane" in opts` and does `dragPlane.set(normal, -getOffset(index))` or the existing `+Z`/`-getPlaneZ` form. Hover, click-to-place and clamp unchanged.
 - [ ] **Step 4:** Run, confirm pass; `pnpm check`; commit "Add a drag-plane option to the shared drag handler".
 
 ### Task 3: State
 
 **Files:** create `src/viz/derivative/state.ts`; test `tests/viz/derivative/state.test.ts`.
 
-- [ ] **Step 1: Failing tests** (spec §5): `initialState()` (square, x 1.5, h 1, zoom 0, show all true); `setFn` → new start, zoom 0, h kept; `setX` clamps to [−3, 3]; snaps to `singularAt` at |Δ| = 0.019 and not at 0.021; no-op (same object) when zoom > 0; `setH` clamps to [1e-3, 2]; `zoomIn` caps at 3; `resetZoom`; `setShow` changes only that flag; `reset` → start, h 1, zoom 0, show kept; `derived`: for square at 1.5, h 1 → fx 2.25, d value 3, hEff 1, secant 4, gap 1, K 1, window [−3, 3], secantInWindow true; at x 2.5, h 1 → hEff 0.5, secant 5.5; at x 3 → hEff null, secant null, gap null; zoom 2 at x 1.5 → K 16, window [1.3125, 1.6875], secantInWindow false at h 1; abs at 0 → d jump, gap null.
-- [ ] **Step 2:** Run, confirm fail. **Step 3:** Implement (pure; reuse `effectiveH`, `secantSlope`). **Step 4:** Run, confirm pass; `pnpm check`; commit "Add derivative explorer state".
+- [ ] **Step 1: Failing tests** (spec §5): `initialState()` (square, x 1.5, h 1, zoom 0, show all true); `setFn` → new start, zoom 0, h kept; `setX` clamps to [−3, 3]; snaps to `singularAt` at |Δ| = 0.019 and not at 0.021; no-op (same object) when zoom > 0; `setH` clamps to [1e-3, 2]; `zoomIn` caps at 3; `resetZoom`; `setShow` changes only that flag; `reset` → start, h 1, zoom 0, show kept; `derived`: for square at 1.5, h 1 → fx 2.25, d value 3, hEff 1, secant 4, gap 1, K 1, window [−3, 3] (zoom 0 special-cases the window to DOMAIN, so `secantInWindow` is always true at zoom 0), secantInWindow true; at x 2.5, h 1 → hEff 0.5, secant 5.5; at x 3 → hEff null, secant null, gap null; zoom 2 at x 1.5 → K 16, window [1.3125, 1.6875], secantInWindow false at h 1; abs at 0 → d jump, secant 1 (h 1), gap null.
+- [ ] **Step 2:** Run, confirm fail.
+- [ ] **Step 3:** Implement (pure; reuse `effectiveH`, `secantSlope`; `window` is DOMAIN at zoom 0 and `[x − 3/K, x + 3/K]` otherwise).
+- [ ] **Step 4:** Run, confirm pass; `pnpm check`; commit "Add derivative explorer state".
 
 ---
 
@@ -74,7 +80,9 @@ README.md, docs/screenshots/derivative-light.png, -dark.png
 **Files:** create `src/viz/derivative/panel.ts`, `explanation.ts`; test `tests/viz/derivative/panel.test.ts` (jsdom); modify `styles/panel.css` only if a new class is needed.
 
 - [ ] **Step 1: Failing tests** (spec §6): `createDxPanel(host, handlers)` with `handlers = { onFn, onH, onZoomIn, onResetZoom, onReset, onResetView, onShow }`: sections Setup [function select, h log slider 1e-3..2 with readout `h = …`], Run [Zoom in, Reset zoom, Reset, Reset view in a role="group" row], Show [Tangent, Secant, Derivative curve], Readouts [x, f(x), f′(x), Secant slope, Secant − f′, Window (row hidden when zoom 0)], note "Reset zoom to move the point" (hidden at zoom 0), explanation. Tests: initialState readouts (x "1.5", f "2.25", f′ "3", secant "4", gap "1", Window row hidden, note hidden); `abs` at 0 → f′ "undefined: left −1, right 1", secant "1", gap "—"; `sqrtabs` at 0 → f′ "∞ (vertical tangent)"; x 2.5, h 1 → h readout contains "clipped to 0.5"; x 3 → h readout contains "no secant" and secant "—"; zoom 3 → Zoom in disabled, Reset zoom enabled, Window row "[1.4531, 1.5469]" (fmt 4 sig), note visible; zoom 0 → Reset zoom disabled; changing the select dispatches `onFn("sine")`; render never fires handlers; rendering twice with the same function keeps the equation node identity.
-- [ ] **Step 2:** Run, confirm fail. **Step 3: Implement** panel and explanation per spec §6 (three paragraphs; structure via `createEquation` once per function; numbers as text spans; the special sentences for `abs`/`sqrtabs` at the singularity; zoomed sentence). **Step 4:** Run, confirm pass; `pnpm check`; commit "Add derivative explorer panel and explanation".
+- [ ] **Step 2:** Run, confirm fail.
+- [ ] **Step 3: Implement** panel and explanation per spec §6 (three paragraphs; structure via `createEquation` once per function; numbers as text spans; the special sentences for `abs`/`sqrtabs` at the singularity; zoomed sentence).
+- [ ] **Step 4:** Run, confirm pass; `pnpm check`; commit "Add derivative explorer panel and explanation".
 
 ### Task 6: Assemble, register, verify
 
@@ -88,4 +96,4 @@ README.md, docs/screenshots/derivative-light.png, -dark.png
 
 ### Task 7: Merge and deploy
 
-- [ ] `pnpm check && pnpm build` (report the bundle size; if the chunk warning trips at 1200 kB, do not raise the limit: add a `build.rollupOptions.output.manualChunks` split for `three` and `katex` and confirm the app still loads); `git checkout main && git merge --ff-only derivative-explorer && git push`; watch `gh run list -w pages.yml -L1` to success; confirm https://knewman23.github.io/ai-lab/#/calculus/derivative-tangent loads; delete the branch.
+- [ ] **Step 1:** `pnpm check && pnpm build` (report the bundle size; if the chunk warning trips at 1200 kB, do not raise the limit: add a `build.rollupOptions.output.manualChunks` split for `three` and `katex` and confirm the app still loads); `git checkout main && git merge --ff-only derivative-explorer && git push`; watch `gh run list -w pages.yml -L1` to success; confirm https://knewman23.github.io/ai-lab/#/calculus/derivative-tangent loads; delete the branch.

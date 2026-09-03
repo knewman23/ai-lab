@@ -51,7 +51,7 @@ all of ℝ, so sampling there is safe. The zoomed main curve is clipped to the s
 the lines (X ∈ [−3.5, 3.5], Z ∈ [−3.4, 3.4]) so a steep curve does not run through the hidden band.
 Dragging is disabled while zoomed (`enabled` predicate) and the panel note says "Reset zoom to
 move the point"; click-to-place is disabled too. The sampling is a pure function
-`zoomSamples(fn, x, K, n = 241): { X: Float32Array; Z: Float32Array }` in `functions1d.ts`, tested
+`zoomSamples(fn, x, K, n = 241): { X: Float32Array; Z: Float32Array }` in `sampling1d.ts`, tested
 so that the maximum |Z − s·f′(x)·X| over the window falls by at least 3× per zoom step for
 `square` (it scales as 1/K).
 
@@ -110,7 +110,7 @@ export const FNS: Readonly<Record<FnKey, Fn1D>>; export const FN_KEYS;
 |x| < 1e-9, otherwise `value`. Because 1e-9 is unreachable by dragging, the state reducer snaps x
 to `singularAt` when |x − singularAt| < 0.02 (§5). `secantSlope(fn, x, h)` = (f(x+h) − f(x))/h.
 `effectiveH(x, h)` = min(h, 3 − x) (so x + h stays in the domain); `null` when that is < 1e-9.
-Display clamping of the derivative curve for `sqrtabs` is done by the scene (clamp Z to the band).
+The sampling helpers (`curveSamples`, `primeSamples`, `zoomSamples`, in `core/math/sampling1d.ts`) return display coordinates; `primeSamples` clamps Z to the band for `sqrtabs`.
 
 Tests: every `value` derivative matches central differences (rel 1e-4) at 25 seeded points with
 |x| > 0.05; `FNS.abs.d(0)` is `jump {−1, 1}`; `FNS.sqrtabs.d(0)` is `vertical`;
@@ -181,7 +181,7 @@ plain-text span updated on each render.
 ## 8. Files and shared changes
 
 ```
-src/core/math/functions1d.ts                         + tests/core/math/functions1d.test.ts
+src/core/math/functions1d.ts, sampling1d.ts          + tests
 src/viz/shared/drag.ts   make the drag-plane source a union so the compiler enforces exactly one:
                          `{ getPlaneZ(index): number }` (existing, normal +Z) or
                          `{ plane: { normal: Vector3; getOffset(index): number } }`, which sets
