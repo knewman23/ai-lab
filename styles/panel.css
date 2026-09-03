@@ -167,6 +167,24 @@ input[type="range"]::-moz-range-track {
   font-size: 13px;
 }
 
+/* matrix input */
+.matrix-input {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px;
+}
+.matrix-input input[type="number"] {
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--ink);
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  padding: 6px 8px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
 /* readout */
 .readout {
   display: grid;
