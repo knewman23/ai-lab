@@ -29,7 +29,9 @@ export interface ThemeColors extends EventTarget {
   soft: Color;
   faint: Color;
   line: Color;
+  line2: Color;
   accent: Color;
+  warn: Color;
 }
 
 export interface VizHost {

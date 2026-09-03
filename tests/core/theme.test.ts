@@ -9,7 +9,9 @@ const LIGHT: Record<string, string> = {
   "--soft": "#4a4a4a",
   "--faint": "#8a8a8a",
   "--line": "#dcdcda",
+  "--line-2": "#c4c4c0",
   "--accent": "#1f4ed8",
+  "--warn": "#9a6b12",
 };
 
 function tokens(overrides: Record<string, string> = {}): Record<string, string> {
@@ -27,7 +29,9 @@ describe("createThemeColors", () => {
     expect(colors.soft.getHexString()).toBe("4a4a4a");
     expect(colors.faint.getHexString()).toBe("8a8a8a");
     expect(colors.line.getHexString()).toBe("dcdcda");
+    expect(colors.line2.getHexString()).toBe("c4c4c0");
     expect(colors.accent.getHexString()).toBe("1f4ed8");
+    expect(colors.warn.getHexString()).toBe("9a6b12");
   });
 
   it("trims surrounding whitespace from a token value", () => {
@@ -46,6 +50,22 @@ describe("createThemeColors", () => {
 
     expect(colors.accent).toBe(accent);
     expect(accent.getHexString()).toBe("55d4a0");
+  });
+
+  it("updates warn and line2 in place after refresh()", () => {
+    const store = tokens();
+    const colors = createThemeColors((token) => store[token] ?? "");
+    const warn = colors.warn;
+    const line2 = colors.line2;
+
+    store["--warn"] = "#e2b357";
+    store["--line-2"] = "#2e323b";
+    colors.refresh();
+
+    expect(colors.warn).toBe(warn);
+    expect(colors.line2).toBe(line2);
+    expect(warn.getHexString()).toBe("e2b357");
+    expect(line2.getHexString()).toBe("2e323b");
   });
 
   it("dispatches change exactly once per refresh that alters colours", () => {

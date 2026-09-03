@@ -15,7 +15,9 @@ const TOKENS = {
   soft: "--soft",
   faint: "--faint",
   line: "--line",
+  line2: "--line-2",
   accent: "--accent",
+  warn: "--warn",
 } as const satisfies Readonly<Record<Exclude<keyof ThemeColors, keyof EventTarget>, string>>;
 
 type Field = keyof typeof TOKENS;
@@ -42,7 +44,9 @@ class ThemeColorsImpl extends EventTarget implements ThemeHandle {
   readonly soft = new Color();
   readonly faint = new Color();
   readonly line = new Color();
+  readonly line2 = new Color();
   readonly accent = new Color();
+  readonly warn = new Color();
 
   constructor(private readonly read: (token: string) => string) {
     super();
