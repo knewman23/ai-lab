@@ -35,18 +35,26 @@ export function createShell(root: HTMLElement): void {
   const vizPage = createVizPage({ main, header, theme, loop, rendererReady });
 
   let token = 0;
+  let homePage: HTMLElement | null = null;
   const router = createRouter((route) => {
     // The router resolves redirects itself; only home and viz arrive here.
     if (route.kind === "redirect") return;
+    // The viz page owns its own frame subtree and removes it in leave();
+    // the shell only owns the home page it appends here.
     vizPage.leave();
-    main.replaceChildren();
     if (route.kind === "home") {
       header.setBreadcrumb([]);
-      main.append(renderHome(REGISTRY));
+      homePage = renderHome(REGISTRY);
+      main.replaceChildren(homePage);
       return;
     }
+    homePage?.remove();
+    homePage = null;
     token += 1;
-    void vizPage.enter(route.entry, token);
+    vizPage.enter(route.entry, token).catch((error: unknown) => {
+      // enter() handles its own failures; this is the backstop.
+      if (import.meta.env.DEV) console.error("viz route failed", error);
+    });
   });
 
   router.start();

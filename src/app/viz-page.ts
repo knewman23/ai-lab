@@ -20,24 +20,33 @@ export interface VizPageDeps {
 export interface VizPage {
   enter(entry: Visualization, token: number): Promise<void>;
   leave(): void;
-  isCurrent(token: number): boolean;
 }
 
 const NOTEBOOK_URL = "https://github.com/knewman23/ai-frontier";
 
-function noRendererNotice(): HTMLElement {
+/** Plain HTML, so it renders whatever the renderer and the viz managed to do. */
+function notice(heading: string, body: string): HTMLElement {
   const wrapper = document.createElement("div");
-  const heading = document.createElement("h2");
-  heading.textContent = "This visualization needs WebGPU or WebGL 2";
-  const body = document.createElement("p");
-  body.textContent =
-    "This browser or GPU did not provide either, so the scene cannot be drawn here.";
+  const title = document.createElement("h2");
+  title.textContent = heading;
+  const text = document.createElement("p");
+  text.textContent = body;
   const link = document.createElement("a");
   link.href = NOTEBOOK_URL;
   link.textContent = "Read the notebook version on GitHub";
-  wrapper.append(heading, body, link);
+  wrapper.append(title, text, link);
   return wrapper;
 }
+
+const POKE_EVENTS = [
+  "pointerdown",
+  "pointermove",
+  "wheel",
+  "click",
+  "keydown",
+  "input",
+  "change",
+] as const;
 
 /** Owns one visualization at a time: mount, size, tick, and tear down. */
 export function createVizPage(deps: VizPageDeps): VizPage {
@@ -49,16 +58,19 @@ export function createVizPage(deps: VizPageDeps): VizPage {
   let renderer: Renderer | null = null;
   let baseline = 0;
 
-  const isCurrent = (token: number): boolean => current === token;
-
-  function leave(): void {
-    current = null;
+  /** Everything a running viz holds, minus the frame and the instance itself. */
+  function stopDriving(): void {
     deps.loop.stop();
     deps.loop.setTick(() => false);
     observer?.disconnect();
     observer = null;
     listeners?.abort();
     listeners = null;
+  }
+
+  function leave(): void {
+    current = null;
+    stopDriving();
 
     if (instance) {
       instance.dispose();
@@ -70,6 +82,8 @@ export function createVizPage(deps: VizPageDeps): VizPage {
       }
       instance = null;
     }
+    renderer = null;
+    baseline = 0;
 
     // The renderer outlives the route; only its host frame goes.
     frame?.el.remove();
@@ -77,6 +91,8 @@ export function createVizPage(deps: VizPageDeps): VizPage {
   }
 
   async function enter(entry: Visualization, token: number): Promise<void> {
+    // Self-contained: an enter() without a leave() still leaves one frame behind.
+    leave();
     current = token;
     const own = createVizFrame();
     frame = own;
@@ -85,51 +101,78 @@ export function createVizPage(deps: VizPageDeps): VizPage {
     deps.main.append(own.el);
 
     const result = await deps.rendererReady;
-    if (!isCurrent(token)) return;
+    // A leave() or a newer enter() happened while the renderer was booting.
+    if (current !== token) return;
 
     if (!result.ok) {
-      own.showNotice(noRendererNotice());
+      own.showNotice(
+        notice(
+          "This visualization needs WebGPU or WebGL 2",
+          "This browser or GPU did not provide either, so the scene cannot be drawn here.",
+        ),
+      );
       if (import.meta.env.DEV) console.warn("renderer unavailable", result.error);
       return;
     }
 
-    renderer = result.renderer;
-    own.canvasContainer.replaceChildren(renderer.domElement);
-    baseline = renderer.info.memory.geometries;
+    try {
+      renderer = result.renderer;
+      own.canvasContainer.replaceChildren(renderer.domElement);
+      baseline = renderer.info.memory.geometries;
 
-    const mounted = entry.mount({
-      canvasContainer: own.canvasContainer,
-      panel: own.panel,
-      renderer,
-      theme: deps.theme,
-    });
-    instance = mounted;
+      const mounted = entry.mount({
+        canvasContainer: own.canvasContainer,
+        panel: own.panel,
+        renderer,
+        theme: deps.theme,
+      });
+      instance = mounted;
 
-    const fit = (): void => {
-      const w = own.canvasContainer.clientWidth;
-      const h = own.canvasContainer.clientHeight;
-      if (w === 0 || h === 0) return;
-      applySize(result.renderer, w, h);
-      mounted.resize(w, h);
-      deps.loop.poke();
-    };
+      const fit = (): void => {
+        const w = own.canvasContainer.clientWidth;
+        const h = own.canvasContainer.clientHeight;
+        if (w === 0 || h === 0) return;
+        applySize(result.renderer, w, h);
+        mounted.resize(w, h);
+        deps.loop.poke();
+      };
 
-    observer = new ResizeObserver(fit);
-    observer.observe(own.canvasContainer);
-    fit();
+      observer = new ResizeObserver(fit);
+      observer.observe(own.canvasContainer);
+      fit();
 
-    const controller = new AbortController();
-    listeners = controller;
-    const poke = (): void => {
-      deps.loop.poke();
-    };
-    for (const type of ["pointerdown", "pointermove", "wheel", "input", "change"] as const) {
-      own.el.addEventListener(type, poke, { passive: true, signal: controller.signal });
+      const controller = new AbortController();
+      listeners = controller;
+      const poke = (): void => {
+        deps.loop.poke();
+      };
+      for (const type of POKE_EVENTS) {
+        own.el.addEventListener(type, poke, { passive: true, signal: controller.signal });
+      }
+
+      deps.loop.setTick((dt) => mounted.update(dt));
+      deps.loop.start();
+    } catch (error) {
+      stopDriving();
+      try {
+        // Best effort: a viz that threw mid-mount may still hold GPU resources,
+        // and its dispose() is as likely to throw as its mount() was.
+        instance?.dispose();
+      } catch {
+        /* the original error is the one worth reporting */
+      }
+      instance = null;
+      renderer = null;
+      baseline = 0;
+      own.showNotice(
+        notice(
+          "This visualization failed to start",
+          "Something went wrong while building the scene, so it cannot be shown here.",
+        ),
+      );
+      if (import.meta.env.DEV) console.error("visualization failed to start", error);
     }
-
-    deps.loop.setTick((dt) => mounted.update(dt));
-    deps.loop.start();
   }
 
-  return { enter, leave, isCurrent };
+  return { enter, leave };
 }

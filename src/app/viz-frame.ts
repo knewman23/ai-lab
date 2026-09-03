@@ -31,6 +31,8 @@ export function createVizFrame(): VizFrame {
       canvasContainer.replaceChildren(loading);
     },
     showNotice(node) {
+      // Out of the scene/panel grid: a notice is a page, not a viewport.
+      el.className = "viz-notice";
       const notice = document.createElement("div");
       notice.className = "notice";
       notice.append(node);

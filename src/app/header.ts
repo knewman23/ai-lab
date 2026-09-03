@@ -11,6 +11,13 @@ export interface Header {
   setBreadcrumb(parts: readonly string[]): void;
 }
 
+function homeLink(): HTMLAnchorElement {
+  const home = link("#/", "Home");
+  // `.keep` survives the band's 760px rule, so phones keep a way back.
+  home.className = "keep";
+  return home;
+}
+
 function link(href: string, text: string): HTMLAnchorElement {
   const anchor = document.createElement("a");
   anchor.href = href;
@@ -39,7 +46,7 @@ export function renderHeader(): Header {
 
   const nav = document.createElement("nav");
   nav.setAttribute("aria-label", "Sections");
-  nav.append(link("https://knewman23.github.io/", "Index"), link("#/", "Home"));
+  nav.append(link("https://knewman23.github.io/", "Index"), homeLink());
   // Static, author-written markup: the two toggle icons.
   nav.insertAdjacentHTML("beforeend", THEME_BUTTON);
 

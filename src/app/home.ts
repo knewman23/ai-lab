@@ -20,15 +20,21 @@ function renderCard(entry: RegistryEntry, index: number): HTMLElement {
     card.setAttribute("aria-disabled", "true");
   }
 
+  // Decoration: the card's accessible name is its title and summary.
+  const number = el("span", "cn", String(index + 1).padStart(2, "0"));
+  number.setAttribute("aria-hidden", "true");
+  const pill = el("span", live ? "pill p-live" : "pill p-soon", live ? "Live" : "Soon");
+  pill.setAttribute("aria-hidden", "true");
   const top = el("div", "ctop");
-  top.append(
-    el("span", "cn", String(index + 1).padStart(2, "0")),
-    el("span", live ? "pill p-live" : "pill p-soon", live ? "Live" : "Soon"),
-  );
+  top.append(number, pill);
 
   const foot = el("div", "cfoot");
   foot.append(el("span", "tags", topicTitle(entry.topic)));
-  if (live) foot.append(el("span", "go", "Open →"));
+  if (live) {
+    const go = el("span", "go", "Open →");
+    go.setAttribute("aria-hidden", "true");
+    foot.append(go);
+  }
 
   card.append(top, el("h3", undefined, entry.title), el("p", undefined, entry.summary), foot);
   return card;
