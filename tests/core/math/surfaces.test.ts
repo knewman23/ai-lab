@@ -36,6 +36,20 @@ describe("SURFACE_KEYS and SURFACES table", () => {
     expect(SURFACES.rosenbrock.start).toEqual([-1.5, 2.5]);
   });
 
+  it("gives each surface its per-surface default learning rate, within the slider range", () => {
+    expect(SURFACES.bowl.defaultLr).toBe(0.1);
+    expect(SURFACES.elongated.defaultLr).toBe(0.1);
+    expect(SURFACES.saddle.defaultLr).toBe(0.1);
+    expect(SURFACES.himmelblau.defaultLr).toBe(0.01);
+    expect(SURFACES.rosenbrock.defaultLr).toBe(0.001);
+
+    for (const key of SURFACE_KEYS) {
+      const { defaultLr } = SURFACES[key];
+      expect(defaultLr).toBeGreaterThanOrEqual(1e-3);
+      expect(defaultLr).toBeLessThanOrEqual(1);
+    }
+  });
+
   it("gives every surface a title and hint", () => {
     for (const key of SURFACE_KEYS) {
       const surface = SURFACES[key];

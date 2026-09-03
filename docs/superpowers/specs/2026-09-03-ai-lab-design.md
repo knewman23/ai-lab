@@ -199,19 +199,19 @@ colour ramp, tangent plane normal (−s·f_x, −s·f_y, 1) and the gradient arr
 all use s·f. The arrow's direction in the xy plane is the true ∇f; only its z component is
 scaled to stay tangent to the drawn surface. Each surface has a default start point that shows off its behaviour.
 
-| Key | f(x, y) | Domain | Display scale | Start | Why |
-|---|---|---|---|---|---|
-| `bowl` | x² + y² | [−3, 3]² | 1/6 | (2.5, 2) | the canonical convex case |
-| `elongated` | x² + 10y² | [−3, 3]² | 1/30 | (2.5, 1.5) | shows zig-zagging and why learning rate matters |
-| `saddle` | x² − y² | [−3, 3]² | 1/6 | (2.5, 0.05) | a critical point that is not a minimum |
-| `himmelblau` | (x² + y − 11)² + (x + y² − 7)² | [−5, 5]² | 1/300 | (0, 0) | four minima, shows dependence on start |
-| `rosenbrock` | (1 − x)² + 100(y − x²)² | x ∈ [−2, 2], y ∈ [−1, 3] | 1/800 | (−1.5, 2.5) | the classic narrow valley |
+| Key | f(x, y) | Domain | Display scale | Start | Start lr | Why |
+|---|---|---|---|---|---|---|
+| `bowl` | x² + y² | [−3, 3]² | 1/6 | (2.5, 2) | 0.1 | the canonical convex case |
+| `elongated` | x² + 10y² | [−3, 3]² | 1/30 | (2.5, 1.5) | 0.1 | shows zig-zagging and why learning rate matters |
+| `saddle` | x² − y² | [−3, 3]² | 1/6 | (2.5, 0.05) | 0.1 | a critical point that is not a minimum |
+| `himmelblau` | (x² + y − 11)² + (x + y² − 7)² | [−5, 5]² | 1/300 | (0, 0) | 0.01 | four minima, shows dependence on start |
+| `rosenbrock` | (1 − x)² + 100(y − x²)² | x ∈ [−2, 2], y ∈ [−1, 3] | 1/800 | (−1.5, 2.5) | 0.001 | the classic narrow valley |
 
 ### Controls (side panel)
 
 1. Surface select (default `bowl`).
 2. Optimizer select: SGD (default), SGD + momentum (β = 0.9), Adam (β₁ 0.9, β₂ 0.999, ε 1e-8).
-3. Learning rate slider, log scale 1e-3 … 1, default 0.1.
+3. Learning rate slider, log scale 1e-3 … 1, default per surface (see the table's Start lr column).
 4. Step button, Run/Pause toggle (steps at a fixed 10 Hz so the path is watchable), Reset.
 5. Toggles: tangent plane, contours, path.
 
@@ -244,8 +244,8 @@ Position (x, y), loss f, gradient (f_x, f_y), |∇f|, step count. Monospace, tab
 - Optimizer state (momentum velocity; Adam m, v, t) and the step count reset to zero on: drag,
   Reset, surface change, optimizer change. Changing the learning rate mid-run keeps state.
   Reset returns the marker to the surface's start point. Surface change behaves like Reset on
-  the new surface (marker to its start, path cleared); optimizer change keeps the marker and
-  clears the path.
+  the new surface (marker to its start, path cleared) and sets the learning rate to that
+  surface's start value; optimizer change keeps the marker and clears the path.
 - `prefers-reduced-motion`: Run steps at 2 Hz and camera damping is disabled.
 - Keyboard: sliders and buttons are native elements, so tab/arrow keys work.
 

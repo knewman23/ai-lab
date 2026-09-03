@@ -11,6 +11,8 @@ export interface Surface {
   /** Display scale applied when mapping f(x, y) into scene units. */
   readonly scale: number;
   readonly start: Vec2;
+  /** Default learning rate when this surface is selected, chosen per surface so the start point doesn't leave the domain on step one. */
+  readonly defaultLr: number;
   /** "What to look for" sentence shown in the explanation panel. */
   readonly hint: string;
 }
@@ -33,6 +35,7 @@ export const SURFACES: Readonly<Record<SurfaceKey, Surface>> = {
     domain: { x: [-3, 3], y: [-3, 3] },
     scale: 1 / 6,
     start: [2.5, 2],
+    defaultLr: 0.1,
     hint: "Every start slides straight downhill to the origin: the canonical convex case.",
   },
   elongated: {
@@ -43,6 +46,7 @@ export const SURFACES: Readonly<Record<SurfaceKey, Surface>> = {
     domain: { x: [-3, 3], y: [-3, 3] },
     scale: 1 / 30,
     start: [2.5, 1.5],
+    defaultLr: 0.1,
     hint: "At a learning rate of 0.1 the narrow axis neither settles nor blows up: y flips sign every step. Nudge the rate below 0.1 to converge, above it to diverge.",
   },
   saddle: {
@@ -53,6 +57,7 @@ export const SURFACES: Readonly<Record<SurfaceKey, Surface>> = {
     domain: { x: [-3, 3], y: [-3, 3] },
     scale: 1 / 6,
     start: [2.5, 0.05],
+    defaultLr: 0.1,
     hint: "The ball slides off along y until it leaves the domain: that's the optimizer escaping a saddle.",
   },
   himmelblau: {
@@ -67,6 +72,7 @@ export const SURFACES: Readonly<Record<SurfaceKey, Surface>> = {
     domain: { x: [-5, 5], y: [-5, 5] },
     scale: 1 / 300,
     start: [0, 0],
+    defaultLr: 0.01,
     hint: "Four minima share this bowl: which one you reach depends on the start.",
   },
   rosenbrock: {
@@ -81,7 +87,8 @@ export const SURFACES: Readonly<Record<SurfaceKey, Surface>> = {
     domain: { x: [-2, 2], y: [-1, 3] },
     scale: 1 / 800,
     start: [-1.5, 2.5],
-    hint: "The path finds the narrow valley fast, then crawls along it toward the minimum.",
+    defaultLr: 0.001,
+    hint: "The path finds the narrow valley fast, then crawls along it toward the minimum, and starts at a much smaller learning rate since its gradients run two orders of magnitude larger than the bowl's.",
   },
 };
 

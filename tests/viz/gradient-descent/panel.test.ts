@@ -164,6 +164,21 @@ describe("createGdPanel", () => {
     expect(onSurface).not.toHaveBeenCalled();
   });
 
+  it("reflects a changed learning rate on the slider without calling onLr", () => {
+    const host = document.createElement("div");
+    const onLr = vi.fn();
+    const panel = createGdPanel(host, { ...handlers(), onLr }, { backend: "webgpu" });
+    const s = { ...initialState(), lr: 0.001 };
+    panel.render(s, derived(s));
+
+    const range = rangeInput(panel.el);
+    expect(Number(range.value)).toBe(0);
+    expect(onLr).not.toHaveBeenCalled();
+
+    const output = panel.el.querySelector("output");
+    expect(output?.textContent).toBe("0.001");
+  });
+
   it("dispose empties the host", () => {
     const host = document.createElement("div");
     const panel = createGdPanel(host, handlers(), { backend: "webgpu" });

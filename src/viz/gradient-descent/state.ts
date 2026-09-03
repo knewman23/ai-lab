@@ -56,7 +56,7 @@ export function initialState(): GdState {
   return {
     surface: surface.key,
     optimizer: "sgd",
-    lr: 0.1,
+    lr: SURFACES.bowl.defaultLr,
     pos: surface.start,
     optState: getOptimizer("sgd").init(),
     steps: 0,
@@ -128,6 +128,7 @@ export function setSurface(s: GdState, key: SurfaceKey): GdState {
   return {
     ...s,
     surface: key,
+    lr: surface.defaultLr,
     pos: surface.start,
     optState: getOptimizer(s.optimizer).init(),
     steps: 0,

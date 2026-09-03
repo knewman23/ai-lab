@@ -140,6 +140,15 @@ describe("setSurface", () => {
     expect(s1.status).toBe("ok");
     expect(s1.running).toBe(false);
   });
+
+  it("sets the learning rate to the new surface's default", () => {
+    const s0 = initialState();
+    const rosenbrock = setSurface(s0, "rosenbrock");
+    expect(rosenbrock.lr).toBe(0.001);
+
+    const himmelblau = setSurface(s0, "himmelblau");
+    expect(himmelblau.lr).toBe(0.01);
+  });
 });
 
 describe("setOptimizer", () => {
