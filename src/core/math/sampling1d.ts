@@ -98,3 +98,19 @@ export function zoomSamples(
   }
   return { X, Z };
 }
+
+/** Even samples of an arbitrary function on [a, b]: T in [a, b], V = fn(T). NaN passes through. */
+export function sampleOn(
+  fn: (t: number) => number,
+  [a, b]: readonly [number, number],
+  n = 241,
+): { T: Float32Array; V: Float32Array } {
+  const T = new Float32Array(n);
+  const V = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    const t = a + (i / (n - 1)) * (b - a);
+    T[i] = t;
+    V[i] = fn(t);
+  }
+  return { T, V };
+}

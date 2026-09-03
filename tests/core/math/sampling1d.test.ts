@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { BAND, DOMAIN, FNS, Z0 } from "../../../src/core/math/functions1d";
-import { curveSamples, primeSamples, zoomSamples } from "../../../src/core/math/sampling1d";
+import {
+  curveSamples,
+  primeSamples,
+  sampleOn,
+  zoomSamples,
+} from "../../../src/core/math/sampling1d";
 
 describe("curveSamples", () => {
   it("returns 241 evenly spaced X over the domain and Z = scale * f(X)", () => {
@@ -121,5 +126,18 @@ describe("zoomSamples", () => {
 
     expect(dev4).toBeGreaterThan(3 * dev16);
     expect(dev16).toBeGreaterThan(3 * dev64);
+  });
+});
+
+describe("sampleOn", () => {
+  it("samples an arbitrary function on [a, b], passing NaN through where it is undefined", () => {
+    const { T, V } = sampleOn(Math.sqrt, [-1, 1], 5);
+    expect(Array.from(T)).toEqual([-1, -0.5, 0, 0.5, 1]);
+    expect(V.length).toBe(5);
+    expect(V[0]).toBeNaN();
+    expect(V[1]).toBeNaN();
+    expect(V[2]).toBe(0);
+    expect(V[3]).toBeCloseTo(Math.SQRT1_2, 6);
+    expect(V[4]).toBe(1);
   });
 });
