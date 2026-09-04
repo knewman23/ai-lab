@@ -42,3 +42,13 @@ export function floorPoint(x: readonly [number, number]): Vec3 {
 export function inputFromFloor(p: readonly [number, number]): readonly [number, number] {
   return [p[0], p[1] - FLOOR_CY];
 }
+
+/**
+ * Neuron `i` of layer `l` as an unlifted world point in the plane y = 0. Callers apply their own
+ * lift off the wall — neurons −0.01 (`LIFT_WALL`), struts −0.08 — as `wallPoint` in the backprop
+ * scene does; labels project from the plane itself and need no lift at all.
+ */
+export function neuronWorld(l: number, i: number): Vec3 {
+  const [x, z] = neuronPosition(l, i);
+  return [x, 0, z];
+}

@@ -9,6 +9,7 @@ import {
   floorPoint,
   inputFromFloor,
   neuronPosition,
+  neuronWorld,
 } from "../../../src/viz/nn/layout";
 
 describe("nn layout", () => {
@@ -39,6 +40,11 @@ describe("nn layout", () => {
 
   it("the single output neuron sits at Z = 3", () => {
     expect(neuronPosition(3, 0)[1]).toBeCloseTo(3);
+  });
+
+  it("neuronWorld is the layout point in the plane y = 0, unlifted", () => {
+    const [x, z] = neuronPosition(2, 1);
+    expect(neuronWorld(2, 1)).toEqual([x, 0, z]);
   });
 
   it("floorPoint maps the input domain onto the floor plane z = 0", () => {
