@@ -35,7 +35,7 @@ function opText(node: GraphNode, values: Values): string {
     case "tanh":
       return `tanh(${a})`;
     case "leaf":
-      return a;
+      throw new Error(`explanation: leaf "${node.id}" has no forward step`);
   }
 }
 

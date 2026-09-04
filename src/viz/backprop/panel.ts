@@ -106,6 +106,7 @@ export function createBpPanel(host: HTMLElement, handlers: BpPanelHandlers): BpP
     playing = state.playing;
     playBtn.setLabel(playing ? "Pause" : "Play");
     stepBtn.setDisabled(d.done);
+    playBtn.setDisabled(d.done);
     passPara.textContent = passLine(state.step, d);
 
     leafSliders?.render(state.leaves);

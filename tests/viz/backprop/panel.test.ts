@@ -9,9 +9,9 @@ import {
   setLeaf,
   setPlaying,
   setShow,
-  stepForward,
 } from "../../../src/viz/backprop/state";
 import type { BpState } from "../../../src/viz/backprop/state";
+import { at } from "./helpers";
 
 function handlers(): BpPanelHandlers {
   return {
@@ -35,12 +35,6 @@ function mount(h: BpPanelHandlers = handlers()): Panel {
 
 function renderState(panel: Panel, s: BpState): void {
   panel.render(s, derived(s));
-}
-
-function at(step: number, s: BpState = initialState()): BpState {
-  let out = s;
-  for (let i = 0; i < step; i++) out = stepForward(out);
-  return out;
 }
 
 function readoutText(el: HTMLElement, key: string): string {

@@ -1,14 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { GRAPHS } from "../../../src/core/math/graphs";
 import { edgeLabel, GRAPH_TEX, passLine, stepText } from "../../../src/viz/backprop/explanation";
-import { derived, initialState, setGraph, stepForward } from "../../../src/viz/backprop/state";
+import { derived, initialState, setGraph } from "../../../src/viz/backprop/state";
 import type { BpState, Derived } from "../../../src/viz/backprop/state";
-
-function at(step: number, s: BpState = initialState()): BpState {
-  let out = s;
-  for (let i = 0; i < step; i++) out = stepForward(out);
-  return out;
-}
+import { at } from "./helpers";
 
 function d(step: number, s?: BpState): Derived {
   return derived(at(step, s));
@@ -38,6 +33,16 @@ describe("stepText", () => {
   it("lists every input of an add node's backward step", () => {
     expect(stepText(d(7))).toBe(
       "backward at n: n.grad = 0.5 → sum.grad += 1 × 0.5, b.grad += 1 × 0.5",
+    );
+  });
+
+  it("shows the accumulated gradient of a shared node", () => {
+    const shared = setGraph(initialState(), "shared-node");
+    expect(stepText(d(6, shared))).toBe(
+      "backward at f: f.grad = 1 → e.grad += 10 × 1, c.grad += 4 × 1",
+    );
+    expect(stepText(d(7, shared))).toBe(
+      "backward at e: e.grad = 11 → ab.grad += 1 × 11, c.grad += 1 × 11",
     );
   });
 
