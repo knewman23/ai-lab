@@ -12,11 +12,13 @@ import { writeWorldSegments } from "../shared/layer-write";
 import type { ThemeColors } from "../types";
 import {
   ARC_BUFFER_FLOATS,
-  arcHalfWidth,
+  attentionRow,
   crossSegments,
-  MAX_ARCS,
+  type Field,
+  halfWidths,
   writeArcs,
 } from "./arcs-geometry";
+import { COLUMN_X } from "./layout";
 import type { HeadKey, StageKey } from "./state";
 
 export interface Arcs {
@@ -34,65 +36,17 @@ export interface Arcs {
   dispose(): void;
 }
 
-/** Which row of a head the ribbons are measuring. */
-type Field = "weights" | "scores";
-
-/**
- * How much of each head's attention row survives into `attnOut`. `W_O` scales head 1 by 0.6 and
- * head 2 by 0.4, *and* head 2's `W_V = 0.8 I` shrinks its values first, so head 2's effective
- * coefficient is 0.32 and the blend sums to 0.92. It is a contribution, not a distribution;
- * writing 0.6 a¹ + 0.4 a² would overstate the second head.
- */
-const BLEND = { head1: 0.6, head2: 0.32 } as const;
-
 /** The arcs sit in front of the wall; the markers and the columns' glyphs sit in front of them. */
 const ARC_ORDER = 8;
 const MARKER_ORDER = 9;
 
-/** Endpoints the marker layer can need: two strokes of two ends at every masked column. */
-const MARKER_ENDPOINTS = MAX_ARCS * 4;
-
-/** One head's row for `query`. Throws rather than defaulting: a short row is a bug, not a blank. */
-function headRow(f: Forward, index: 0 | 1, query: number, field: Field): Float64Array {
-  const head = f.heads[index];
-  if (head === undefined) throw new Error(`gpt arcs: the pass has no head ${index + 1}`);
-  const row = head[field][query];
-  if (row === undefined) {
-    throw new Error(`gpt arcs: head ${index + 1} has no ${field} row ${query}`);
-  }
-  return row;
-}
-
 /**
- * The row the ribbons are sized from. `both` combines the two heads by their `BLEND`
- * coefficients — for the scores as well, so the focus switch changes what is measured and not
- * which heads are shown.
+ * Endpoints the marker layer can need: two strokes of two ends at every column. Counted from the
+ * columns rather than from `MAX_ARCS`, which means "arcs drawn at once" and is equal only by
+ * coincidence — a smaller `MAX_ARCS` would under-allocate this buffer with nothing to catch it
+ * until `writeWorldSegments` overran at draw time.
  */
-function attentionRow(f: Forward, query: number, head: HeadKey, field: Field): number[] {
-  if (head === "head1") return [...headRow(f, 0, query, field)];
-  if (head === "head2") return [...headRow(f, 1, query, field)];
-  const first = headRow(f, 0, query, field);
-  const second = headRow(f, 1, query, field);
-  return [...first].map((value, j) => {
-    const other = second[j];
-    if (other === undefined) {
-      throw new Error(`gpt arcs: the two heads' ${field} rows disagree in length at key ${j}`);
-    }
-    return BLEND.head1 * value + BLEND.head2 * other;
-  });
-}
-
-/**
- * Ribbon half-widths for a row. Weights are already in 0..1 and go through unchanged; raw scores
- * are unbounded and are min-max normalised across the row first. A row whose scores are all equal
- * has no spread to show and draws at full width, as the single-key row of query 0 does.
- */
-function halfWidths(row: readonly number[], normalise: boolean): number[] {
-  if (!normalise) return row.map((weight) => arcHalfWidth(weight));
-  const lo = Math.min(...row);
-  const span = Math.max(...row) - lo;
-  return row.map((score) => arcHalfWidth(span > 0 ? (score - lo) / span : 1));
-}
+const MARKER_ENDPOINTS = COLUMN_X.length * 4;
 
 /**
  * The attention arcs: for the selected query column, one ribbon fanning back to every key it
@@ -133,15 +87,15 @@ export function createArcs(theme: ThemeColors): Arcs {
   let stage: StageKey = "all";
 
   function redraw(): void {
-    const scores = stage === "scores";
+    const field: Field = stage === "scores" ? "scores" : "weights";
     let count = 0;
     const strokes: Segment[] = [];
     if (shown !== null) {
-      const row = attentionRow(shown.f, shown.query, shown.head, scores ? "scores" : "weights");
-      count = writeArcs(positions, shown.query, halfWidths(row, scores));
+      const row = attentionRow(shown.f, shown.query, shown.head, field);
+      count = writeArcs(positions, shown.query, halfWidths(row, field));
       // The mask leaves no sentinel behind: the row simply stops, so the keys past its end are
       // exactly the ones the query cannot see.
-      if (scores) {
+      if (field === "scores") {
         for (let j = row.length; j < shown.f.x.length; j++) strokes.push(...crossSegments(j));
       }
     }
@@ -167,6 +121,9 @@ export function createArcs(theme: ThemeColors): Arcs {
     },
 
     setFocus(next): void {
+      // Every band of the scene gets the same focus, so this lands on each of them on every
+      // change; only the one that actually moved should pay for a rewrite.
+      if (next === stage) return;
       stage = next;
       redraw();
     },

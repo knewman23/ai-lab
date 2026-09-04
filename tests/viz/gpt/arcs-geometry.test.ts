@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { EMBEDDING_PRESETS, forward, SEQUENCES } from "../../../src/core/math/transformer";
 import type { Vec3 } from "../../../src/viz/shared/layer";
 import {
   ARC_BUFFER_FLOATS,
@@ -9,7 +10,10 @@ import {
   arcControl,
   arcHalfWidth,
   arcTriangles,
+  attentionRow,
+  BLEND,
   crossSegments,
+  halfWidths,
   MAX_ARCS,
   writeArcs,
 } from "../../../src/viz/gpt/arcs-geometry";
@@ -90,6 +94,92 @@ describe("arcControl", () => {
 
   it("still lifts a self-arc, whose two ends are the same column", () => {
     expect(arcControl(2, 2)[2]).toBeCloseTo(BAND_Z.attention + 0.25, 12);
+  });
+});
+
+const PASS = forward({
+  embeddings: EMBEDDING_PRESETS.tuned,
+  sequence: SEQUENCES["cat-sat"],
+  positional: true,
+  causal: true,
+});
+
+/** One head's raw row, for comparing against what `attentionRow` selects and blends. */
+function raw(head: 0 | 1, query: number, field: "weights" | "scores"): number[] {
+  const h = PASS.heads[head];
+  if (h === undefined) throw new Error(`no head ${head}`);
+  const row = h[field][query];
+  if (row === undefined) throw new Error(`no ${field} row ${query}`);
+  return [...row];
+}
+
+describe("attentionRow", () => {
+  it("selects one head's own row, and the two heads genuinely differ", () => {
+    expect(attentionRow(PASS, 3, "head1", "weights")).toEqual(raw(0, 3, "weights"));
+    expect(attentionRow(PASS, 3, "head2", "weights")).toEqual(raw(1, 3, "weights"));
+    expect(raw(0, 3, "weights")).not.toEqual(raw(1, 3, "weights"));
+  });
+
+  it("blends both heads as 0.6 a1 + 0.32 a2, not the naive 0.6 a1 + 0.4 a2", () => {
+    const a1 = raw(0, 4, "weights");
+    const a2 = raw(1, 4, "weights");
+    const blended = attentionRow(PASS, 4, "both", "weights");
+    blended.forEach((value, j) => expect(value).toBeCloseTo(0.6 * a1[j]! + 0.32 * a2[j]!, 12));
+    const naive = a1.map((w, j) => 0.6 * w + 0.4 * a2[j]!);
+    expect(blended).not.toEqual(naive);
+  });
+
+  it("sums to 0.92, because head 2's W_V shrinks its values before W_O mixes them", () => {
+    // Each head's row is a distribution, so the blend sums to the coefficients themselves.
+    const total = attentionRow(PASS, 4, "both", "weights").reduce((sum, w) => sum + w, 0);
+    expect(total).toBeCloseTo(0.92, 9);
+    expect(total).toBeLessThan(1);
+    expect(BLEND.head1 + BLEND.head2).toBeCloseTo(total, 9);
+  });
+
+  it("is as long as the row the causal mask left, whichever head is asked for", () => {
+    for (const head of ["head1", "head2", "both"] as const) {
+      expect(attentionRow(PASS, 2, head, "weights")).toHaveLength(3);
+    }
+  });
+
+  it("blends the raw scores too, so the focus changes what is measured not which heads show", () => {
+    const s1 = raw(0, 3, "scores");
+    const s2 = raw(1, 3, "scores");
+    const blended = attentionRow(PASS, 3, "both", "scores");
+    blended.forEach((value, j) => expect(value).toBeCloseTo(0.6 * s1[j]! + 0.32 * s2[j]!, 12));
+  });
+
+  it("throws for a query the pass has no row for, rather than drawing an empty fan", () => {
+    expect(() => attentionRow(PASS, 9, "head1", "weights")).toThrow(/row 9/);
+  });
+});
+
+/** Element-wise, because the spec's 0.010 + 0.075 * 1 is not exactly 0.085 in float64. */
+function expectWidths(actual: readonly number[], expected: readonly number[]): void {
+  expect(actual).toHaveLength(expected.length);
+  actual.forEach((width, j) => expect(width).toBeCloseTo(expected[j]!, 12));
+}
+
+describe("halfWidths", () => {
+  it("passes weights straight through, because a weight is already 0..1", () => {
+    expectWidths(halfWidths([0, 0.25, 1], "weights"), [0.01, 0.01 + 0.075 * 0.25, 0.085]);
+  });
+
+  it("min-max normalises raw scores, which are unbounded and often all negative", () => {
+    // -3 is the row's floor and 1 its ceiling, so -1 lands exactly halfway.
+    expectWidths(halfWidths([-3, 1, -1], "scores"), [0.01, 0.085, 0.01 + 0.075 * 0.5]);
+  });
+
+  it("draws a row with no spread at full width, as query 0's single key must be", () => {
+    expectWidths(halfWidths([2.5], "scores"), [0.085]);
+    expectWidths(halfWidths([4, 4, 4], "scores"), [0.085, 0.085, 0.085]);
+  });
+
+  it("keeps every ribbon visible, even the key read least", () => {
+    for (const width of halfWidths(raw(0, 4, "scores"), "scores")) {
+      expect(width).toBeGreaterThanOrEqual(0.01);
+    }
   });
 });
 

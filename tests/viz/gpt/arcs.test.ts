@@ -239,6 +239,17 @@ describe("createArcs focus", () => {
     arcs.dispose();
   });
 
+  it("does not repaint when the focus has not actually moved", () => {
+    const { arcs } = make();
+    arcs.set(CAUSAL, 1, "head1");
+    const rewrite = vi.spyOn(arcs.mesh.geometry, "computeBoundingSphere");
+    arcs.setFocus("all");
+    expect(rewrite).not.toHaveBeenCalled();
+    arcs.setFocus("scores");
+    expect(rewrite).toHaveBeenCalledOnce();
+    arcs.dispose();
+  });
+
   it("keeps the focus when a new pass arrives", () => {
     const { arcs } = make();
     arcs.setFocus("scores");

@@ -7,8 +7,10 @@
  * itself inside out and the fix is never to negate a normal but to emit the strip consistently.
  */
 
+import type { Forward } from "../../core/math/transformer";
 import type { Segment, Vec3 } from "../shared/layer";
 import { BAND_Z, columnX, COLUMN_X } from "./layout";
+import type { HeadKey } from "./state";
 
 /** How many straight pieces one Bézier is sampled into; the stations are one more than this. */
 export const ARC_SEGMENTS = 24;
@@ -25,7 +27,11 @@ export const ARC_VERTICES = ARC_SEGMENTS * 6;
 /** One arc per sequence position at most: a query reads every key up to and including itself. */
 export const MAX_ARCS = COLUMN_X.length;
 
-/** Floats the ribbon mesh preallocates. A multiple of 3, or `computeBoundingSphere` reads past it. */
+/**
+ * Floats the ribbon mesh preallocates. A multiple of 3, or `computeBoundingSphere` reads past it.
+ * That whole-buffer read also means the sphere covers the zeroed tail, so it always contains the
+ * world origin and is larger than the ribbons themselves. Culling is conservative, never wrong.
+ */
 export const ARC_BUFFER_FLOATS = MAX_ARCS * ARC_VERTICES * 3;
 
 /** Half-width of a ribbon carrying no weight at all, and how much a weight of 1 adds to it. */
@@ -39,6 +45,48 @@ const CONTROL_LIFT_GAIN = 0.35;
 /** Arm length of a masked position's `×`, in either direction along both diagonals. */
 const CROSS_ARM = 0.07;
 
+/** Which row of a head the ribbons are measuring. */
+export type Field = "weights" | "scores";
+
+/**
+ * How much of each head's attention row survives into `attnOut`. `W_O` scales head 1 by 0.6 and
+ * head 2 by 0.4, *and* head 2's `W_V = 0.8 I` shrinks its values first, so head 2's effective
+ * coefficient is 0.32 and the blend sums to 0.92. It is a contribution, not a distribution;
+ * writing 0.6 a¹ + 0.4 a² would overstate the second head.
+ */
+export const BLEND = { head1: 0.6, head2: 0.32 } as const;
+
+/** One head's row for `query`. Throws rather than defaulting: a short row is a bug, not a blank. */
+function headRow(f: Forward, index: 0 | 1, query: number, field: Field): Float64Array {
+  const head = f.heads[index];
+  if (head === undefined) throw new Error(`gpt arcs: the pass has no head ${index + 1}`);
+  const row = head[field][query];
+  if (row === undefined) {
+    throw new Error(`gpt arcs: head ${index + 1} has no ${field} row ${query}`);
+  }
+  return row;
+}
+
+/**
+ * The row the ribbons are sized from. `both` combines the two heads by their `BLEND`
+ * coefficients — for the scores as well, so the focus switch changes what is measured and not
+ * which heads are shown. Two heads' raw scores are not commensurable, so under `scores` that
+ * blend is a display combination rather than a model quantity, which the readout says outright.
+ */
+export function attentionRow(f: Forward, query: number, head: HeadKey, field: Field): number[] {
+  if (head === "head1") return [...headRow(f, 0, query, field)];
+  if (head === "head2") return [...headRow(f, 1, query, field)];
+  const first = headRow(f, 0, query, field);
+  const second = headRow(f, 1, query, field);
+  return [...first].map((value, j) => {
+    const other = second[j];
+    if (other === undefined) {
+      throw new Error(`gpt arcs: the two heads' ${field} rows disagree in length at key ${j}`);
+    }
+    return BLEND.head1 * value + BLEND.head2 * other;
+  });
+}
+
 /**
  * How thick a ribbon carrying `weight` is drawn, measured from its centre line. The base keeps a
  * near-zero weight a visible hairline rather than nothing, so "this key is read faintly" and
@@ -46,6 +94,18 @@ const CROSS_ARM = 0.07;
  */
 export function arcHalfWidth(weight: number): number {
   return HALF_WIDTH_BASE + HALF_WIDTH_GAIN * weight;
+}
+
+/**
+ * Ribbon half-widths for a row. Weights are already in 0..1 and go through unchanged; raw scores
+ * are unbounded and are min-max normalised across the row first. A row whose scores are all equal
+ * has no spread to show and draws at full width, as the single-key row of query 0 does.
+ */
+export function halfWidths(row: readonly number[], field: Field): number[] {
+  if (field === "weights") return row.map((weight) => arcHalfWidth(weight));
+  const lo = Math.min(...row);
+  const span = Math.max(...row) - lo;
+  return row.map((score) => arcHalfWidth(span > 0 ? (score - lo) / span : 1));
 }
 
 /**
