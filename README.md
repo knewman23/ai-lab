@@ -160,20 +160,18 @@ The registry test asserts the loaded module's `id`, `topic`, `title` and
 
 ## Roadmap
 
-1. ~~Matrix transformation (linear algebra)~~ — shipped: drag the two basis vectors of a 2×2
-   matrix, watch the plane and unit square deform, see the determinant as signed area and
-   eigenvectors as the lines that don't turn.
-2. ~~Backprop graph (machine learning)~~ — shipped: the `Value` autograd graph on a wall with value
-   and gradient bars, a stepped forward and backward pass, local derivatives on the active edges,
-   and editable leaves.
-3. ~~Neural network (machine learning)~~ — shipped: a 2-4-4-1 tanh MLP on a wall with weights as
-   struts, the data and live decision boundary on the floor, and full-batch gradient descent you
-   can step or play.
-4. GPT transformer (machine learning) — token embeddings, attention heads, residual stream.
-5. ~~Derivative & tangent explorer (calculus)~~ — shipped: drag a point along a curve on a
-   vertical plane, watch the tangent follow, shrink h to collapse the secant onto it, read the
-   derivative curve in the band underneath, and zoom the domain until the curve straightens.
-6. Walkthrough mode (shell) — optional numbered steps that reconfigure any scene.
+Six scenes are live: derivative & tangent and the chain rule graph (calculus), matrix
+transformation (linear algebra), and gradient descent, the backprop graph and the neural
+network (machine learning).
+
+Next:
+
+1. GPT transformer (machine learning) — token embeddings, attention heads, residual stream.
+2. Walkthrough mode (shell) — optional numbered steps that reconfigure any scene.
+
+After that: SVD & low-rank approximation, Taylor series, and overfitting / bias–variance /
+regularization. The queue behind those, with what each scene would let you manipulate and
+what it reuses, is in [docs/roadmap.md](docs/roadmap.md).
 
 ## Related
 
