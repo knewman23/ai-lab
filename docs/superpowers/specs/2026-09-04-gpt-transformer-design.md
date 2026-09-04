@@ -468,6 +468,14 @@ costs (the §3.4 limitation, in one paragraph); what the two heads lean toward; 
 is absent (§3.6); and that there is no training here, with a link to the neural network scene
 for that.
 
+**This copy is load-bearing, and the plan must treat it that way.** Three properties of the
+scene are true, visible, and misleading if unexplained: head 1 is not the previous-token head
+its rotation suggests (§3.4); the block predicts the token it just read (§3.7); and a tied
+unembedding makes a bar grow when its word is dragged *further out*, not just when it is
+dragged *toward* the final vector (§10). Each is taught rather than hidden, so the panel prose
+is the only thing between a viewer and three wrong conclusions. It gets its own task and its
+own review in the plan, not a paragraph appended to the last one.
+
 ## 8. Files and shared changes
 
 New:
@@ -587,3 +595,9 @@ Walkthrough mode is specified separately and built after this scene. This spec's
 obligation to it: every control in §6 is driven by a pure setter in `state.ts` returning a new
 `GptState`, and the stage-focus selector (§6.5) gives a walkthrough a natural per-step target.
 Nothing here should reach into the scene's Three.js objects to change state.
+
+One rule from this spec should be carried into the walkthrough spec verbatim, because it
+closed two of the seven blocking issues found in review: **anything the panel displays must be
+returned by the pure layer, never recomputed in the scene.** A walkthrough will want to show
+state the scenes currently hold internally, and that is exactly where the same class of drift
+would reappear.
