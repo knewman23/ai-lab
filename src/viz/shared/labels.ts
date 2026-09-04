@@ -68,7 +68,7 @@ export function createLabelLayer(host: HTMLElement): LabelLayer {
     set(id, text, world, kind): void {
       const existing = entries.get(id);
       if (existing) {
-        existing.el.textContent = text;
+        if (existing.el.textContent !== text) existing.el.textContent = text;
         if (existing.el.className !== kind) {
           // A new kind may mean a new anchor, so force the transform to be rewritten.
           existing.el.className = kind;
