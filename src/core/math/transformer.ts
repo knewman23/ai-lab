@@ -162,7 +162,9 @@ function attend(x: readonly Vec2[], head: HeadWeights, causal: boolean): Head {
     out.push(
       v.slice(0, width).reduce<Vec2>(
         (sum, vj, j) => {
-          const w = a[j] ?? 0;
+          // `a` is this row's softmax, allocated at `width` three lines above.
+          const w = a[j];
+          if (w === undefined) throw new Error(`transformer: attention row ${i} is short at ${j}`);
           return [sum[0] + w * vj[0], sum[1] + w * vj[1]];
         },
         [0, 0],
