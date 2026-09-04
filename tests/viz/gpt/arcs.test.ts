@@ -1,7 +1,9 @@
+import { DoubleSide, MeshStandardMaterial } from "three";
 import { describe, expect, it, vi } from "vitest";
 import { EMBEDDING_PRESETS, forward, SEQUENCES } from "../../../src/core/math/transformer";
 import type { Vec3 } from "../../../src/viz/shared/layer";
 import {
+  ARC_BUFFER_FLOATS,
   ARC_VERTICES,
   arcHalfWidth,
   arcTriangles,
@@ -118,6 +120,28 @@ describe("createArcs", () => {
     for (const vertex of drawn(arcs.mesh, arcs.positions)) {
       expect(vertex[1]).toBe(Math.fround(-0.06));
     }
+    arcs.dispose();
+  });
+
+  it("normals every vertex +y and never the reverse, whichever way its arc runs", () => {
+    const { arcs } = make();
+    arcs.set(CAUSAL, 4, "both");
+    const normals = arcs.mesh.geometry.getAttribute("normal");
+    // The whole buffer, not only the drawn range: the tail is normalled too.
+    expect(normals.array).toHaveLength(ARC_BUFFER_FLOATS);
+    for (let n = 0; n < normals.count; n++) {
+      // Every triangle is wound the same way, so one normal serves them all. Negating this
+      // is what lights the DoubleSide back faces inside out; the geometry never flips it.
+      expect([normals.getX(n), normals.getY(n), normals.getZ(n)]).toEqual([0, 1, 0]);
+    }
+    arcs.dispose();
+  });
+
+  it("draws the ribbons double-sided, so a back face is lit rather than culled", () => {
+    const { arcs } = make();
+    expect(arcs.mesh.material).toBe(arcs.material);
+    expect(arcs.material).toBeInstanceOf(MeshStandardMaterial);
+    expect(arcs.material.side).toBe(DoubleSide);
     arcs.dispose();
   });
 
