@@ -204,7 +204,7 @@ For `shared-node` the hint says: "e feeds both f and L, so e.grad is the sum of 
   0.4 × 6.4 × 0.4 centred on the bar's axis (X_i − 0.12, Z_i) and spanning y ∈ [−3.2, 3.2], so a
   zero-valued leaf (x2 in the neuron) is still grabbable. The drag plane contains the bar's axis and
   faces the camera: `plane: { normal: (i) => normalize(camera.x − X_i, 0, camera.z − Z_i), getOffset:
-  (i) => normal · (X_i, 0, Z_i) }` (the normal function runs at pointerdown, so it follows the orbit;
+  (i) => normal · (X_i − 0.12, 0, Z_i) }` (the value bar sits at X_i − 0.12, so the plane contains its axis) (the normal function runs at pointerdown, so it follows the orbit;
   a plane with normal +x would amplify pointer motion 2–3× from the home camera). `onDrag(i, p)` →
   `setLeaf(id_i, −p[1] / s_value)` (`setLeaf` clamps; p[1] is the world y of the hit; −y is positive).
   Grab cursor over a leaf bar. No click-to-place.
