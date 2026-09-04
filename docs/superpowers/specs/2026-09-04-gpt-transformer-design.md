@@ -222,14 +222,25 @@ distribution.
 
 ### 3.8 What `forward` returns
 
-One call, given `{ embeddings, sequence, positional }`, returns everything the scene draws:
+One call returns everything the scene draws. Both scene toggles that change the computation —
+positional encoding and the causal mask — are inputs, so there is exactly one code path and
+no branch inside the scene:
 
 ```ts
+interface ForwardInput {
+  readonly embeddings: readonly (readonly [number, number])[]; // length 8
+  readonly sequence: readonly number[]; // length 5, vocabulary indices
+  readonly positional: boolean; // §6.7 toggle: add pe(p) or not
+  readonly causal: boolean; // §6.7 toggle: mask j > i or not
+}
+
 interface Forward {
   readonly x: readonly Float64Array[]; // per position, after embed + position
+  readonly pe: readonly Float64Array[]; // pe(p) per position, or zeros when positional is false
   readonly heads: readonly HeadPass[]; // one per head
   readonly attnOut: readonly Float64Array[]; // after W_O
   readonly xResid: readonly Float64Array[]; // x + attnOut
+  readonly mlpHidden: readonly Float64Array[]; // the four tanh activations per position
   readonly mlpOut: readonly Float64Array[];
   readonly xFinal: readonly Float64Array[]; // xResid + mlpOut
   readonly logits: Float64Array; // length 8, from xFinal[last]
@@ -239,14 +250,25 @@ interface HeadPass {
   readonly q: readonly Float64Array[];
   readonly k: readonly Float64Array[];
   readonly v: readonly Float64Array[];
-  readonly scores: readonly Float64Array[]; // row i has length i+1; masked entries absent
+  readonly scores: readonly Float64Array[]; // see the row-length rule below
   readonly weights: readonly Float64Array[]; // same shape, rows sum to 1
   readonly out: readonly Float64Array[];
 }
 ```
 
-The temperature is deliberately not an input to `forward`: `probabilities(logits, T)` is a
-separate export, so moving the slider costs one softmax rather than a whole forward pass.
+**Row lengths.** With `causal: true`, row `i` has `i + 1` entries — masked positions are
+absent rather than present-and-zero, so nothing downstream has to know about `-Infinity`.
+With `causal: false`, every row has five entries. §5.4's `×` markers for masked positions are
+therefore drawn from the row's length, not from a sentinel value.
+
+`pe`, `mlpHidden` and `logits` exist precisely because §7's readout displays them: criterion
+§1.2 requires every number on screen to come from this interface, so anything the panel shows
+must be returned here rather than recomputed in the scene.
+
+The temperature is deliberately not an input: `probabilities(logits, T)` is a separate export,
+so moving the slider costs one softmax rather than a whole forward pass. `PE_SCALE` and the
+weight constants are also exported, for the readouts that name them and for §9.10's
+change-detector test.
 
 ## 4. Layout (`viz/gpt/layout.ts`, pure, unit-tested)
 
@@ -457,7 +479,8 @@ be useful to a later scene it can move to `shared/` then, not now.
 **`core/math/transformer.test.ts`**
 
 1. Every attention row, both heads, every sequence, all three presets: sums to 1 within 1e-12.
-2. Row `i` has exactly `i + 1` entries — the causal mask leaves nothing for `j > i`.
+2. With `causal: true`, row `i` has exactly `i + 1` entries — the mask leaves nothing for
+   `j > i`.
 3. Positional encoding off: the two `the` positions in `cat-sat` have bit-identical `q`, `k`
    and `v` in both heads. On: they differ.
 4. Weight tying: `logits[v]` equals `dot(xFinal[last], embedding[v])` for all `v`.
