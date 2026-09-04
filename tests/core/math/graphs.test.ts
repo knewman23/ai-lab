@@ -1,12 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { GRAPH_KEYS, GRAPHS } from "../../../src/core/math/graphs";
-import type { Graph, GraphNode } from "../../../src/core/math/autograd";
-
-function node(g: Graph, id: string): GraphNode {
-  const n = g.nodes.find((x) => x.id === id);
-  if (!n) throw new Error(`no node ${id}`);
-  return n;
-}
+import { nodeById as node } from "../../../src/core/math/autograd";
 
 describe("GRAPH_KEYS and GRAPHS table", () => {
   it("orders keys as in the spec table", () => {

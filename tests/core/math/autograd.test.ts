@@ -114,6 +114,10 @@ describe("gradsAfter", () => {
     4: { L: 1, f: 1, e: 11, c: 15, ab: 11, a: -33, b: 22 },
   };
 
+  it("treats a negative k like 0", () => {
+    expect(gradsAfter(shared, values, -2)).toEqual({});
+  });
+
   it("reveals a key only once a contribution has landed; e shows 1 then 11", () => {
     for (const [k, grads] of Object.entries(expected)) {
       expect(gradsAfter(shared, values, Number(k))).toEqual(grads);
@@ -167,6 +171,10 @@ describe("revealed", () => {
 
   it("k = 0: only the leaves, no backward steps", () => {
     expect(revealed(neuron, 0)).toEqual({ values: new Set(NEURON_LEAVES), backwardSteps: 0 });
+  });
+
+  it("treats a negative stepIndex like 0", () => {
+    expect(revealed(neuron, -3)).toEqual(revealed(neuron, 0));
   });
 
   it("k = 5: every value known, no backward steps", () => {

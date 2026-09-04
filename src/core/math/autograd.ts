@@ -1,3 +1,4 @@
+/** The operations a node can perform; leaves hold a value and have no inputs. */
 export type Op = "leaf" | "add" | "mul" | "tanh";
 
 /** One node of a scalar computation graph; leaves have `op: "leaf"` and no inputs. */
@@ -34,7 +35,14 @@ export type PassStep =
   | { readonly kind: "forward"; readonly node: string }
   | { readonly kind: "backward"; readonly node: string };
 
-function nodeById(g: Graph, id: string): GraphNode {
+/** Which values are known after some number of steps, and how many backward steps have run. */
+export interface Revealed {
+  readonly values: ReadonlySet<string>;
+  readonly backwardSteps: number;
+}
+
+/** The node with the given id; throws on an unknown id. */
+export function nodeById(g: Graph, id: string): GraphNode {
   const n = g.nodes.find((x) => x.id === id);
   if (!n) throw new Error(`autograd: unknown node "${id}" in graph "${g.key}"`);
   return n;
@@ -64,7 +72,7 @@ function nonLeaves(g: Graph): readonly string[] {
   return topoOrder(g).filter((id) => nodeById(g, id).op !== "leaf");
 }
 
-/** Every node's value given the leaves' values. */
+/** Every node's value given the leaves' values. A missing leaf value propagates NaN by design. */
 export function forward(g: Graph, leaves: Values): Values {
   const values: Record<string, number> = { ...leaves };
   for (const id of nonLeaves(g)) {
@@ -107,12 +115,12 @@ export function localGrad(g: Graph, node: string, inputIndex: number, values: Va
 /**
  * Gradients after the first k backward steps. The output's step sets its grad to 1; each step
  * then does grads[input] += localGrad · grads[node]. A key exists only once a contribution has
- * landed, so k = 0 gives {} and a shared node shows its partial sum until every consumer has run.
+ * landed, so k <= 0 gives {} and a shared node shows its partial sum until every consumer has run.
  */
 export function gradsAfter(g: Graph, values: Values, k: number): Values {
   const grads: Record<string, number> = {};
   const order = [...nonLeaves(g)].reverse();
-  for (const id of order.slice(0, k)) {
+  for (const id of order.slice(0, Math.max(0, k))) {
     if (id === g.output) grads[id] = 1;
     const upstream = grads[id] ?? 0;
     nodeById(g, id).inputs.forEach((input, i) => {
@@ -136,14 +144,11 @@ export function passSteps(g: Graph): readonly PassStep[] {
   ];
 }
 
-/** Which values are known after the first `stepIndex` steps (leaves always), and how many backward steps have run. */
-export function revealed(
-  g: Graph,
-  stepIndex: number,
-): { readonly values: ReadonlySet<string>; readonly backwardSteps: number } {
+/** Which values are known after the first `stepIndex` steps (leaves always; `stepIndex <= 0` is before anything runs), and how many backward steps have run. */
+export function revealed(g: Graph, stepIndex: number): Revealed {
   const values = new Set(g.leaves.map((leaf) => leaf.id));
   let backwardSteps = 0;
-  for (const step of passSteps(g).slice(0, stepIndex)) {
+  for (const step of passSteps(g).slice(0, Math.max(0, stepIndex))) {
     if (step.kind === "forward") values.add(step.node);
     else backwardSteps++;
   }
