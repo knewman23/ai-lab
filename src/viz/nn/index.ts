@@ -11,7 +11,7 @@ import type { Visualization, VizHost, VizInstance } from "../types";
 import { createFloor } from "./floor";
 import { frameNn } from "./frame-nn";
 import { syncLabels } from "./labels-sync";
-import { inputFromFloor, WALL_H, WALL_W } from "./layout";
+import { inputFromFloor, WALL_H, WALL_OPACITY, WALL_W } from "./layout";
 import { createNeurons } from "./neurons";
 import { createNnPanel, type NnPanel } from "./panel";
 import { createPoints } from "./points";
@@ -32,8 +32,12 @@ import {
 } from "./state";
 import { createWeights } from "./weights";
 
-/** The wall is a backdrop for the network, so it is fainter than the backprop scene's. */
-const WALL_OPACITY = 0.18;
+/**
+ * How long one played epoch — the gradient step, the 1600-point boundary grid and the redraw —
+ * may take before the DEV build complains. Ten epochs a second leaves 100 ms a frame; 8 ms is
+ * the point past which a played run would start to feel like it is dropping frames.
+ */
+const EPOCH_BUDGET_MS = 8;
 
 const HINT = {
   storageKey: "ai-lab.hint.nn",
@@ -149,13 +153,15 @@ function mount(host: VizHost): VizInstance {
 
     if (state.params !== lastParams) {
       floor.set(boundaryGrid(state.params));
+      // The struts read the weights and nothing else, so they are rebuilt here rather
+      // than on every probe move or toggle.
+      weights.set(state.params);
       lastParams = state.params;
     }
     if (state.dataset !== lastDataset) {
       points.set(d.dataset);
       lastDataset = state.dataset;
     }
-    weights.set(state.params);
     // Verbatim: `neurons.set` scales the raw input layer itself.
     neurons.set(d.probeActivations);
     probe.set(state.probe);
@@ -226,7 +232,14 @@ function mount(host: VizHost): VizInstance {
         playClock += dt * 1000;
         while (playClock >= EPOCH_MS) {
           playClock -= EPOCH_MS;
+          const started = import.meta.env.DEV ? performance.now() : 0;
           apply(trainEpoch(state));
+          if (import.meta.env.DEV) {
+            const ms = performance.now() - started;
+            if (ms > EPOCH_BUDGET_MS) {
+              console.warn(`nn: epoch apply took ${ms.toFixed(1)} ms (budget ${EPOCH_BUDGET_MS})`);
+            }
+          }
         }
       } else {
         playClock = 0;

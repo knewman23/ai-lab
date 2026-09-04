@@ -1,18 +1,66 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { PerspectiveCamera, Vector3 } from "three";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createThemeColors } from "../../../src/core/theme";
 import { neuralNetwork } from "../../../src/viz/nn";
+import { frameNn } from "../../../src/viz/nn/frame-nn";
+import { floorPoint } from "../../../src/viz/nn/layout";
 import type { Renderer, VizHost } from "../../../src/viz/types";
+
+/**
+ * Counts the repaints of the decision boundary, the scene's one expensive redraw: the
+ * assembler must ask for it when the weights change and at no other time.
+ */
+const counts = vi.hoisted(() => ({ floorSet: 0 }));
+
+vi.mock("../../../src/viz/nn/floor", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../../src/viz/nn/floor")>();
+  return {
+    ...actual,
+    createFloor: (theme: Parameters<typeof actual.createFloor>[0]) => {
+      const floor = actual.createFloor(theme);
+      return {
+        ...floor,
+        set(grid: Float32Array): void {
+          counts.floorSet += 1;
+          floor.set(grid);
+        },
+      };
+    },
+  };
+});
+
+/** The canvas is square so screen pixels and NDC agree with the scene camera's aspect of 1. */
+const SIZE = 400;
 
 function host(): { host: VizHost; theme: ReturnType<typeof createThemeColors> } {
   const canvas = document.createElement("canvas");
   const renderer = {
     domElement: canvas,
-    render: vi.fn(),
+    // Stands in for the matrix update a real renderer does each frame, which the drag
+    // raycast and the label projection both read.
+    render: vi.fn(
+      (
+        scene: { updateMatrixWorld(force: boolean): void },
+        camera: { updateMatrixWorld(force: boolean): void },
+      ) => {
+        scene.updateMatrixWorld(true);
+        camera.updateMatrixWorld(true);
+      },
+    ),
     backend: {},
     info: { memory: { geometries: 0 } },
   } as unknown as Renderer;
   const theme = createThemeColors(() => "#1f4ed8");
+  vi.spyOn(canvas, "getBoundingClientRect").mockReturnValue({
+    left: 0,
+    top: 0,
+    width: SIZE,
+    height: SIZE,
+  } as DOMRect);
+  canvas.setPointerCapture = vi.fn();
+  canvas.releasePointerCapture = vi.fn();
+  canvas.hasPointerCapture = vi.fn(() => false);
   const canvasContainer = document.createElement("div");
   canvasContainer.append(canvas);
   return {
@@ -33,9 +81,69 @@ function trainingLine(el: HTMLElement): string {
   return el.querySelector(".training-line")?.textContent ?? "";
 }
 
+function probeReadout(el: HTMLElement): string {
+  return [...el.querySelectorAll("dd")].map((d) => d.textContent ?? "").join(" ");
+}
+
+/** The probe readout's input pair, which `probeText` writes as "(x, y) -> ...". */
+function probeInput(el: HTMLElement): readonly [number, number] {
+  const m = /\(([-\d.]+), ([-\d.]+)\)/.exec(probeReadout(el));
+  if (!m) throw new Error(`no probe readout in: ${probeReadout(el)}`);
+  return [Number(m[1]), Number(m[2])];
+}
+
+/**
+ * The CSS pixel the world point `world` projects to, from a stand-in for the scene's camera:
+ * `createSceneKit` builds a 45-degree camera at aspect 1, and `goHome` parks it at `frameNn`
+ * looking at the framing's target. Lets a test aim a pointer at a known spot on the floor.
+ */
+function pixelOf(world: readonly [number, number, number]): readonly [number, number] {
+  const home = frameNn();
+  const camera = new PerspectiveCamera(45, 1, 0.1, 100);
+  // The scene is Z-up, as `createSceneKit` builds it.
+  camera.up.set(0, 0, 1);
+  camera.position.set(...home.position);
+  camera.lookAt(new Vector3(...home.target));
+  camera.updateMatrixWorld();
+  const p = new Vector3(...world).project(camera);
+  return [((p.x + 1) / 2) * SIZE, ((1 - p.y) / 2) * SIZE];
+}
+
+function pointer(type: string, x: number, y: number): PointerEvent {
+  // MouseEvent rather than PointerEvent: jsdom's PointerEvent support varies, and the
+  // handlers only read pointerId, clientX and clientY.
+  const event = new MouseEvent(type, { clientX: x, clientY: y });
+  Object.defineProperty(event, "pointerId", { value: 1 });
+  return event as PointerEvent;
+}
+
+/** A press and release at the same spot: the click-to-place arm of the probe drag. */
+function clickCanvas(canvas: HTMLElement, at: readonly [number, number]): void {
+  canvas.dispatchEvent(pointer("pointerdown", at[0], at[1]));
+  canvas.dispatchEvent(pointer("pointerup", at[0], at[1]));
+}
+
 function labelTexts(container: HTMLElement): string[] {
   return [...container.querySelectorAll(".viz-labels span")].map((s) => s.textContent ?? "");
 }
+
+function range(el: HTMLElement): HTMLInputElement {
+  const found = el.querySelector<HTMLInputElement>('input[type="range"]');
+  if (!found) throw new Error("learning-rate slider not found");
+  return found;
+}
+
+function toggle(el: HTMLElement, label: string): HTMLInputElement {
+  const found = [...el.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')].find((i) =>
+    i.parentElement?.textContent?.includes(label),
+  );
+  if (!found) throw new Error(`toggle not found: ${label}`);
+  return found;
+}
+
+beforeEach(() => {
+  counts.floorSet = 0;
+});
 
 afterEach(() => {
   localStorage.clear();
@@ -163,6 +271,68 @@ describe("neuralNetwork.mount", () => {
     expect(h.canvasContainer.querySelector(".canvas-hint")).not.toBeNull();
     viz.dispose();
     expect(h.canvasContainer.querySelector(".canvas-hint")).toBeNull();
+  });
+
+  it("repaints the boundary only when the weights change", () => {
+    const { host: h } = host();
+    const viz = neuralNetwork.mount(h);
+    viz.update(0.016);
+    // Once for the initial parameters.
+    expect(counts.floorSet).toBe(1);
+
+    button(h.panel, "Step").click();
+    expect(counts.floorSet).toBe(2);
+
+    const slider = range(h.panel);
+    slider.value = String(Number(slider.value) - 1);
+    slider.dispatchEvent(new Event("input"));
+
+    const weightsToggle = toggle(h.panel, "Weights");
+    weightsToggle.checked = false;
+    weightsToggle.dispatchEvent(new Event("change"));
+
+    clickCanvas(h.renderer.domElement, pixelOf(floorPoint([1.5, 1.5])));
+
+    // The learning rate, an overlay toggle and a probe move leave the weights alone.
+    expect(counts.floorSet).toBe(2);
+
+    viz.dispose();
+  });
+
+  it("moves the probe and hides the hint when the floor is clicked", () => {
+    const { host: h } = host();
+    const viz = neuralNetwork.mount(h);
+    // One frame so the scene graph's world matrices are current for the raycast.
+    viz.update(0.016);
+    expect(probeInput(h.panel)).toEqual([0, 0]);
+    const before = labelTexts(h.canvasContainer);
+
+    clickCanvas(h.renderer.domElement, pixelOf(floorPoint([1.5, 1.5])));
+
+    const [x, y] = probeInput(h.panel);
+    expect(x).toBeCloseTo(1.5, 1);
+    expect(y).toBeCloseTo(1.5, 1);
+    expect(labelTexts(h.canvasContainer)).not.toEqual(before);
+    expect(h.canvasContainer.querySelector(".canvas-hint")).toBeNull();
+
+    viz.dispose();
+  });
+
+  it("restarts training at epoch 0 when the dataset changes", () => {
+    const { host: h } = host();
+    const viz = neuralNetwork.mount(h);
+
+    button(h.panel, "Step").click();
+    expect(trainingLine(h.panel).startsWith("Epoch 1")).toBe(true);
+
+    const select = h.panel.querySelector<HTMLSelectElement>("select");
+    if (!select) throw new Error("dataset select not found");
+    select.value = "circles";
+    select.dispatchEvent(new Event("change"));
+
+    expect(trainingLine(h.panel).startsWith("Epoch 0")).toBe(true);
+
+    viz.dispose();
   });
 
   it("leaves the hint off once a previous visit dismissed it", () => {

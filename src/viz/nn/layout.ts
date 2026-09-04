@@ -5,6 +5,8 @@ import type { Vec3 } from "../shared/layer";
 export const WALL_W = 10;
 /** Height (Z extent) of the wall. */
 export const WALL_H = 6;
+/** How solid the wall is drawn: a backdrop the network reads against, not a surface of its own. */
+export const WALL_OPACITY = 0.18;
 /** Z of the lowest and highest neuron in a multi-neuron layer. */
 const Z_RANGE: readonly [number, number] = [0.8, 5.2];
 

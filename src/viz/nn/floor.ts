@@ -144,6 +144,9 @@ export function createFloor(theme: ThemeColors): Floor {
     },
 
     setShow(on): void {
+      // Repainting costs 1600 vertex colours and a buffer upload, so an unchanged
+      // toggle does nothing: the assembler calls this on every state change.
+      if (on === shown) return;
       shown = on;
       apply();
     },

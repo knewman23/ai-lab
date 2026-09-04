@@ -89,6 +89,21 @@ describe("createFloor", () => {
     floor.dispose();
   });
 
+  it("setShow does nothing when the toggle has not changed", () => {
+    const { floor } = make();
+    floor.set(uniform(1));
+    const before = colours(floor).version;
+
+    floor.setShow(true);
+    // The assembler calls setShow on every state change; an unchanged toggle must not
+    // re-lerp and re-upload all 1600 vertex colours.
+    expect(colours(floor).version).toBe(before);
+
+    floor.setShow(false);
+    expect(colours(floor).version).toBeGreaterThan(before);
+    floor.dispose();
+  });
+
   it("rewrites the colours from the kept grid when the theme changes", () => {
     const { floor, theme } = make();
     floor.set(uniform(1));
