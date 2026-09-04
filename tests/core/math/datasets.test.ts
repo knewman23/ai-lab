@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { DATASET_KEYS, DATASETS, DOMAIN, type DatasetKey } from "../../../src/core/math/datasets";
 import { accuracy, gradients, initParams, step } from "../../../src/core/math/mlp";
 
@@ -55,5 +55,17 @@ describe.each(DATASET_KEYS)("%s", (key) => {
 describe("DOMAIN", () => {
   it("is [−3, 3]", () => {
     expect([...DOMAIN]).toEqual([-3, 3]);
+  });
+});
+
+describe("determinism", () => {
+  it("rebuilds identical points when the module is evaluated again", async () => {
+    // The datasets are built once at module load from fixed seeds; re-evaluating the
+    // module must reproduce them exactly, or a Reset would silently re-roll the data.
+    vi.resetModules();
+    const again = (await import("../../../src/core/math/datasets")).DATASETS;
+    for (const key of DATASET_KEYS) {
+      expect(again[key].points).toEqual(DATASETS[key].points);
+    }
   });
 });

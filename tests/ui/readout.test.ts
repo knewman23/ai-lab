@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from "vitest";
-import { createReadout, fmt, proseNum } from "../../src/ui/readout";
+import { formatLr, createReadout, fmt, proseNum } from "../../src/ui/readout";
 
 describe("fmt", () => {
   it.each([
@@ -52,5 +52,14 @@ describe("createReadout", () => {
   it("set() throws for an unknown key", () => {
     const readout = createReadout(["loss"]);
     expect(() => readout.set("nope", "x")).toThrow();
+  });
+});
+
+describe("formatLr", () => {
+  it("keeps three significant digits and strips trailing zeros", () => {
+    expect(formatLr(0.1)).toBe("0.1");
+    expect(formatLr(0.001)).toBe("0.001");
+    expect(formatLr(1)).toBe("1");
+    expect(formatLr(0.0316227766)).toBe("0.0316");
   });
 });

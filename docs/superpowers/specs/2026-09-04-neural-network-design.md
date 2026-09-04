@@ -1,7 +1,7 @@
 # Neural network — a tiny MLP learning a 2D classification, layers on a wall, boundary on the floor
 
 Date: 2026-09-04
-Status: approved by spec review (revision 3: per-dataset start seeds)
+Status: as built (revision 4: dataset seeds, input-layer bound, xor labelling and the Play-stop list corrected against the code; revision 3 added per-dataset start seeds)
 Parent: [AI Lab design](2026-09-03-ai-lab-design.md); siblings: [Backprop graph](2026-09-03-backprop-graph-design.md), [Gradient descent](2026-09-03-ai-lab-design.md)
 Registry: replaces the `machine-learning` roadmap entry `neural-network`
 
@@ -60,11 +60,11 @@ export const DATASETS: Readonly<Record<DatasetKey, Dataset>>; export const DATAS
 export const DOMAIN = [-3, 3] as const;                         // both input coordinates
 ```
 
-Datasets (seed 1, coordinates within the domain, targets ±1):
+Datasets (built once at module load from fixed seeds 11, 12 and 13; coordinates within the domain, targets ±1):
 
 | Key | Points | Construction | Why |
 |---|---|---|---|
-| `xor` (default) | 40 | 10 per quadrant, centres (±1.5, ±1.5), Gaussian σ 0.45; y = +1 when the coordinates share a sign | not linearly separable; the classic reason for a hidden layer |
+| `xor` (default) | 40 | 10 per quadrant, centres (±1.5, ±1.5), Gaussian σ 0.45; y = +1 when the cluster's centre has coordinates of matching sign (labelling by cluster rather than by the noisy sample keeps the split exactly 20/20) | not linearly separable; the classic reason for a hidden layer |
 | `moons` | 60 | the classic pair: upper arc centre (−0.8, −0.5), radius 1.6, θ evenly spaced over [0, π], y = +1; lower arc centre (0.8, 0.5), θ over [π, 2π], y = −1; 30 each, Gaussian σ 0.2 | a curved boundary |
 | `circles` | 60 | inner disc radius ≤ 0.8 (+1) and ring radius 1.8–2.4 (−1), σ 0.15 | a closed boundary |
 
@@ -79,7 +79,7 @@ Training: `lr` default 0.1 (log slider 0.001 … 0.5). One epoch = one full-batc
 still reproducible. The datasets are fixed data, not re-rolled by Reset.
 
 Tests: `mulberry32(1)` yields a fixed first three values (recorded once) and is in [0, 1); `initParams`
-shapes (4×2, 4×4, 1×4) and range; `forward` layer count 4 and |a| ≤ 1; `gradients` matches central
+shapes (4×2, 4×4, 1×4) and range; `forward` layer count 4, with |a| ≤ 1 for layers 1–3 (layer 0 is the raw input, which is why `neurons.set` scales it); `gradients` matches central
 differences of `loss` (h 1e-5, rel 1e-4) for every weight and bias on `xor` at seed 1; `step`
 returns new arrays with `p − lr·g`; `loss` falls monotonically over the first 20 epochs on `xor` at
 lr 0.1 from `DATASETS.xor.startSeed` and `accuracy ≥ 0.9` within 300 epochs; the same accuracy bound
@@ -194,7 +194,7 @@ them, and press Reset for a different starting seed if it stalls."; circles: "Th
 
 - Drag the probe on the floor (`attachDrag`, `getPlaneZ: () => 0`, hit sphere); click anywhere on
   the floor plane places it (`surfaceTarget` = the floor mesh). Grab cursor over the probe.
-- Step/Play/Reset as in §5; Play stops only on Pause or Reset (there is no end of training). Nothing
+- Step/Play/Reset as in §5; there is no end of training, so Play stops only on Pause, Reset, or a dataset change. Nothing
   eases or animates apart from the epoch cadence, so `prefers-reduced-motion` changes nothing (the
   steps are discrete either way).
 - Hint (`ai-lab.hint.nn`): "Press Play and watch the boundary on the floor bend toward the data.";
