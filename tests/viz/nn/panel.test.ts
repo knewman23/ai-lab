@@ -84,6 +84,25 @@ describe("createNnPanel", () => {
     expect(onDataset).toHaveBeenCalledWith("circles");
   });
 
+  it("orders the sections as the spec lists them", () => {
+    const panel = mount();
+    expect([...panel.el.querySelectorAll("section.panel-section > h3")].map((h) => h.textContent)) //
+      .toEqual(["Setup", "Training", "Run", "Show", "Readouts"]);
+  });
+
+  it("reflects state.dataset on the select without firing", () => {
+    const h = handlers();
+    const panel = mount(h);
+    const select = panel.el.querySelector<HTMLSelectElement>("select");
+    if (!select) throw new Error("dataset select not found");
+
+    renderState(panel, initialState());
+    expect(select.value).toBe("xor");
+    renderState(panel, setDataset(initialState(), "moons"));
+    expect(select.value).toBe("moons");
+    for (const spy of Object.values(h)) expect(spy).not.toHaveBeenCalled();
+  });
+
   it("dispatches the training buttons and follows state.playing", () => {
     const onStep = vi.fn();
     const onPlay = vi.fn();
@@ -176,9 +195,9 @@ describe("createNnPanel", () => {
     const panel = mount();
     const s = setProbe(initialState(), [1.5, -0.5]);
     renderState(panel, s);
-    expect(readoutText(panel.el, "probe")).toBe(probeText(s, derived(s)));
+    expect(readoutText(panel.el, "Probe")).toBe(probeText(s, derived(s)));
     const keys = [...panel.el.querySelectorAll("dt")].map((n) => n.textContent);
-    expect(keys).toEqual(["probe"]);
+    expect(keys).toEqual(["Probe"]);
   });
 
   it("keeps the explanation equations across renders and dataset changes", () => {

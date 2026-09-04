@@ -25,7 +25,7 @@ const SHOW_KEYS: readonly { key: ShowKey; label: string }[] = [
 ];
 
 /** The one readout row: epoch, loss and accuracy live in the training line instead. */
-const PROBE_ROW = "probe";
+const PROBE_ROW = "Probe";
 
 export interface NnPanel {
   el: HTMLElement;

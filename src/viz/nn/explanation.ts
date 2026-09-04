@@ -20,7 +20,9 @@ export function trainingLine(s: NnState, d: Derived): string {
 
 /**
  * "(x₁, x₂) → <output> (<class>)" for the probe row. An output of exactly 0 reads "−1", matching
- * `accuracy`, which counts 0 as wrong.
+ * `accuracy`, which counts 0 as wrong. The class in parentheses is a label, not a formatted number,
+ * so it keeps the typographic minus of "+1"/"−1" in `datasets.ts` while the coordinates and the
+ * output stay on `fmt`'s plain hyphen like every other readout.
  */
 export function probeText(s: NnState, d: Derived): string {
   const cls = d.probeOutput > 0 ? "+1" : "−1";
