@@ -17,7 +17,7 @@ describe("createWall", () => {
     expect([geometry.parameters.width, geometry.parameters.height]).toEqual([10, 6]);
     const m = wall.mesh.material as MeshBasicMaterial;
     expect(m.transparent).toBe(true);
-    expect(m.opacity).toBe(0.35);
+    expect(m.opacity).toBe(0.18);
     expect(m.depthWrite).toBe(false);
     expect(m.color.equals(theme.faint)).toBe(true);
     expect(wall.mesh.renderOrder).toBe(0);

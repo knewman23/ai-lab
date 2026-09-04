@@ -7,9 +7,9 @@ describe("frameWall", () => {
     expect(target).toEqual([0, 0, 3]);
   });
 
-  it("stands at target + 12 * (0.55, -1.05, 0.5)", () => {
+  it("stands at target + 12 * (0.8, -1.05, 0.5)", () => {
     const { position } = frameWall();
-    expect(position[0]).toBeCloseTo(6.6, 6);
+    expect(position[0]).toBeCloseTo(9.6, 6);
     expect(position[1]).toBeCloseTo(-12.6, 6);
     expect(position[2]).toBeCloseTo(9, 6);
   });

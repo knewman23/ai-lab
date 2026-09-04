@@ -184,7 +184,7 @@ describe("createBpPanel", () => {
   it("fills the readouts with the output and each leaf's value and grad", () => {
     const panel = mount();
     renderState(panel, initialState());
-    expect(readoutText(panel.el, "o")).toBe("0.7071  ∂ —");
+    expect(readoutText(panel.el, "o")).toBe("—  ∂ —");
     expect(readoutText(panel.el, "x1")).toBe("2  ∂ —");
     expect(readoutText(panel.el, "b")).toBe("6.881  ∂ —");
 
@@ -199,7 +199,7 @@ describe("createBpPanel", () => {
     const panel = mount();
     renderState(panel, initialState());
     renderState(panel, setGraph(initialState(), "product-sum"));
-    expect(readoutText(panel.el, "d")).toBe("4  ∂ —");
+    expect(readoutText(panel.el, "d")).toBe("—  ∂ —");
     expect(readoutText(panel.el, "c")).toBe("10  ∂ —");
     expect(() => readoutText(panel.el, "o")).toThrow();
   });

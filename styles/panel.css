@@ -278,11 +278,19 @@ input[type="range"]::-moz-range-track {
   left: 0;
   top: 0;
   white-space: nowrap;
-  font: 12px var(--mono);
+  font: 500 13px/1.25 var(--mono);
   color: var(--ink);
+  background: color-mix(in srgb, var(--bg) 78%, transparent);
+  padding: 0 3px;
+  border-radius: 3px;
+}
+.viz-labels .op {
+  background: none;
+  padding: 0;
+  font-size: 12px;
 }
 .viz-labels .value {
-  color: var(--soft);
+  color: var(--ink);
 }
 .viz-labels .grad {
   color: var(--accent);

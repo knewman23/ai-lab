@@ -7,10 +7,11 @@ export interface BpReadouts {
   dispose(): void;
 }
 
-/** "<value>  ∂ <grad>"; the grad is "—" until the node has a key in `grads`. */
+/** "<value>  ∂ <grad>"; each half is "—" until the pass has revealed it. */
 function rowText(id: string, d: Derived): string {
+  const value = d.revealed.values.has(id) ? fmt(d.values[id] ?? NaN) : "—";
   const grad = d.grads[id];
-  return `${fmt(d.values[id] ?? NaN)}  ∂ ${grad === undefined ? "—" : fmt(grad)}`;
+  return `${value}  ∂ ${grad === undefined ? "—" : fmt(grad)}`;
 }
 
 /** Appends the output row and one row per leaf to `section`; panel.ts rebuilds it when the graph changes. */

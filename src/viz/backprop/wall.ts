@@ -15,7 +15,7 @@ export interface Wall {
 }
 
 /** Translucent enough that edges and bars behind the wall stay readable. */
-const OPACITY = 0.35;
+const OPACITY = 0.18;
 
 /** The wall's four edges in world space, lifted toward the camera like the graph's edges. */
 function outlineSegments(): readonly Segment[] {

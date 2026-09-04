@@ -87,6 +87,8 @@ export function commit(layer: Layer, endpoints: number): void {
   layer.geometry.getAttribute("position").needsUpdate = true;
   layer.geometry.setDrawRange(0, endpoints);
   layer.geometry.computeBoundingSphere();
+  // WebGPU warns on a draw with zero vertices, so an empty layer is skipped outright.
+  layer.object.visible = endpoints > 0;
 }
 
 /** Releases a layer's GPU resources. */

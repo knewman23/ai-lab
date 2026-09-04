@@ -24,7 +24,7 @@ const ACTIVE_ENDPOINTS = 8;
 
 /**
  * The graph's edges drawn on the wall, lifted toward the camera: every edge in
- * `--line` at renderOrder 2, and the edges into the active node in `--accent`
+ * `--soft` at renderOrder 2, and the edges into the active node in `--accent`
  * at renderOrder 3 on top. Direction is implied by the layout (left to right).
  */
 export function createEdges(theme: ThemeColors): Edges {
@@ -36,7 +36,7 @@ export function createEdges(theme: ThemeColors): Edges {
   group.add(all.object, active.object);
 
   function applyTheme(): void {
-    all.material.color.copy(theme.line);
+    all.material.color.copy(theme.soft);
     active.material.color.copy(theme.accent);
   }
   applyTheme();
