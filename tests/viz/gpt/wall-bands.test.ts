@@ -45,6 +45,11 @@ describe("createWallBands", () => {
     bands.dispose();
   });
 
+  it("dims an unfocused band to the quarter opacity the spec asks for", () => {
+    // The literal, not the constant the implementation reads: this is what pins 0.25.
+    expect(DIM_OPACITY).toBe(0.25);
+  });
+
   it("leaves the focused band lit and dims the other four", () => {
     const { bands } = make();
     bands.setFocus("mlp");

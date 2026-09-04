@@ -5,6 +5,7 @@
  */
 
 import type { Vec2 } from "../../core/math/numeric";
+import type { StageKey } from "./state";
 
 /** Width (X extent) of the wall the pipeline is drawn on. */
 export const WALL_W = 6;
@@ -30,6 +31,26 @@ export const BAND_Z = {
 
 /** Names a band; the stage-focus selector and the column glyphs both key off these. */
 export type BandKey = keyof typeof BAND_Z;
+
+/**
+ * Which band each focusable stage lives on. The three attention stages — the raw scores, the
+ * softmax over them, the weighted sum — all happen on the attention band, so all three focus it.
+ * Every part of the scene that dims on focus reads this, so they can never disagree.
+ */
+const STAGE_BAND: Readonly<Record<Exclude<StageKey, "all">, BandKey>> = {
+  embed: "embed",
+  scores: "attention",
+  softmax: "attention",
+  weighted: "attention",
+  residual: "residual",
+  mlp: "mlp",
+  logits: "logits",
+};
+
+/** The band a focused stage sits on, or null for `all`, which focuses nothing. */
+export function bandForStage(stage: StageKey): BandKey | null {
+  return stage === "all" ? null : STAGE_BAND[stage];
+}
 
 /** X extent of the floor, and its Y extent running from the wall toward the camera. */
 export const FLOOR_X: Vec2 = [-3, 3];

@@ -23,6 +23,9 @@ export interface Columns {
  */
 const ENDPOINTS = COLUMN_X.length * COLUMN_ENDPOINTS;
 
+/** §5.3's "one step brighter": how much lighter than `--accent` the query column is drawn. */
+const QUERY_LIGHTEN = 0.08;
+
 /**
  * The five token columns: a vertical line per sequence position with an arrow glyph on each of
  * the five vector bands. Colour is per layer, not per segment, so the selection is a split
@@ -39,7 +42,9 @@ export function createColumns(theme: ThemeColors): Columns {
 
   function applyTheme(): void {
     ink.material.color.copy(theme.ink);
-    accent.material.color.copy(theme.accent);
+    // A step brighter than the accent itself, so the query column reads as selected against
+    // the arcs and the probability bars, which are drawn in the flat accent.
+    accent.material.color.copy(theme.accent).offsetHSL(0, 0, QUERY_LIGHTEN);
   }
   applyTheme();
   theme.addEventListener("change", applyTheme);

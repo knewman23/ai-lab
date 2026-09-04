@@ -51,9 +51,13 @@ export type DragOptions = DragBase &
       }
   );
 
-/** A pointerdown that missed the targets counts as a click, not an orbit, within these bounds. */
-const CLICK_SLOP_PX = 6;
-const CLICK_MS = 400;
+/**
+ * A pointerdown that missed the targets counts as a click, not an orbit, within these bounds.
+ * Exported so a scene with its own pick handler — `gpt/column-pick.ts` — divides press from
+ * orbit at exactly the same point this does, rather than at a second copy of the numbers.
+ */
+export const CLICK_SLOP_PX = 6;
+export const CLICK_MS = 400;
 /** Re-testing the hover raycast on every pointermove is wasted work at 60 Hz. */
 const HOVER_STEP_PX = 4;
 

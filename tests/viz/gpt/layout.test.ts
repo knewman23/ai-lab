@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { Vec2 } from "../../../src/core/math/numeric";
 import {
   BAND_Z,
+  bandForStage,
   COLUMN_X,
   EMBED_DOMAIN,
   FLOOR_X,
@@ -109,5 +110,21 @@ describe("gpt layout", () => {
     expect(glyphLength(1.6)).toBeCloseTo(0.3652, 3);
     expect(glyphLength(2.6)).toBeCloseTo(0.4739, 3);
     expect(glyphLength(5.6)).toBeCloseTo(0.5459, 3);
+  });
+});
+
+describe("bandForStage", () => {
+  it("sends every stage to the band it happens on, and 'all' to none", () => {
+    expect(bandForStage("all")).toBeNull();
+    expect(bandForStage("embed")).toBe("embed");
+    expect(bandForStage("residual")).toBe("residual");
+    expect(bandForStage("mlp")).toBe("mlp");
+    expect(bandForStage("logits")).toBe("logits");
+  });
+
+  it("puts the scores, the softmax and the weighted sum on the one attention band", () => {
+    for (const stage of ["scores", "softmax", "weighted"] as const) {
+      expect(bandForStage(stage)).toBe("attention");
+    }
   });
 });

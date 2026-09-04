@@ -2,7 +2,7 @@ import { Group } from "three";
 import { disposeLayers, type Layer, lineLayer, type Segment } from "../shared/layer";
 import { writeWorldSegments } from "../shared/layer-write";
 import type { ThemeColors } from "../types";
-import { BAND_Z, type BandKey, WALL_W } from "./layout";
+import { BAND_Z, type BandKey, bandForStage, WALL_W } from "./layout";
 import type { StageKey } from "./state";
 
 export interface WallBands {
@@ -23,20 +23,6 @@ const LIFT = -0.01;
 
 /** What a band out of focus drops to. Full is 1, so this is the whole of the spec's 0.25. */
 export const DIM_OPACITY = 0.25;
-
-/**
- * Which band each focusable stage belongs to. The three attention stages — raw scores, the
- * softmax, the weighted sum — all happen on the attention band, so all three light it.
- */
-const FOCUS_BAND: Readonly<Record<Exclude<StageKey, "all">, BandKey>> = {
-  embed: "embed",
-  scores: "attention",
-  softmax: "attention",
-  weighted: "attention",
-  residual: "residual",
-  mlp: "mlp",
-  logits: "logits",
-};
 
 const BANDS = Object.keys(BAND_Z) as readonly BandKey[];
 
@@ -77,7 +63,7 @@ export function createWallBands(theme: ThemeColors): WallBands {
     layers,
 
     setFocus(stage): void {
-      const focus = stage === "all" ? null : FOCUS_BAND[stage];
+      const focus = bandForStage(stage);
       for (const band of BANDS) {
         layers[band].material.opacity = focus === null || focus === band ? 1 : DIM_OPACITY;
       }

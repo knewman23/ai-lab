@@ -7,6 +7,7 @@ import {
   Raycaster,
   Vector2,
 } from "three";
+import { CLICK_MS, CLICK_SLOP_PX } from "../shared/drag";
 import { BAND_Z, COLUMN_X, columnX, GLYPH_MAX } from "./layout";
 
 export interface ColumnPickOptions {
@@ -18,17 +19,12 @@ export interface ColumnPickOptions {
 }
 
 /**
- * The same bounds `shared/drag.ts` uses to tell a click from an orbit, so a press that selects
- * a column and a press that turns the camera part company at exactly the same point.
- */
-const CLICK_SLOP_PX = 6;
-const CLICK_MS = 400;
-
-/**
  * Click-to-select-a-column: a press and release close together in space and time, both over the
- * same column's pick volume, select it. Anything longer or further is an orbit and is left to
- * OrbitControls, which is why the press is heard in the capture phase — the hit test must run
- * before OrbitControls' own pointerdown handler, whatever order the two were registered in.
+ * same column's pick volume, select it. The bounds are `shared/drag.ts`'s own, imported rather
+ * than restated, so a press that selects a column and a press that turns the camera part company
+ * at exactly the same point. Anything longer or further is an orbit and is left to OrbitControls,
+ * which is why the press is heard in the capture phase — the hit test must run before
+ * OrbitControls' own pointerdown handler, whatever order the two were registered in.
  *
  * Returns a disposer that removes every listener.
  */

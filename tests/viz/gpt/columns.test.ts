@@ -86,9 +86,17 @@ describe("createColumns", () => {
   it("colours the layers --ink and --accent, and recolours on a theme change", () => {
     const { columns, theme, repaint } = make();
     expect(columns.layers.ink.material.color.getHex()).toBe(theme.ink.getHex());
-    expect(columns.layers.accent.material.color.getHex()).toBe(theme.accent.getHex());
-    repaint("--accent", "#0a0b0c");
-    expect(columns.layers.accent.material.color.getHex()).toBe(0x0a0b0c);
+    // A step brighter than the flat accent, so the query column stands out from the arcs.
+    const brighter = theme.accent.clone().offsetHSL(0, 0, 0.08);
+    expect(columns.layers.accent.material.color.getHex()).toBe(brighter.getHex());
+    expect(columns.layers.accent.material.color.getHSL({ h: 0, s: 0, l: 0 }).l).toBeGreaterThan(
+      theme.accent.getHSL({ h: 0, s: 0, l: 0 }).l,
+    );
+
+    repaint("--accent", "#663344");
+    expect(columns.layers.accent.material.color.getHex()).toBe(
+      theme.accent.clone().offsetHSL(0, 0, 0.08).getHex(),
+    );
     columns.dispose();
   });
 
