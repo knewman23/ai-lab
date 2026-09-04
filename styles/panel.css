@@ -264,6 +264,36 @@ input[type="range"]::-moz-range-track {
   color: var(--ink);
 }
 
+/* ---------- on-canvas world-space labels ----------
+   Appended before the usage hint, so the hint paints on top with no z-index. */
+.viz-labels {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  user-select: none;
+}
+.viz-labels span {
+  position: absolute;
+  left: 0;
+  top: 0;
+  white-space: nowrap;
+  font: 12px var(--mono);
+  color: var(--ink);
+}
+.viz-labels .value {
+  color: var(--soft);
+}
+.viz-labels .grad {
+  color: var(--accent);
+}
+.viz-labels .edge {
+  background: var(--bg);
+  border: 1px solid var(--line);
+  padding: 0 4px;
+  border-radius: 3px;
+}
+
 /* ---------- on-canvas usage hint ---------- */
 .canvas-hint {
   position: absolute;
