@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
+import type { Graph } from "../../../src/core/math/autograd";
 import { nodeById } from "../../../src/core/math/autograd";
 import { GRAPHS } from "../../../src/core/math/graphs";
 import { WALL_H, WALL_W, Z_RANGE, layoutGraph } from "../../../src/viz/backprop/layout";
+import type { Positions } from "../../../src/viz/backprop/layout";
 
-function columns(pos: Readonly<Record<string, readonly [number, number]>>): number[] {
+function columns(pos: Positions): number[] {
   return [...new Set(Object.values(pos).map(([x]) => x))].sort((a, b) => a - b);
 }
 
@@ -44,6 +46,39 @@ describe("backprop layout", () => {
     // x1w1 averages x1 (5.2) and w1 (4.1); x2w2 averages x2 (3) and w2 (1.9): x1w1 sits higher.
     expect(pos.x1w1?.[1]).toBeCloseTo(5.2);
     expect(pos.x2w2?.[1]).toBeCloseTo(0.8);
+  });
+
+  it("mean input Z beats declaration order; equal means fall back to declaration order", () => {
+    const leaf = (id: string) => ({ id, label: id, op: "leaf" as const, inputs: [] });
+    const g: Graph = {
+      key: "synthetic",
+      title: "synthetic",
+      leaves: [
+        { id: "p", start: 1, range: [0, 2] },
+        { id: "q", start: 1, range: [0, 2] },
+      ],
+      nodes: [
+        leaf("p"),
+        leaf("q"),
+        // m1 is declared first but reads q (the lower leaf), so it sits below m2.
+        { id: "m1", label: "m1", op: "tanh", inputs: ["q"] },
+        { id: "m2", label: "m2", op: "tanh", inputs: ["p"] },
+        // Both read p and q, so the means tie and s1 (declared first) sits higher.
+        { id: "s1", label: "s1", op: "add", inputs: ["p", "q"] },
+        { id: "s2", label: "s2", op: "mul", inputs: ["q", "p"] },
+        { id: "out", label: "out", op: "add", inputs: ["m1", "m2"] },
+      ],
+      output: "out",
+      hint: "",
+    };
+    const pos = layoutGraph(g);
+    expect(pos.p?.[1]).toBeCloseTo(5.2);
+    expect(pos.q?.[1]).toBeCloseTo(0.8);
+    const col1 = ["m2", "s1", "s2", "m1"].map((id) => pos[id]?.[1] as number);
+    expect(col1[0]).toBeCloseTo(5.2);
+    expect(col1[3]).toBeCloseTo(0.8);
+    expect(col1[1] as number).toBeGreaterThan(col1[2] as number);
+    expect(pos.m2?.[1] as number).toBeGreaterThan(pos.m1?.[1] as number);
   });
 
   it("product-sum has 3 columns; shared-node has 5", () => {

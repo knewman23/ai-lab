@@ -47,6 +47,7 @@ function passLength(key: GraphKey): number {
   return passSteps(GRAPHS[key]).length;
 }
 
+/** The default graph (`neuron`) at its starting leaves, before any step, with every overlay on. */
 export function initialState(): BpState {
   return {
     graph: "neuron",
@@ -76,6 +77,7 @@ export function stepForward(s: BpState): BpState {
   return { ...s, step, playing: s.playing && step < len };
 }
 
+/** Rewinds the pass to step 0 and stops playing; leaves are kept. */
 export function resetPass(s: BpState): BpState {
   return { ...s, step: 0, playing: false };
 }
@@ -86,13 +88,14 @@ export function setPlaying(s: BpState, on: boolean): BpState {
   return { ...s, playing: on };
 }
 
+/** Turns one overlay on or off. */
 export function setShow(s: BpState, key: ShowKey, on: boolean): BpState {
   return { ...s, show: { ...s.show, [key]: on } };
 }
 
 /** Returns the leaves to their starts and the pass to step 0; overlay toggles and graph are kept. */
 export function reset(s: BpState): BpState {
-  return { ...s, leaves: starts(GRAPHS[s.graph]), step: 0, playing: false };
+  return setGraph(s, s.graph);
 }
 
 /** Allocates new objects each call; call once per state change (e.g. per render), not in a hot loop. */

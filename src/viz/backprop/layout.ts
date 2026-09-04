@@ -44,10 +44,14 @@ export function layoutGraph(g: Graph): Positions {
   const pos: Record<string, readonly [number, number]> = {};
   for (let c = 0; c < cols; c++) {
     const ids = g.nodes.filter((n) => depth.get(n.id) === c).map((n) => n.id);
+    const placedZ = (input: string): number => {
+      const z = pos[input]?.[1];
+      if (z === undefined) throw new Error(`layout: input "${input}" placed after its consumer`);
+      return z;
+    };
     const meanZ = (id: string): number => {
       const inputs = nodeById(g, id).inputs;
-      if (inputs.length === 0) return 0;
-      return inputs.reduce((acc, input) => acc + (pos[input]?.[1] ?? 0), 0) / inputs.length;
+      return inputs.reduce((acc, input) => acc + placedZ(input), 0) / inputs.length;
     };
     // Array.prototype.sort is stable, so equal means keep declaration order.
     const ordered = c === 0 ? ids : [...ids].sort((a, b) => meanZ(b) - meanZ(a));
