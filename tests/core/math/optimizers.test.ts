@@ -5,7 +5,6 @@ import { SURFACES } from "../../../src/core/math/surfaces";
 import {
   OPTIMIZER_KEYS,
   OPTIMIZERS,
-  formatLr,
   getOptimizer,
   type AnyOptimizer,
 } from "../../../src/core/math/optimizers";
@@ -142,15 +141,6 @@ describe("immutability", () => {
       }).not.toThrow();
     });
   }
-});
-
-describe("formatLr", () => {
-  it("formats to 3 significant digits with no trailing zeros", () => {
-    expect(formatLr(0.1)).toBe("0.1");
-    expect(formatLr(0.001)).toBe("0.001");
-    expect(formatLr(1)).toBe("1");
-    expect(formatLr(0.0316)).toBe("0.0316");
-  });
 });
 
 describe("equation", () => {

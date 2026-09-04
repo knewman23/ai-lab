@@ -55,8 +55,9 @@ export const REGISTRY: readonly RegistryEntry[] = [
     topic: "machine-learning",
     title: "Neural network",
     summary:
-      "Watch layers, activations, and weights, shown as edge thickness, animate through a live forward pass.",
-    status: "soon",
+      "Watch a tiny network learn: layers on a wall with weights as struts, the data and the decision boundary on the floor, one gradient step at a time.",
+    status: "ready",
+    load: () => import("../viz/nn").then((m) => m.neuralNetwork),
   },
   {
     id: "gpt-transformer",

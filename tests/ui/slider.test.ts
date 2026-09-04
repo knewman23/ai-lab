@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi } from "vitest";
 import { createLogSlider, createSlider } from "../../src/ui/slider";
-import { formatLr } from "../../src/core/math/optimizers";
+import { formatLr } from "../../src/ui/readout";
 import { fmt } from "../../src/ui/readout";
 
 function input(el: HTMLElement): HTMLInputElement {

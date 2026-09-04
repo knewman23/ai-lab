@@ -1,5 +1,5 @@
 import { createEquation } from "../../ui/equation";
-import { fmt, proseNum } from "../../ui/readout";
+import { formatLr, fmt, proseNum } from "../../ui/readout";
 import type { Derived, NnState } from "./state";
 
 /**
@@ -33,7 +33,7 @@ export function probeText(s: NnState, d: Derived): string {
 function epochText(s: NnState): string {
   return (
     "Each Step runs one full-batch gradient descent epoch: the gradient of the loss with respect " +
-    `to every weight (the backprop scene, done 28 times at once), then a step of size η = ${proseNum(s.lr)}.`
+    `to every weight (the backprop scene, done 28 times at once), then a step of size η = ${formatLr(s.lr)}.`
   );
 }
 

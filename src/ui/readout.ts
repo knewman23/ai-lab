@@ -4,6 +4,16 @@ export function fmt(n: number, sig = 4): string {
   return Number(n.toPrecision(sig)).toString();
 }
 
+/**
+ * Formats a learning rate to 3 significant digits with trailing zeros
+ * stripped, for display in equations and controls (e.g. 0.1 -> "0.1",
+ * 0.0316227766 -> "0.0316"). Lives here rather than beside a scene's optimizer
+ * table so every scene's sliders and prose agree on one learning-rate format.
+ */
+export function formatLr(lr: number): string {
+  return fmt(lr, 3);
+}
+
 /** `fmt` for prose: spells the minus sign with a typographic minus. Readouts keep `fmt`'s plain hyphen. */
 export function proseNum(n: number): string {
   return fmt(n).replaceAll("-", "\u2212");

@@ -28,10 +28,7 @@ describe("registry", () => {
   const roadmapExpectations: ReadonlyArray<{
     id: string;
     topic: string;
-  }> = [
-    { id: "neural-network", topic: "machine-learning" },
-    { id: "gpt-transformer", topic: "machine-learning" },
-  ];
+  }> = [{ id: "gpt-transformer", topic: "machine-learning" }];
 
   it.each(roadmapExpectations)(
     "has roadmap entry $id under $topic with status soon",
@@ -55,6 +52,13 @@ describe("registry", () => {
   it("loads the derivative explorer from its own chunk", async () => {
     await loadReady("calculus", "derivative-tangent");
     const summary = findEntry("calculus", "derivative-tangent")?.summary;
+    expect(summary).not.toContain("roadmap");
+    expect(summary).not.toContain("soon");
+  });
+
+  it("loads the neural network from its own chunk", async () => {
+    await loadReady("machine-learning", "neural-network");
+    const summary = findEntry("machine-learning", "neural-network")?.summary;
     expect(summary).not.toContain("roadmap");
     expect(summary).not.toContain("soon");
   });

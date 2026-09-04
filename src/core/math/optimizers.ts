@@ -1,4 +1,5 @@
 import type { Vec2 } from "./numeric";
+import { formatLr } from "../../ui/readout";
 
 export type OptimizerKey = "sgd" | "momentum" | "adam";
 
@@ -31,15 +32,6 @@ const MOMENTUM_BETA = 0.9;
 const ADAM_BETA1 = 0.9;
 const ADAM_BETA2 = 0.999;
 const ADAM_EPS = 1e-8;
-
-/**
- * Formats a learning rate to 3 significant digits with trailing zeros
- * stripped, for display in equations and controls (e.g. 0.1 -> "0.1",
- * 0.0316227766 -> "0.0316").
- */
-export function formatLr(lr: number): string {
-  return Number(lr.toPrecision(3)).toString();
-}
 
 const sgd: Optimizer<StateFor<"sgd">> = {
   key: "sgd",

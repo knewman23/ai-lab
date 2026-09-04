@@ -1,4 +1,4 @@
-import { formatLr } from "../core/math/optimizers";
+import { formatLr } from "./readout";
 import { fmt } from "./readout";
 
 /** Native range steps, mapped log-uniformly onto [min, max]. */
