@@ -10,7 +10,6 @@ import {
   WALL_H,
   WALL_OPACITY,
   WALL_W,
-  bandZ,
   columnX,
   embedFromFloor,
   floorFromEmbed,
@@ -42,7 +41,6 @@ describe("gpt layout", () => {
 
   it("stacks the five stage bands from embed at 0.5 to logits at 4.2", () => {
     expect(BAND_Z).toEqual({ embed: 0.5, attention: 1.5, residual: 2.5, mlp: 3.4, logits: 4.2 });
-    expect(bandZ("logits")).toBe(4.2);
   });
 
   // The tallest bar rises GLYPH_MAX above the logits band; that plus a label pill must fit.

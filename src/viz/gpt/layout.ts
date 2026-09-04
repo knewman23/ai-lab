@@ -56,11 +56,6 @@ export function columnX(i: number): number {
   return x;
 }
 
-/** Z of a stage band, by name. */
-export function bandZ(band: BandKey): number {
-  return BAND_Z[band];
-}
-
 /**
  * An embedding → the point on the floor plane z = 0 that represents it. The domain `[-2, 2]²`
  * lands in x `[-2.8, 2.8]`, y `[-5.8, -0.2]`: inside the floor with a margin, so a dragged word
