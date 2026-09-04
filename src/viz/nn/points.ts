@@ -40,7 +40,12 @@ export function createPoints(theme: ThemeColors): Points {
   let last: Dataset | undefined;
 
   function write(d: Dataset): void {
-    mesh.count = Math.min(d.points.length, CAPACITY);
+    if (d.points.length > CAPACITY) {
+      throw new Error(
+        `nn points: ${d.key} has ${d.points.length} points, over the ${CAPACITY} cap`,
+      );
+    }
+    mesh.count = d.points.length;
     for (let i = 0; i < mesh.count; i++) {
       const point = d.points[i]!;
       const [x, y, z] = floorPoint(point.x);

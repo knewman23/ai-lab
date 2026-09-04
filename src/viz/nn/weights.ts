@@ -97,7 +97,9 @@ export function createWeights(theme: ThemeColors): Weights {
         const inputs = SIZES[l]!;
         for (let o = 0; o < SIZES[l + 1]!; o++) {
           for (let i = 0; i < inputs; i++, n++) {
-            const w = p.weights[l]?.[o * inputs + i] ?? 0;
+            // Indexed unchecked on purpose: a mis-shaped `Params` must surface as a NaN
+            // scale, not as 28 plausible thin ink struts. `neurons.ts` states the same rule.
+            const w = p.weights[l]![o * inputs + i]!;
             const t = BASE_THICKNESS + THICKNESS_GAIN * Math.min(1, Math.abs(w) / 3);
             const mesh = struts[n]!;
             mesh.scale.set(t, lengths[n]!, t);

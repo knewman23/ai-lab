@@ -77,7 +77,12 @@ export function createFloor(theme: ThemeColors): Floor {
   group.add(mesh, outline.object);
 
   const scratch = new Color();
-  /** The last grid set, kept so `setShow` and a theme change can repaint without the assembler. */
+  /**
+   * The last grid set, kept so `setShow` and a theme change can repaint without the assembler.
+   * It is held by reference, not copied, which is safe because `boundaryGrid` allocates a fresh
+   * array per call: do not pass a reused scratch buffer, or a later repaint would paint from
+   * whatever that buffer had since been mutated to hold.
+   */
   let lastGrid: Float32Array | undefined;
   let shown = true;
 
@@ -94,11 +99,11 @@ export function createFloor(theme: ThemeColors): Floor {
     return scratch.lerpColors(theme.bg, theme.ink, (t - 0.5) * 2);
   }
 
-  function repaint(): void {
-    if (lastGrid === undefined) return;
+  /** Precondition: `lastGrid` is set; `apply` is what decides whether to call this. */
+  function repaint(grid: Float32Array): void {
     for (let iy = 0; iy < N; iy++) {
       for (let ix = 0; ix < N; ix++) {
-        colourFor(lastGrid[ix + N * (N - 1 - iy)] ?? 0);
+        colourFor(grid[ix + N * (N - 1 - iy)] ?? 0);
         writeVertex(ix + N * iy);
       }
     }
@@ -111,10 +116,20 @@ export function createFloor(theme: ThemeColors): Floor {
     geometry.getAttribute("color").needsUpdate = true;
   }
 
+  /**
+   * The boundary is painted only when it is both toggled on and has a grid to paint: before the
+   * first `set`, and whenever the toggle is off, the floor is the faint wash at the low opacity.
+   */
+  function apply(): void {
+    const grid = shown ? lastGrid : undefined;
+    material.opacity = grid === undefined ? HIDDEN_OPACITY : SHOWN_OPACITY;
+    if (grid === undefined) wash();
+    else repaint(grid);
+  }
+
   function applyTheme(): void {
     outline.material.color.copy(theme.line);
-    if (shown) repaint();
-    else wash();
+    apply();
   }
   applyTheme();
   theme.addEventListener("change", applyTheme);
@@ -125,14 +140,12 @@ export function createFloor(theme: ThemeColors): Floor {
 
     set(grid): void {
       lastGrid = grid;
-      if (shown) repaint();
+      apply();
     },
 
     setShow(on): void {
       shown = on;
-      material.opacity = on ? SHOWN_OPACITY : HIDDEN_OPACITY;
-      if (on) repaint();
-      else wash();
+      apply();
     },
 
     dispose(): void {
