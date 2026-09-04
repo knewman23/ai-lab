@@ -26,16 +26,22 @@ Success criteria:
 1. Two clicks from the home page.
 2. Every number on screen is computed from the current embeddings by the forward pass in
    `core/math/transformer.ts`; nothing is hardcoded per stage.
-3. At the `tuned` embedding preset with positional encoding on, head 1's attention row for
-   the last token has its argmax at the immediately preceding position (asserted in a test;
-   see §3.7 for the free parameter this constrains).
-4. At the `collapsed` preset every attention weight in the last row is within 0.15 of
-   uniform (asserted in a test), so a viewer sees that embeddings carrying no information
-   produce attention carrying no information.
-5. Dragging a vocabulary point changes the probability bars within one frame; a full
-   recompute and redraw stays under 4 ms (DEV warns past it, as the nn scene does).
+3. At the `collapsed` preset with positional encoding on, head 1's attention row for the
+   last token peaks at the immediately preceding position — weights
+   `[0.115, 0.144, 0.223, 0.290, 0.227]`, a margin of 0.063 over the runner-up (asserted in
+   a test). With content stripped out, the only signal left is position, and head 1 reads it.
+4. At the `collapsed` preset with positional encoding **off**, every attention weight in
+   every row of both heads is within 0.01 of uniform `1/(i+1)` (measured: 1.7e-3; asserted
+   in a test). No information in, no information out.
+5. At the `tuned` preset with positional encoding on, head 1's last-token argmax is **not**
+   the preceding position for any of the three sentences (measured: positions 1, 0 and 0;
+   asserted in a test). Content outcompetes position, which is the honest consequence of
+   `d_model = 2` and is what §3.4 and the explanation panel say.
 6. Turning positional encoding off makes the two `the` tokens' query, key and value vectors
-   identical (asserted in a test) and visibly collapses their columns' glyphs.
+   bit-identical in both heads (asserted in a test) and visibly collapses their columns'
+   glyphs.
+7. Dragging a vocabulary point changes the probability bars within one frame; a full
+   recompute and redraw stays under 4 ms (DEV warns past it, as the nn scene does).
 
 Out of scope: training of any kind; more than one block; layer normalisation (§3.6 explains
 why and what the panel says instead); editable `W_Q`, `W_K`, `W_V`, `W_O` or MLP weights;
@@ -92,15 +98,21 @@ spread:    all eight on a circle of radius 1.8 at angles k · 45°
 ```
 
 `tuned` groups the parts of speech (determiner up, nouns right, verbs left, modifiers down).
-`collapsed` carries almost no information, so attention goes almost uniform and the output
-distribution goes almost flat. `spread` is maximally distinguishable but semantically
-arbitrary, so attention is sharp and the prediction is confident nonsense — the pair makes
-the point that sharpness is not meaning.
+
+`collapsed` carries almost no information: the output distribution goes nearly flat (top
+three at 0.14, 0.13, 0.13 for every sentence) and, with positional encoding off, attention
+goes exactly uniform. The radius is 0.1 rather than 0 so the eight points stay separately
+visible and draggable on the floor; that residue is why criterion §1.4 allows 0.01 rather
+than demanding exact uniformity.
+
+`spread` is maximally distinguishable but semantically arbitrary, so attention is sharp and
+the prediction is confident nonsense (`the` 0.52, `fast` 0.45 on the default sentence) — the
+pair with `collapsed` makes the point that sharpness is not meaning.
 
 ### 3.3 Positional encoding
 
 ```
-pe(p) = PE_SCALE · (cos p, sin p)        PE_SCALE = 0.35
+pe(p) = PE_SCALE · (cos p, sin p)        PE_SCALE = 0.8
 x_p   = embedding[token[p]] + pe(p)      (or just the embedding when the toggle is off)
 ```
 
@@ -135,11 +147,19 @@ W_O = [ 0.6  0    0.4  0  ]      i.e. 0.6 · o^1 + 0.4 · o^2
       [ 0    0.6  0    0.4 ]
 ```
 
-**Known limitation, stated in the explanation panel.** At `d_model = 2` the positional and
-content information share the same two dimensions, so neither head is pure: head 1's scores
-still contain embedding cross-terms and head 2's still contain positional ones. Real models
-have enough dimensions to give each an almost-separate subspace. The panel says this; the
-scene does not pretend otherwise.
+**Head 1 is previous-position-*biased*, not previous-position.** The rotation identity is
+exact — `R(-1) · pe(p) = pe(p-1)` — so the positional part of `q_i` points precisely at the
+positional part of `k_{i-1}`. But at `d_model = 2` the positional and content information
+share the same two dimensions, so head 1's scores also carry embedding cross-terms, and at
+the `tuned` preset those cross-terms win: head 1's last-token argmax lands on position 1, 0
+and 0 for the three sentences, never on the preceding position (criterion §1.5). Strip the
+content out with the `collapsed` preset and the bias becomes visible immediately — the row
+peaks at the preceding position with a 0.063 margin (criterion §1.3).
+
+This is not a defect to hide; it is the most useful thing the scene can teach about why real
+models are wide. Real models have enough dimensions to give position and content
+almost-separate subspaces, so a genuine previous-token head can exist. The explanation panel
+says exactly this, and names `collapsed` as the preset that demonstrates it.
 
 ### 3.5 Residual stream and MLP
 
@@ -184,14 +204,21 @@ So the eight probability bars are eight dot products against the eight draggable
 dragging a word toward the last token's final vector raises its bar. This is the scene's
 central payoff and the reason weight tying was chosen over a separate matrix.
 
-**The one free parameter.** Success criterion §1.3 — head 1's last-row argmax lands on the
-preceding position at the `tuned` preset — depends on the ratio between `PE_SCALE` and the
-embedding magnitudes. `PE_SCALE = 0.35` is the starting value; implementation may tune it
-within `[0.25, 0.80]` to satisfy the test, and must not change the `tuned` embeddings to do
-so (they are what §1.4's and §6's presets depend on). If no value in that range satisfies
-it, the fallback is to raise `PE_SCALE` to 1.0 and record in this spec that head 1 is
-positional at the cost of the embeddings being a weaker signal — a spec revision, not a
-silent change.
+**Why `PE_SCALE = 0.8`.** It is the value at which head 1's positional bias is visible as a
+difference in arc thickness at the `collapsed` preset (a 0.063 margin over the runner-up;
+at 0.35 the margin is 0.018, which no viewer would see) while the `tuned` embeddings still
+comfortably outcompete it. It is a fixed constant, pinned by the §9.8 change-detector test
+along with every other weight; changing it changes three success criteria and is a spec
+revision, not an implementation choice.
+
+**What the block actually predicts, and why the panel must say so.** These weights are
+hand-authored, not trained. With a tied unembedding, an untrained block's final vector stays
+close to the last token's own vector, so the default `tuned` prediction is `the` at 0.79 —
+the token it just read. That is a real and instructive property of untrained tied models, not
+a bug, and the explanation panel states it: a trained model's `W_O` and MLP are precisely
+what break that self-prediction. The scene's payoff is the action, not the default: drag any
+word toward where the last token's final vector lands and watch its bar take over the
+distribution.
 
 ### 3.8 What `forward` returns
 
@@ -245,9 +272,17 @@ inside the floor with a margin, so a dragged word can reach the domain edge but 
 the floor. `embedFromFloor` clamps to the domain.
 
 A token's 2-vector is drawn inside its column as an arrow in the wall plane, from the band
-point outward: `(x_col + GLYPH * v.x, 0, z_band + GLYPH * v.y)` with `GLYPH = 0.30` and the
-length clamped at 0.75 so a large vector cannot reach into the neighbouring column
-(half the 1.2 column pitch, less the arrowhead).
+point outward along `v`'s direction, at length
+
+```
+glyphLength(|v|) = 0.55 * tanh(|v| / 2.0)
+```
+
+Vector magnitudes across all presets, sentences and stages run from about 0.1 to 5.63, so a
+linear scale with a hard clamp would saturate on the `spread` preset and stop responding to
+drags. `tanh` is monotone, never reaches the 0.55 ceiling — under half the 1.2 column pitch,
+so an arrow can never touch its neighbour — and still separates the common range: `|v| = 1.6`
+gives 0.39, `|v| = 5.6` gives 0.54.
 
 ## 5. Scene
 
@@ -428,18 +463,24 @@ be useful to a later scene it can move to `shared/` then, not now.
 4. Weight tying: `logits[v]` equals `dot(xFinal[last], embedding[v])` for all `v`.
 5. A hand-computed fixture — two positions, head 1 only, embeddings `(1,0)` and `(0,1)`,
    positional encoding off — matches to 1e-12.
-6. `tuned` with positional encoding on: `argmax` of head 1's last row is position 3
-   (success criterion §1.3).
-7. `collapsed`: every weight in the last row is within 0.15 of 0.2 (criterion §1.4).
-8. The `W_O`, `W1`, `b1`, `W2`, `b2`, `W_Q`, `W_K`, `W_V` constants equal the values in §3
-   (a change-detector, deliberately, per §3.5).
-9. `probabilities` sums to 1 and is monotone in the logit order for every `T` in
-   `{0.2, 1, 3}`; a low `T` concentrates more mass on the argmax than a high `T`.
-10. Determinism: two `forward` calls on equal inputs return equal numbers.
+6. `collapsed` with positional encoding on: head 1's last row equals
+   `[0.115, 0.144, 0.223, 0.290, 0.227]` to 1e-3, so its argmax is position 3 and its margin
+   over the runner-up is at least 0.05 (criterion §1.3).
+7. `collapsed` with positional encoding off: every weight in every row of both heads is
+   within 0.01 of `1/(i+1)` (criterion §1.4).
+8. `tuned` with positional encoding on: head 1's last-row argmax is 1, 0 and 0 for
+   `cat-sat`, `dog-ran` and `scrambled` — never 3 (criterion §1.5).
+9. Mask off: row `i` has five entries for every `i`, and still sums to 1.
+10. The `PE_SCALE`, `W_O`, `W1`, `b1`, `W2`, `b2`, `W_Q`, `W_K`, `W_V` constants equal the
+    values in §3 (a change-detector, deliberately, per §3.5 and §3.7).
+11. `probabilities` sums to 1 and is monotone in the logit order for every `T` in
+    `{0.2, 1, 3}`; a low `T` concentrates more mass on the argmax than a high `T`.
+12. Determinism: two `forward` calls on equal inputs return equal numbers.
 
 **`viz/gpt/layout.test.ts`** — `floorFromEmbed` / `embedFromFloor` round-trip to 1e-12 over
 the domain corners and centre; `embedFromFloor` clamps a point outside the floor into
-`[-2, 2]²`; the glyph length clamp never exceeds half the column pitch.
+`[-2, 2]²`; `glyphLength` is strictly increasing, is 0 at 0, and stays under 0.55 for
+magnitudes up to 100 — so no arrow can reach the neighbouring column.
 
 **`viz/gpt/arcs-geometry.test.ts`** — endpoints land exactly on the two columns' band points;
 the control-point lift grows with `|Δx|`; half-width is monotone in the weight and positive at
@@ -458,7 +499,8 @@ once the entry becomes lazy.
 | Risk                                                                                              | Mitigation                                                                                                                     |
 | ------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
 | `d_model = 2` cannot separate positional from content information, so the heads are impure        | Stated in §3.4 and in the explanation panel; head 1's behaviour is pinned by a test rather than asserted in prose              |
-| Criterion §1.3 may not hold at any `PE_SCALE` in `[0.25, 0.80]`                                   | §3.7 names the fallback (`PE_SCALE = 1.0`) and requires a spec revision rather than a silent change                            |
+| The default `tuned` prediction is `the` at 0.79 — the block predicts the token it just read | Inherent to an untrained tied-unembedding block, so it is taught rather than hidden: §3.7 and the explanation panel say why, and the scene's payoff is the drag, not the default |
+| Every numeric claim in §1, §3 and §9 was verified against a reference implementation before this spec was approved | The implementation must reproduce those exact numbers; §9.6–§9.10 are the tests that hold it to them |
 | Five arcs plus five columns plus eight bars on one wall may read as clutter                       | One query row at a time, non-focused bands dimmed, and a Chrome MCP pass in both themes before merge; arcs float 0.06 off the wall so they never z-fight |
 | Attention is split between the wall and the floor — the option-A risk                             | The floor carries the residual path (§5.7) for the same token the arcs belong to, so the two surfaces show one story           |
 | Ribbon geometry with `DoubleSide` under WebGPU                                                    | Consistent winding, no negated normals, tested in `arcs-geometry.test.ts`; the repo's `PlaneGeometry` lesson applies           |
