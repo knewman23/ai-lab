@@ -125,6 +125,17 @@ describe("nn scene state", () => {
     expect(Math.abs(d.probeOutput)).toBeLessThanOrEqual(1);
   });
 
+  // The assembler caches the 1600-point boundary grid by comparing `params` identity, so a reducer
+  // that copied the parameters untouched would silently recompute it on every probe drag.
+  it("only the training reducers change the params identity", () => {
+    const s = initialState();
+    expect(setProbe(s, [1, 1]).params).toBe(s.params);
+    expect(setLr(s, 0.2).params).toBe(s.params);
+    expect(setShow(s, "data", false).params).toBe(s.params);
+    expect(setPlaying(s, true).params).toBe(s.params);
+    expect(trainEpoch(s).params).not.toBe(s.params);
+  });
+
   it("derived leaves the boundary grid to the assembler", () => {
     expect(derived(initialState())).not.toHaveProperty("boundaryGrid");
   });
