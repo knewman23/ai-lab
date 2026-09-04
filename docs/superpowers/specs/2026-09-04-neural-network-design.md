@@ -115,9 +115,14 @@ opacity .18.
 
 **Neurons** (`neurons.ts`): 11 spheres (`MeshStandardMaterial`, roughness .5) at `neuronPosition`
 lifted 0.01 toward −y. Two shared materials, `ink` and `accent`, are swapped onto each mesh by sign,
-so a theme "change" recolours two materials and no per-object state. `set(activations)` sets each
-sphere's scale (radius 0.08 + 0.14·|a|) and material by sign (`--ink` positive, `--accent` negative; the input layer's "activations" are the probe
-coordinates scaled to [−1, 1] by dividing by 3). Labels (label layer): "input", "hidden", "hidden",
+so a theme "change" recolours two materials and no per-object state. `set(activations)` takes `forward`'s
+output verbatim and does the input-layer scaling itself: layer 0 arrives as the raw probe
+coordinates in [−3, 3], so `set` divides that layer by `DOMAIN[1]` before sizing, while layers 1–3
+are already in [−1, 1]. Doing it here rather than at the call site is deliberate: a caller that
+forgot would render a plausible-looking wrong picture, since the radius formula clamps at |a| = 1.
+Each sphere then gets radius 0.08 + 0.14·min(1, |a|) and a material by sign (`--ink` for a ≥ 0,
+`--accent` for a < 0; the sphere's tie-break at exactly 0 is ink, unlike the §6 readout's "−1",
+because the common case is the probe resting at the origin). Labels (label layer): "input", "hidden", "hidden",
 "output" above each column (`node` kind), and "x₁"/"x₂" beside the two input neurons.
 
 **Weights** (`weights.ts`): 28 struts, `BoxGeometry(1, 1, 1)` shared, each positioned at the
