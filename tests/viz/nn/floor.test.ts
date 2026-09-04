@@ -84,7 +84,7 @@ describe("createFloor", () => {
     for (const v of [0, 137, COUNT - 1]) expectVertex(colours(floor), v, theme.faint);
 
     floor.setShow(true);
-    expect(material.opacity).toBeCloseTo(0.85, 9);
+    expect(material.opacity).toBeCloseTo(0.55, 9);
     for (const v of [0, 137, COUNT - 1]) expectVertex(colours(floor), v, theme.ink);
     floor.dispose();
   });

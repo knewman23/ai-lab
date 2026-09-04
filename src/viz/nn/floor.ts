@@ -27,7 +27,7 @@ const N = 40;
 const COUNT = N * N;
 
 /** Opacity with the boundary shown, and the faint wash it drops to when hidden. */
-const SHOWN_OPACITY = 0.85;
+const SHOWN_OPACITY = 0.55;
 const HIDDEN_OPACITY = 0.18;
 
 /** Lift the outline toward +z, the camera side of the floor, so the plane does not z-fight it. */

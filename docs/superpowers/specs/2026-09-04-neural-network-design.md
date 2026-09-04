@@ -133,14 +133,15 @@ Toggle "Weights".
 
 **Floor** (`floor.ts`): `PlaneGeometry(6, 6, 39, 39)` at z = 0 centred (0, −3.5, 0) with a vertex
 `color` attribute (1600 vertices), `MeshBasicMaterial({ vertexColors: true, transparent: true,
-opacity: 0.85 })`, renderOrder 0; `set(grid: Float32Array)` writes each vertex colour as
+opacity: 0.55 })`, renderOrder 0; `set(grid: Float32Array)` writes each vertex colour as
 `mix(--accent, --bg, --ink)` at t = (value + 1)/2 (two-segment lerp through `--bg` at 0.5), using
 copies of the theme `Color`s; a thin `--line` outline. **Vertex order:** `PlaneGeometry` lays its
 vertices out with the local y axis running from +3 down to −3, so geometry vertex `ix + n·iy` takes
 its colour from grid entry `ix + n·(n − 1 − iy)` (the same mirror `gradient-descent/surface-mesh.ts`
 documents). The module keeps the last grid so a theme "change" can rewrite all 1600 colours. Toggle
 "Boundary": off writes a uniform `--faint` to every vertex and drops opacity to .18; on rewrites
-from the kept grid at .85. Data points (`points.ts`): one
+from the kept grid at .55 (the browser check showed .85 made the field swamp the data points, which
+share its two colours). Data points (`points.ts`): one
 `InstancedMesh` of spheres r 0.07 (up to 60 instances) at `floorPoint` + z 0.07, `setColorAt` per
 instance `--ink` (+1) / `--accent` (−1) with `instanceColor.needsUpdate` and, per the toolchain
 notes, `frustumCulled = false` plus `computeBoundingSphere()` after the matrices; re-coloured on a
