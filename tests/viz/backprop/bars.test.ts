@@ -277,9 +277,10 @@ describe("hit box pool after a graph switch", () => {
 
     const [ax, , az] = wallPoint(pp, bars.leafIds[0]!);
     ray.set(new Vector3(ax - BAR_DX, -10, az), new Vector3(0, 1, 0));
+    // A ray through a closed box meets two faces, so count objects, not intersections.
     const hits = ray.intersectObjects([...bars.hitTargets], false);
-    expect(hits).toHaveLength(1);
-    expect(bars.hitTargets.indexOf(hits[0]!.object as never)).toBe(0);
+    expect(hits.length).toBeGreaterThan(0);
+    expect(hits.every((h) => h.object === bars.hitTargets[0])).toBe(true);
     bars.dispose();
   });
 });
