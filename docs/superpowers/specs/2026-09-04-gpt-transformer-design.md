@@ -121,8 +121,9 @@ x_p   = embedding[token[p]] + pe(p)      (or just the embedding when the toggle 
 
 `cos`/`sin` of the position in radians, not the usual multi-frequency sinusoid: at
 `d_model = 2` there is room for exactly one frequency. The consequence is deliberate and is
-what makes §3.4's head 1 work — rotating a query by one radian points it at the previous
-position's key.
+what makes §3.4's head 1 work — rotating a query back by one radian points the *positional
+part* of that query exactly at the previous position's key. Only the positional part: §3.4
+explains why the content part then competes with it, and usually wins.
 
 ### 3.4 Attention: two heads, `d_head = 2`
 
@@ -213,7 +214,7 @@ central payoff and the reason weight tying was chosen over a separate matrix.
 **Why `PE_SCALE = 0.8`.** It is the value at which head 1's positional bias is visible as a
 difference in arc thickness at the `collapsed` preset (a 0.063 margin over the runner-up;
 at 0.35 the margin is 0.018, which no viewer would see) while the `tuned` embeddings still
-comfortably outcompete it. It is a fixed constant, pinned by the §9.8 change-detector test
+comfortably outcompete it. It is a fixed constant, pinned by the §9.10 change-detector test
 along with every other weight; changing it changes three success criteria and is a spec
 revision, not an implementation choice.
 
@@ -286,10 +287,10 @@ WALL_W = 6      WALL_H = 5.2      WALL_OPACITY = 0.18
 column x        [-2.4, -1.2, 0, 1.2, 2.4]
 band z          embed 0.5   attention 1.5   residual 2.5   mlp 3.4   logits 4.2
 floor           x in [-3, 3], y in [-6, 0]
+```
 
 `WALL_H` is 5.2 rather than 4.6 because the tallest probability bar rises 0.55 above the
 logits band at z = 4.2; 4.75 plus the label pill must fit inside the wall.
-```
 
 Two pure conversions, round-trip tested:
 
@@ -331,9 +332,22 @@ HTML label at its right edge (`embed + position`, `attention`, `+ residual`, `ML
 ### 5.3 Token columns (`columns.ts`)
 
 Five vertical lines from the embed band to the MLP band, one per sequence position, with the
-word as an HTML label below the wall's bottom edge. At each of the four vector bands
-(embed, attention output, residual, MLP output) the column carries an arrow glyph for that
-position's vector at that stage, coloured `--ink`. The selected query column is drawn in
+word as an HTML label below the wall's bottom edge. At each of the five vector bands the column carries an arrow glyph, coloured `--ink`, for
+one of:
+
+| Band        | Vector     | What it is                                            |
+| ----------- | ---------- | ----------------------------------------------------- |
+| embed       | `x`        | running stream, after the embedding and `pe(p)`       |
+| attention   | `attnOut`  | a **delta** — what attention adds                     |
+| + residual  | `xResid`   | running stream, `x + attnOut`                         |
+| MLP         | `mlpOut`   | a **delta** — what the MLP adds                       |
+| logits      | `xFinal`   | running stream, `xResid + mlpOut`; the vector that produces the logits |
+
+Two of the five are increments and three are the stream itself, which is the distinction §1's
+"watch the vector get edited as it climbs" depends on; the readout names it, and the delta
+bands' glyphs are drawn with an open arrowhead so the two kinds never look alike. `xFinal`
+gets a glyph on the logits band because it is what §3.7 dots against every embedding — without
+it the vector the whole prediction rests on would appear nowhere on the wall. The selected query column is drawn in
 `--accent` and one step brighter.
 
 Five clickable hit boxes, one per column, as in `backprop/hit-boxes.ts`: a click selects that
@@ -554,7 +568,7 @@ once the entry becomes lazy.
 | ------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
 | `d_model = 2` cannot separate positional from content information, so the heads are impure        | Stated in §3.4 and in the explanation panel; head 1's behaviour is pinned by a test rather than asserted in prose              |
 | The default `tuned` prediction is `the` at 0.79 — the block predicts the token it just read | Inherent to an untrained tied-unembedding block, so it is taught rather than hidden: §3.7 and the explanation panel say why, and the scene's payoff is the drag, not the default |
-| Every numeric claim in §1, §3 and §9 was verified against a reference implementation before this spec was approved | The implementation must reproduce those exact numbers; §9.6–§9.10 are the tests that hold it to them |
+| The behavioural claims in §1.3–§1.6 were verified against the reference implementation before approval; the illustrative figures quoted elsewhere were corrected twice in review and could still be stale | The implementation reproduces §1.3–§1.6 exactly, and §9.6–§9.10 hold it to them. Every other quoted number is illustration: if one disagrees with the code, the code wins and the spec gets a revision |
 | Five arcs plus five columns plus eight bars on one wall may read as clutter                       | One query row at a time, non-focused bands dimmed, and a Chrome MCP pass in both themes before merge; arcs float 0.06 off the wall so they never z-fight |
 | Attention is split between the wall and the floor — the option-A risk                             | The floor carries the residual path (§5.7) for the same token the arcs belong to, so the two surfaces show one story           |
 | Ribbon geometry with `DoubleSide` under WebGPU                                                    | Consistent winding, no negated normals, tested in `arcs-geometry.test.ts`; the repo's `PlaneGeometry` lesson applies           |
