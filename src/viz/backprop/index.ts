@@ -6,13 +6,14 @@ import { attachDrag } from "../shared/drag";
 import type { Framing } from "../shared/framing";
 import { createUsageHint, type UsageHint } from "../shared/hint";
 import { createLabelLayer } from "../shared/labels";
+import { createWall } from "../shared/wall";
 import type { Visualization, VizHost, VizInstance } from "../types";
 import { createBars, type SetCause } from "./bars";
 import { S_VALUE, BAR_DX } from "./bars-geometry";
 import { createEdges } from "./edges";
 import { frameWall } from "./frame-wall";
 import { syncLabels } from "./labels-sync";
-import { layoutGraph, type Positions, wallPoint } from "./layout";
+import { layoutGraph, type Positions, WALL_H, WALL_W, wallPoint } from "./layout";
 import { createNodes } from "./nodes";
 import { createBpPanel, type BpPanel } from "./panel";
 import {
@@ -29,7 +30,9 @@ import {
   STEP_MS,
   stepForward,
 } from "./state";
-import { createWall } from "./wall";
+
+/** Translucent enough that edges and bars behind the wall stay readable. */
+const WALL_OPACITY = 0.18;
 
 const HINT = {
   storageKey: "ai-lab.hint.backprop",
@@ -66,7 +69,7 @@ function buildScene(host: VizHost, reducedMotion: boolean) {
       kit.dispose();
     });
 
-    const wall = createWall(host.theme);
+    const wall = createWall(host.theme, { width: WALL_W, height: WALL_H, opacity: WALL_OPACITY });
     built.push(() => {
       wall.dispose();
     });

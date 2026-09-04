@@ -1,11 +1,22 @@
-import { Box3, MeshBasicMaterial, PlaneGeometry } from "three";
+import { Box3, type Mesh, MeshBasicMaterial, PlaneGeometry } from "three";
 import { describe, expect, it, vi } from "vitest";
 import { createThemeColors } from "../../../src/core/theme";
-import { createWall } from "../../../src/viz/backprop/wall";
+import { createWall, type WallOptions } from "../../../src/viz/shared/wall";
 
-function make() {
+const BACKPROP: WallOptions = { width: 10, height: 6, opacity: 0.18 };
+
+function make(opts: WallOptions = BACKPROP) {
   const theme = createThemeColors(() => "#1f4ed8");
-  return { wall: createWall(theme), theme };
+  return { wall: createWall(theme, opts), theme };
+}
+
+/** The world-space bounding box of the wall's plane, with its transform applied. */
+function worldBox(mesh: Mesh): Box3 {
+  mesh.updateMatrixWorld(true);
+  const world = mesh.geometry.clone().applyMatrix4(mesh.matrixWorld);
+  const box = new Box3().setFromBufferAttribute(world.getAttribute("position") as never);
+  world.dispose();
+  return box;
 }
 
 describe("createWall", () => {
@@ -26,22 +37,41 @@ describe("createWall", () => {
 
   it("covers x in [-5, 5], y = 0, z in [0, 6] once the mesh transform is applied", () => {
     const { wall } = make();
-    wall.mesh.updateMatrixWorld(true);
-    const world = wall.mesh.geometry.clone().applyMatrix4(wall.mesh.matrixWorld);
-    const box = new Box3().setFromBufferAttribute(world.getAttribute("position") as never);
+    const box = worldBox(wall.mesh);
     expect(box.min.x).toBeCloseTo(-5, 6);
     expect(box.max.x).toBeCloseTo(5, 6);
     expect(box.min.y).toBeCloseTo(0, 6);
     expect(box.max.y).toBeCloseTo(0, 6);
     expect(box.min.z).toBeCloseTo(0, 6);
     expect(box.max.z).toBeCloseTo(6, 6);
-    world.dispose();
     wall.dispose();
   });
 
-  it("outlines the four wall edges", () => {
+  it("takes its size and opacity from the options", () => {
+    const { wall } = make({ width: 8, height: 4, opacity: 0.3 });
+    const box = worldBox(wall.mesh);
+    expect(box.min.x).toBeCloseTo(-4, 6);
+    expect(box.max.x).toBeCloseTo(4, 6);
+    expect(box.min.z).toBeCloseTo(0, 6);
+    expect(box.max.z).toBeCloseTo(4, 6);
+    expect((wall.mesh.material as MeshBasicMaterial).opacity).toBe(0.3);
+    wall.dispose();
+  });
+
+  it("outlines the four wall edges, lifted off the wall toward the camera", () => {
     const { wall } = make();
     expect(wall.outline.geometry.drawRange.count).toBe(8);
+    for (let n = 0; n < 8; n++) expect(wall.outline.positions[n * 3 + 1]).toBeCloseTo(-0.01, 6);
+    wall.dispose();
+  });
+
+  it("recolours the mesh and the outline when the theme changes", () => {
+    const { wall, theme } = make();
+    theme.faint.setHex(0x123456);
+    theme.line.setHex(0x654321);
+    theme.dispatchEvent(new Event("change"));
+    expect((wall.mesh.material as MeshBasicMaterial).color.equals(theme.faint)).toBe(true);
+    expect(wall.outline.material.color.equals(theme.line)).toBe(true);
     wall.dispose();
   });
 
