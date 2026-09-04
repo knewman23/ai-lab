@@ -33,8 +33,9 @@ Success criteria:
    `scrambled`, so the test's bound is 0.03, not 0.05. With content stripped out, the only
    signal left is position, and head 1 reads it.
 4. At the `collapsed` preset with positional encoding **off**, every attention weight in
-   every row of both heads is within 0.01 of uniform `1/(i+1)` (measured: 1.7e-3; asserted
-   in a test). No information in, no information out.
+   every row of both heads is within 0.01 of uniform `1/(i+1)` (worst case across all three
+   sentences: 3.02e-3, on `dog-ran` head 2 row 1; asserted in a test). No information in, no
+   information out.
 5. At the `tuned` preset with positional encoding on, head 1's last-token argmax is **not**
    the preceding position for any of the three sentences (measured: positions 1, 0 and 0;
    asserted in a test). Content outcompetes position, which is the honest consequence of
@@ -103,7 +104,7 @@ spread:    all eight on a circle of radius 1.8 at angles k · 45°
 
 `collapsed` carries almost no information: the output distribution goes nearly flat (top
 three at 0.14, 0.13, 0.13 for every sentence) and, with positional encoding off, attention
-goes exactly uniform. The radius is 0.1 rather than 0 so the eight points stay separately
+goes uniform to within 3.02e-3. The radius is 0.1 rather than 0 so the eight points stay separately
 visible and draggable on the floor; that residue is why criterion §1.4 allows 0.01 rather
 than demanding exact uniformity.
 
@@ -190,8 +191,8 @@ unchanged, so a later edit cannot silently redraw every screenshot in `docs/scre
 ### 3.6 No layer norm
 
 At `d_model = 2`, normalising a vector to zero mean and unit variance across two components
-leaves only `±(1, -1)/sqrt(2)` — every token would collapse onto one of two points and the
-scene would show nothing. It is therefore omitted. The explanation panel says so explicitly,
+leaves only `±(1, -1)` — every token would collapse onto one of two points and the scene
+would show nothing. It is therefore omitted. The explanation panel says so explicitly,
 and says what layer norm does in a real block (rescales each token's vector to a fixed
 length before the attention and MLP sublayers, which keeps activations in range as depth
 grows) so the omission reads as a documented simplification rather than an error.
@@ -308,11 +309,11 @@ point outward along `v`'s direction, at length
 glyphLength(|v|) = 0.55 * tanh(|v| / 2.0)
 ```
 
-Vector magnitudes across all presets, sentences and stages run from about 0.1 to 5.63, so a
+Vector magnitudes across all presets, sentences and stages run from 0.02 to 5.63, so a
 linear scale with a hard clamp would saturate on the `spread` preset and stop responding to
 drags. `tanh` is monotone, never reaches the 0.55 ceiling — under half the 1.2 column pitch,
-so an arrow can never touch its neighbour — and still separates the common range: `|v| = 1.6`
-gives 0.39, `|v| = 5.6` gives 0.54.
+so an arrow can never touch its neighbour — and still separates the common range:
+`|v| = 1.6` gives 0.37, `|v| = 2.6` gives 0.44, `|v| = 5.6` gives 0.55.
 
 ## 5. Scene
 
@@ -475,10 +476,25 @@ src/viz/gpt/frame-gpt.ts            camera framing
 
 Changed:
 
-- `src/app/registry.ts` — the `gpt-transformer` roadmap entry becomes a `LazyVisualization`
-  with `load: () => import("../viz/gpt").then((m) => m.gptTransformer)`. The existing
-  registry test asserts the loaded module's `id`/`topic`/`title`/`summary` equal the entry's,
-  so both copies must match.
+- `src/app/registry.ts` — the `gpt-transformer` entry changes `status: "soon"` to
+  `status: "ready"` and gains
+  `load: () => import("../viz/gpt").then((m) => m.gptTransformer)`. Its `summary` is replaced
+  verbatim, in both the registry and `viz/gpt/index.ts`, by:
+
+  > Drag eight word embeddings across the floor and watch one transformer block respond:
+  > attention arcs between the tokens, the residual stream, and the probability of every
+  > next word.
+
+  The current summary describes a scene with no draggable floor and no tied unembedding, and
+  `loadReady` asserts the module's `summary` equals the entry's, so the two copies must match
+  exactly.
+
+- `tests/app/registry.test.ts` — **this scene empties the roadmap.** `gpt-transformer` is the
+  last `status: "soon"` entry, so the `roadmapExpectations` array and the
+  `it.each(roadmapExpectations)` block that consumes it must both be deleted; vitest throws on
+  `it.each([])`. Add a `loads the GPT transformer from its own chunk` case alongside the other
+  five, following the same shape (`loadReady("machine-learning", "gpt-transformer")` plus the
+  `summary` assertions that it contains neither `roadmap` nor `soon`).
 - `vite.config.ts` — nothing. The scene is another lazy chunk under the existing
   `codeSplitting.groups`.
 - `README.md` and `docs/roadmap.md` — move the scene from in-flight to live.
