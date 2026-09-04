@@ -9,10 +9,11 @@ a study tool and a portfolio piece. Live at
 ![Derivative and tangent explorer](docs/screenshots/derivative-light.png)
 ![Chain rule graph](docs/screenshots/chain-rule-light.png)
 ![Backprop graph](docs/screenshots/backprop-light.png)
+![Neural network](docs/screenshots/neural-network-light.png)
 
 ## What's in it
 
-Five scenes so far.
+Six scenes so far.
 
 **Gradient descent** on a draggable 3D loss surface. Drag the ball anywhere on the surface
 and watch the gradient arrow and tangent plane follow it, pick SGD, momentum or Adam and
@@ -43,6 +44,8 @@ and watch values fill in node by node; step the backward pass and watch gradient
 each edge with the local derivative written on it. Drag a leaf's bar or move its slider and every
 revealed number recomputes. Three graphs: the tanh neuron, a·b + c, and one where a node feeds two
 consumers so its gradient visibly accumulates.
+
+**Neural network.** A 2-4-4-1 tanh network learning to classify points in a plane. The layers stand on a wall with every weight a strut, thick for large and blue for negative, and every neuron sized by its activation. The floor in front is the input space: the training data sits on it and the network's current output is painted across it, so each gradient step visibly bends the decision boundary toward the data. Step or play the training, drag a probe across the floor to light up the activations behind any prediction, and switch between XOR, two moons and circles.
 
 ## Run it
 
@@ -163,7 +166,9 @@ The registry test asserts the loaded module's `id`, `topic`, `title` and
 2. ~~Backprop graph (machine learning)~~ — shipped: the `Value` autograd graph on a wall with value
    and gradient bars, a stepped forward and backward pass, local derivatives on the active edges,
    and editable leaves.
-3. Neural network (machine learning) — a small MLP with a live forward pass and training.
+3. ~~Neural network (machine learning)~~ — shipped: a 2-4-4-1 tanh MLP on a wall with weights as
+   struts, the data and live decision boundary on the floor, and full-batch gradient descent you
+   can step or play.
 4. GPT transformer (machine learning) — token embeddings, attention heads, residual stream.
 5. ~~Derivative & tangent explorer (calculus)~~ — shipped: drag a point along a curve on a
    vertical plane, watch the tangent follow, shrink h to collapse the secant onto it, read the

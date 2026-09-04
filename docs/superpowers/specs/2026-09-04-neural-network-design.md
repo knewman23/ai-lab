@@ -149,8 +149,8 @@ theme "change"; toggle "Data".
 
 **Probe** (`probe.ts`): a sphere r 0.12 `--soft` standing on the floor at the probe position (raised
 its own radius, 0.12, in z so it rests on the plane), draggable on the
-plane z = 0 (`getPlaneZ: () => 0`), clamped to the domain; a hit sphere r 0.25; a label "probe → <output>" at the sphere (`value`
-kind). Dragging the probe re-runs `forward` for its position and re-colours the wall's
+plane z = 0 (`getPlaneZ: () => 0`), clamped to the domain; a hit sphere r 0.25; a label at the sphere carrying the bare output value (`value`
+kind, matching how every other scene renders a numeric label). Dragging the probe re-runs `forward` for its position and re-colours the wall's
 activations; it never changes the parameters.
 
 **Training** (`state.ts`): `NnState { dataset: DatasetKey; seed: number; params: Params; epoch:
