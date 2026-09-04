@@ -312,8 +312,10 @@ glyphLength(|v|) = 0.55 * tanh(|v| / 2.0)
 
 Vector magnitudes across all presets, sentences and stages run from 0.02 to 5.63, so a
 linear scale with a hard clamp would saturate on the `spread` preset and stop responding to
-drags. `tanh` is monotone, never reaches the 0.55 ceiling — under half the 1.2 column pitch,
-so an arrow can never touch its neighbour — and still separates the common range:
+drags. `tanh` is monotone and never exceeds the 0.55 ceiling — under half the 1.2 column pitch,
+so an arrow can never touch its neighbour. (It *reaches* 0.55: `Math.tanh` saturates to
+exactly 1 in float64 from about `|v| = 38`, far past the 5.63 this scene produces. The
+requirement is the bound, not strictness.) It and still separates the common range:
 `|v| = 1.6` gives 0.37, `|v| = 2.6` gives 0.47, `|v| = 5.6` gives 0.55.
 
 ## 5. Scene
@@ -561,7 +563,8 @@ be useful to a later scene it can move to `shared/` then, not now.
 
 **`viz/gpt/layout.test.ts`** — `floorFromEmbed` / `embedFromFloor` round-trip to 1e-12 over
 the domain corners and centre; `embedFromFloor` clamps a point outside the floor into
-`[-2, 2]²`; `glyphLength` is strictly increasing, is 0 at 0, and stays under 0.55 for
+`[-2, 2]²`; `glyphLength` is 0 at 0, is strictly increasing over the range the scene
+actually produces (0 to 20, well past its 5.63 maximum), and never exceeds 0.55 for
 magnitudes up to 100 — so no arrow can reach the neighbouring column.
 
 **`viz/gpt/arcs-geometry.test.ts`** — endpoints land exactly on the two columns' band points;
