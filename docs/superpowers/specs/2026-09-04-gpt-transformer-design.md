@@ -1,7 +1,7 @@
 # GPT transformer — one block at d_model = 2, pipeline on a wall, embeddings you drag on the floor
 
 Date: 2026-09-04
-Status: proposed
+Status: approved (spec review passed 2026-09-04, four rounds)
 Parent: [AI Lab design](2026-09-03-ai-lab-design.md); siblings: [Neural network](2026-09-04-neural-network-design.md), [Backprop graph](2026-09-03-backprop-graph-design.md), [Matrix transformation](2026-09-03-matrix-transformation-design.md)
 Registry: replaces the `machine-learning` roadmap entry `gpt-transformer`
 
@@ -355,8 +355,9 @@ column as the query.
 
 ### 5.4 Attention arcs (`arcs.ts`, pure geometry in `arcs-geometry.ts`)
 
-For the selected query position `i` and the selected head (or the `W_O`-weighted combination
-when both are shown), one ribbon per visible key `j <= i`: a quadratic Bézier from
+For the selected query position `i` and the selected head — or, when `both` is shown, §6.4's
+blend `0.6 a¹_j + 0.32 a²_j`, which is not a distribution and is not what a naive reading of
+`W_O` would give — one ribbon per visible key `j <= i`: a quadratic Bézier from
 `(x_j, 0, z_attn)` to `(x_i, 0, z_attn)`, control point at the midpoint lifted by
 `0.25 + 0.35 * |x_i - x_j|` in z, offset −0.06 in y so it floats in front of the wall.
 Twenty-four segments, built as a triangle strip with half-width
@@ -424,7 +425,10 @@ nn scene. Returns a `Framing`.
    `on the mat sat cat`.
 2. **Embeddings** — select: `tuned` (default), `collapsed`, `spread`; plus a **Reset
    embeddings** button that returns the current preset's positions after they have been
-   dragged.
+   dragged. Each preset carries one line of hint text under the select, because the presets
+   are the scene's lessons and a viewer will not read this spec: `collapsed` says "no
+   information in the embeddings — switch here to see head 1's positional bias on its own",
+   which is the §1.3 link stated in the interface rather than only in the tests.
 3. **Query token** — select over the five positions, defaulting to the last. Kept in sync
    with clicking a column, so the scene is usable without the 3D interaction.
 4. **Head** — select: `head 1`, `head 2`, `both` (default). `both` draws a blend of the two
@@ -534,8 +538,10 @@ be useful to a later scene it can move to `shared/` then, not now.
    is position 3 and its margin over the runner-up is at least 0.03 (measured 0.063, 0.063,
    0.036). On `cat-sat` the row equals `[0.115, 0.144, 0.223, 0.290, 0.227]` to 1e-3
    (criterion §1.3).
-7. `collapsed` with positional encoding off: every weight in every row of both heads is
-   within 0.01 of `1/(i+1)` (criterion §1.4).
+7. `collapsed` with positional encoding off, across all three sentences: every weight in
+   every row of both heads is within 0.01 of `1/(i+1)`. The test must span the sentences, not
+   just `cat-sat` — the worst case is 3.02e-3 on `dog-ran`, and a `cat-sat`-only test would
+   pass at 1.7e-3 and never see it (criterion §1.4).
 8. `tuned` with positional encoding on: head 1's last-row argmax is 1, 0 and 0 for
    `cat-sat`, `dog-ran` and `scrambled` — never 3 (criterion §1.5).
 9. Mask off: row `i` has five entries for every `i`, and still sums to 1.
