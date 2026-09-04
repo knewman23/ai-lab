@@ -2,13 +2,19 @@
  * One GPT block at `d_model = 2`: embed + position → two heads → residual → MLP → residual →
  * a weight-tied unembedding. Small enough that a token's vector is a point on a plane, so the
  * scene can draw every intermediate. Pure; the scene reads only what `forward` returns.
+ *
+ * The computation runs in `Vec2`, so the fixed widths are checked by the compiler; `forward`
+ * converts to the `Float64Array`s its interface promises once, at the return.
  */
+
+import { apply, type Mat2 } from "./matrix2";
+import type { Vec2 } from "./numeric";
 
 /** Vocabulary order fixes every index in `SEQUENCES` and every logit slot. */
 export const VOCAB = ["the", "cat", "sat", "on", "mat", "dog", "ran", "fast"] as const;
 
 /** One token's position in embedding space; eight of them, in vocabulary order. */
-export type Embeddings = readonly (readonly [number, number])[];
+export type Embeddings = readonly Vec2[];
 
 /** Five positions each, as vocabulary indices. */
 export const SEQUENCES = {
@@ -45,16 +51,17 @@ export const EMBEDDING_PRESETS = {
   spread: circle(1.8),
 } as const satisfies Record<string, Embeddings>;
 
-/** A 2×2 matrix, row-major. */
-export type Matrix2 = readonly [number, number, number, number];
+/** The MLP's hidden layer, and a 2×4 or 4×2 matrix stored row-major. */
+export type Vec4 = readonly [number, number, number, number];
+export type Mat2x4 = readonly [number, number, number, number, number, number, number, number];
 
-function rotation(theta: number): Matrix2 {
+function rotation(theta: number): Mat2 {
   const c = Math.cos(theta);
   const s = Math.sin(theta);
   return [c, -s, s, c];
 }
 
-const IDENTITY: Matrix2 = [1, 0, 0, 1];
+const IDENTITY: Mat2 = [1, 0, 0, 1];
 
 /**
  * The one frequency `d_model = 2` has room for: `pe(p) = PE_SCALE · (cos p, sin p)`. At 0.8 head
@@ -64,18 +71,30 @@ const IDENTITY: Matrix2 = [1, 0, 0, 1];
 export const PE_SCALE = 0.8;
 
 /** Head 1 leans positional: `R(-1) · pe(p) = pe(p - 1)`. Head 2 leans content. */
-export const W_Q: readonly Matrix2[] = [rotation(-1), IDENTITY];
-export const W_K: readonly Matrix2[] = [IDENTITY, IDENTITY];
-export const W_V: readonly Matrix2[] = [IDENTITY, [0.8, 0, 0, 0.8]];
+export const W_Q: readonly [Mat2, Mat2] = [rotation(-1), IDENTITY];
+export const W_K: readonly [Mat2, Mat2] = [IDENTITY, IDENTITY];
+export const W_V: readonly [Mat2, Mat2] = [IDENTITY, [0.8, 0, 0, 0.8]];
 
-/** 2×4 row-major: 0.6 · o¹ + 0.4 · o². */
-export const W_O: readonly number[] = [0.6, 0, 0.4, 0, 0, 0.6, 0, 0.4];
+/** 2×4 row-major over the concatenated head outputs: 0.6 · o¹ + 0.4 · o². */
+export const W_O: Mat2x4 = [0.6, 0, 0.4, 0, 0, 0.6, 0, 0.4];
 
 /** 4×2 row-major, then 2×4 row-major; chosen so the MLP is visible without dominating. */
-export const W1: readonly number[] = [1.2, 0.3, -0.4, 1.1, 0.9, -1, -1.1, -0.5];
-export const b1: readonly number[] = [0.1, -0.2, 0, 0.15];
-export const W2: readonly number[] = [0.25, -0.15, 0.3, 0.1, 0.1, 0.35, -0.2, 0.25];
-export const b2: readonly number[] = [0, 0];
+export const W1: Mat2x4 = [1.2, 0.3, -0.4, 1.1, 0.9, -1, -1.1, -0.5];
+export const b1: Vec4 = [0.1, -0.2, 0, 0.15];
+export const W2: Mat2x4 = [0.25, -0.15, 0.3, 0.1, 0.1, 0.35, -0.2, 0.25];
+export const b2: Vec2 = [0, 0];
+
+/** One head's three projections, bundled so `attend` never indexes the parallel arrays above. */
+interface HeadWeights {
+  readonly wq: Mat2;
+  readonly wk: Mat2;
+  readonly wv: Mat2;
+}
+
+const HEADS: readonly [HeadWeights, HeadWeights] = [
+  { wq: W_Q[0], wk: W_K[0], wv: W_V[0] },
+  { wq: W_Q[1], wk: W_K[1], wv: W_V[1] },
+];
 
 export interface ForwardInput {
   readonly embeddings: Embeddings; // length 8
@@ -106,127 +125,122 @@ export interface Forward {
   readonly logits: Float64Array; // length 8, from xFinal[last]
 }
 
-const at = (v: Float64Array, i: number): number => v[i] ?? 0;
-const cell = (m: readonly number[], i: number): number => m[i] ?? 0;
-
-/** `M · v` for a row-major 2×2. */
-function apply2(m: Matrix2, v: Float64Array): Float64Array {
-  return Float64Array.of(m[0] * at(v, 0) + m[1] * at(v, 1), m[2] * at(v, 0) + m[3] * at(v, 1));
+/** `attend`'s result before `forward` widens the 2-vectors to the interface's arrays. */
+interface Head {
+  readonly q: readonly Vec2[];
+  readonly k: readonly Vec2[];
+  readonly v: readonly Vec2[];
+  readonly scores: readonly Float64Array[];
+  readonly weights: readonly Float64Array[];
+  readonly out: readonly Vec2[];
 }
+
+const add = (a: Vec2, b: Vec2): Vec2 => [a[0] + b[0], a[1] + b[1]];
+const dot = (a: Vec2, b: Vec2): number => a[0] * b[0] + a[1] * b[1];
 
 /** The numerically stable form, so a masked row of one entry gives exactly 1. */
 function softmax(values: Float64Array): Float64Array {
-  let max = -Infinity;
-  for (const value of values) max = Math.max(max, value);
-  const out = new Float64Array(values.length);
-  let total = 0;
-  for (let i = 0; i < out.length; i++) {
-    const e = Math.exp(at(values, i) - max);
-    out[i] = e;
-    total += e;
-  }
-  for (let i = 0; i < out.length; i++) out[i] = at(out, i) / total;
-  return out;
+  const max = values.reduce((a, b) => Math.max(a, b), -Infinity);
+  const exponentials = Float64Array.from(values, (value) => Math.exp(value - max));
+  const total = exponentials.reduce((a, b) => a + b, 0);
+  return Float64Array.from(exponentials, (e) => e / total);
 }
 
-function attend(x: readonly Float64Array[], head: number, causal: boolean): HeadPass {
-  const wq = W_Q[head] ?? IDENTITY;
-  const wk = W_K[head] ?? IDENTITY;
-  const wv = W_V[head] ?? IDENTITY;
-  const q = x.map((v) => apply2(wq, v));
-  const k = x.map((v) => apply2(wk, v));
-  const v = x.map((u) => apply2(wv, u));
+function attend(x: readonly Vec2[], head: HeadWeights, causal: boolean): Head {
+  const q = x.map((v) => apply(head.wq, v));
+  const k = x.map((v) => apply(head.wk, v));
+  const v = x.map((u) => apply(head.wv, u));
   const scores: Float64Array[] = [];
   const weights: Float64Array[] = [];
-  const out: Float64Array[] = [];
-  for (let i = 0; i < x.length; i++) {
+  const out: Vec2[] = [];
+  q.forEach((qi, i) => {
     const width = causal ? i + 1 : x.length;
-    const row = new Float64Array(width);
-    for (let j = 0; j < width; j++) {
-      const qi = q[i];
-      const kj = k[j];
-      if (!qi || !kj) throw new Error(`transformer: missing q/k at ${i},${j}`);
-      row[j] = (at(qi, 0) * at(kj, 0) + at(qi, 1) * at(kj, 1)) / Math.SQRT2;
-    }
+    const row = Float64Array.from(k.slice(0, width), (kj) => dot(qi, kj) / Math.SQRT2);
     const a = softmax(row);
-    const o = new Float64Array(2);
-    for (let j = 0; j < width; j++) {
-      const vj = v[j];
-      if (!vj) throw new Error(`transformer: missing v at ${j}`);
-      o[0] = at(o, 0) + at(a, j) * at(vj, 0);
-      o[1] = at(o, 1) + at(a, j) * at(vj, 1);
-    }
     scores.push(row);
     weights.push(a);
-    out.push(o);
-  }
+    out.push(
+      v.slice(0, width).reduce<Vec2>(
+        (sum, vj, j) => {
+          const w = a[j] ?? 0;
+          return [sum[0] + w * vj[0], sum[1] + w * vj[1]];
+        },
+        [0, 0],
+      ),
+    );
+  });
   return { q, k, v, scores, weights, out };
 }
+
+/** `W_O` applied to the two heads' concatenated outputs. */
+function projectHeads(o1: Vec2, o2: Vec2): Vec2 {
+  return [
+    W_O[0] * o1[0] + W_O[1] * o1[1] + W_O[2] * o2[0] + W_O[3] * o2[1],
+    W_O[4] * o1[0] + W_O[5] * o1[1] + W_O[6] * o2[0] + W_O[7] * o2[1],
+  ];
+}
+
+/** Both heads run over the same positions, so the index is in range by construction. */
+function outAt(head: Head, i: number): Vec2 {
+  const o = head.out[i];
+  if (!o) throw new Error(`transformer: missing head output at ${i}`);
+  return o;
+}
+
+const widen = (vectors: readonly (readonly number[])[]): Float64Array[] =>
+  vectors.map((v) => Float64Array.from(v));
 
 /** The whole block in one call: everything the scene draws comes out of here. */
 export function forward(input: ForwardInput): Forward {
   const { embeddings, sequence, positional, causal } = input;
-  const pe = sequence.map((_, p) =>
-    positional
-      ? Float64Array.of(PE_SCALE * Math.cos(p), PE_SCALE * Math.sin(p))
-      : new Float64Array(2),
+
+  const pe: Vec2[] = sequence.map((_, p) =>
+    positional ? [PE_SCALE * Math.cos(p), PE_SCALE * Math.sin(p)] : [0, 0],
   );
-  const x = sequence.map((token, p) => {
+  const x = sequence.map((token, p): Vec2 => {
     const e = embeddings[token];
-    const offset = pe[p];
-    if (!e || !offset) throw new Error(`transformer: no embedding for token ${token}`);
-    return Float64Array.of(e[0] + at(offset, 0), e[1] + at(offset, 1));
+    if (!e) throw new Error(`transformer: no embedding for token ${token}`);
+    return add(e, pe[p] ?? [0, 0]);
   });
 
-  const heads = W_Q.map((_, h) => attend(x, h, causal));
-  const attnOut = x.map((_, i) => {
-    const concat = heads.flatMap((head) => {
-      const o = head.out[i];
-      if (!o) throw new Error(`transformer: missing head output at ${i}`);
-      return [at(o, 0), at(o, 1)];
-    });
-    const project = (r: number): number =>
-      concat.reduce((total, value, n) => total + cell(W_O, r * concat.length + n) * value, 0);
-    return Float64Array.of(project(0), project(1));
-  });
-  const xResid = x.map((v, i) => {
-    const a = attnOut[i];
-    if (!a) throw new Error(`transformer: missing attention output at ${i}`);
-    return Float64Array.of(at(v, 0) + at(a, 0), at(v, 1) + at(a, 1));
-  });
+  const heads = [attend(x, HEADS[0], causal), attend(x, HEADS[1], causal)] as const;
+  const attnOut = x.map((_, i) => projectHeads(outAt(heads[0], i), outAt(heads[1], i)));
+  const xResid = x.map((v, i) => add(v, attnOut[i] ?? [0, 0]));
 
-  const mlpHidden = xResid.map((v) => {
-    const h = new Float64Array(b1.length);
-    for (let n = 0; n < h.length; n++) {
-      h[n] = Math.tanh(cell(W1, 2 * n) * at(v, 0) + cell(W1, 2 * n + 1) * at(v, 1) + cell(b1, n));
-    }
-    return h;
-  });
-  const mlpOut = mlpHidden.map((h) => {
-    const m = new Float64Array(b2.length);
-    for (let r = 0; r < m.length; r++) {
-      let total = cell(b2, r);
-      for (let n = 0; n < h.length; n++) total += cell(W2, r * h.length + n) * at(h, n);
-      m[r] = total;
-    }
-    return m;
-  });
-  const xFinal = xResid.map((v, i) => {
-    const m = mlpOut[i];
-    if (!m) throw new Error(`transformer: missing MLP output at ${i}`);
-    return Float64Array.of(at(v, 0) + at(m, 0), at(v, 1) + at(m, 1));
-  });
+  const mlpHidden = xResid.map((v): Vec4 => [
+    Math.tanh(W1[0] * v[0] + W1[1] * v[1] + b1[0]),
+    Math.tanh(W1[2] * v[0] + W1[3] * v[1] + b1[1]),
+    Math.tanh(W1[4] * v[0] + W1[5] * v[1] + b1[2]),
+    Math.tanh(W1[6] * v[0] + W1[7] * v[1] + b1[3]),
+  ]);
+  const mlpOut = mlpHidden.map((h): Vec2 => [
+    W2[0] * h[0] + W2[1] * h[1] + W2[2] * h[2] + W2[3] * h[3] + b2[0],
+    W2[4] * h[0] + W2[5] * h[1] + W2[6] * h[2] + W2[7] * h[3] + b2[1],
+  ]);
+  const xFinal = xResid.map((v, i) => add(v, mlpOut[i] ?? [0, 0]));
 
   // Weight-tied unembedding: a logit is the final vector's dot product with a draggable point.
   const last = xFinal[xFinal.length - 1];
-  const logits = new Float64Array(embeddings.length);
-  for (let v = 0; v < embeddings.length; v++) {
-    const e = embeddings[v];
-    if (!last || !e) throw new Error(`transformer: cannot unembed ${v}`);
-    logits[v] = at(last, 0) * e[0] + at(last, 1) * e[1];
-  }
+  if (!last) throw new Error("transformer: forward needs at least one position");
+  const logits = Float64Array.from(embeddings, (e) => dot(last, e));
 
-  return { x, pe, heads, attnOut, xResid, mlpHidden, mlpOut, xFinal, logits };
+  return {
+    x: widen(x),
+    pe: widen(pe),
+    heads: heads.map((head) => ({
+      ...head, // scores and weights are already Float64Array rows of the mask's width
+      q: widen(head.q),
+      k: widen(head.k),
+      v: widen(head.v),
+      out: widen(head.out),
+    })),
+    attnOut: widen(attnOut),
+    xResid: widen(xResid),
+    mlpHidden: widen(mlpHidden),
+    mlpOut: widen(mlpOut),
+    xFinal: widen(xFinal),
+    logits,
+  };
 }
 
 /**
@@ -234,7 +248,6 @@ export function forward(input: ForwardInput): Forward {
  * rather than a whole forward pass.
  */
 export function probabilities(logits: Float64Array, t = 1): Float64Array {
-  const scaled = new Float64Array(logits.length);
-  for (let i = 0; i < scaled.length; i++) scaled[i] = at(logits, i) / t;
-  return softmax(scaled);
+  if (t <= 0) throw new Error(`transformer: probabilities needs T > 0, got ${t}`);
+  return softmax(Float64Array.from(logits, (logit) => logit / t));
 }

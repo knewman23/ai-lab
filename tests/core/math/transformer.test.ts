@@ -245,27 +245,9 @@ describe("probabilities", () => {
 describe("determinism", () => {
   it("returns equal numbers for two calls on equal inputs", () => {
     const embeddings = (): Embeddings => EMBEDDING_PRESETS.tuned.map(([x, y]) => [x, y] as const);
-    const plain = (f: Forward): unknown => ({
-      x: f.x.map((v) => Array.from(v)),
-      pe: f.pe.map((v) => Array.from(v)),
-      heads: f.heads.map((h) => ({
-        q: h.q.map((v) => Array.from(v)),
-        k: h.k.map((v) => Array.from(v)),
-        v: h.v.map((v) => Array.from(v)),
-        scores: h.scores.map((v) => Array.from(v)),
-        weights: h.weights.map((v) => Array.from(v)),
-        out: h.out.map((v) => Array.from(v)),
-      })),
-      attnOut: f.attnOut.map((v) => Array.from(v)),
-      xResid: f.xResid.map((v) => Array.from(v)),
-      mlpHidden: f.mlpHidden.map((v) => Array.from(v)),
-      mlpOut: f.mlpOut.map((v) => Array.from(v)),
-      xFinal: f.xFinal.map((v) => Array.from(v)),
-      logits: Array.from(f.logits),
-    });
     const input = { sequence: [...SEQUENCES["cat-sat"]], positional: true, causal: true };
-    expect(plain(forward({ ...input, embeddings: embeddings() }))).toEqual(
-      plain(forward({ ...input, embeddings: embeddings() })),
+    expect(forward({ ...input, embeddings: embeddings() })).toEqual(
+      forward({ ...input, embeddings: embeddings() }),
     );
   });
 });
