@@ -46,8 +46,9 @@ export const REGISTRY: readonly RegistryEntry[] = [
     topic: "machine-learning",
     title: "Backprop graph",
     summary:
-      "See the autograd graph behind backpropagation, laid out in 3D with forward and backward passes animated.",
-    status: "soon",
+      "Step through the forward and backward passes of a small autograd graph: values fill in, then gradients flow back along every edge with the local derivative written on it.",
+    status: "ready",
+    load: () => import("../viz/backprop").then((m) => m.backpropGraph),
   },
   {
     id: "neural-network",
