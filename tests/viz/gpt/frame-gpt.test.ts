@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { frameGpt } from "../../../src/viz/gpt/frame-gpt";
-import { FLOOR_Y, WALL_H } from "../../../src/viz/gpt/layout";
+import { FLOOR_Y, WALL_H, WALL_W } from "../../../src/viz/gpt/layout";
 
 describe("frameGpt", () => {
   it("targets a point between the wall's centre and the floor's near edge", () => {
@@ -21,9 +21,15 @@ describe("frameGpt", () => {
     expect(Math.abs(position[0] - target[0])).toBeLessThan(Math.abs(position[1] - target[1]) / 2);
   });
 
-  it("keeps the whole wall and floor in front of it, and is stable across calls", () => {
-    const a = frameGpt();
-    expect(a.position[1]).toBeLessThan(FLOOR_Y[0]);
-    expect(frameGpt()).toEqual(a);
+  it("stands back beyond the floor's near edge, far enough for both surfaces to fit", () => {
+    const { position, target } = frameGpt();
+    // Behind the whole floor, so nothing the scene draws is between the camera and the target.
+    expect(position[1]).toBeLessThan(FLOOR_Y[0]);
+    const distance = Math.hypot(
+      position[0] - target[0],
+      position[1] - target[1],
+      position[2] - target[2],
+    );
+    expect(distance).toBeGreaterThan(Math.max(WALL_W, WALL_H, FLOOR_Y[1] - FLOOR_Y[0]));
   });
 });

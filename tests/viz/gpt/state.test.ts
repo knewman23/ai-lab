@@ -5,6 +5,7 @@ import {
   TEMPERATURE_RANGE,
   derived,
   initialState,
+  pass,
   resetEmbeddings,
   setCausal,
   setEmbedding,
@@ -55,6 +56,23 @@ describe("gpt scene state", () => {
     ];
     for (const next of results) expect(next).not.toBe(s);
     expect(snapshot(s)).toBe(before);
+  });
+
+  it("setHead, setStage and setResidualPath each set what they name", () => {
+    const s = initialState();
+    expect(setHead(s, "head1").head).toBe("head1");
+    expect(setHead(setHead(s, "head1"), "head2").head).toBe("head2");
+    expect(setStage(s, "weighted").stage).toBe("weighted");
+    expect(setResidualPath(s, false).residualPath).toBe(false);
+    expect(setResidualPath(setResidualPath(s, false), true).residualPath).toBe(true);
+    // The rest of the state comes across untouched.
+    expect({ ...setStage(s, "weighted"), stage: s.stage }).toEqual(s);
+  });
+
+  // Five positions is a spec constant, and `setQuery`'s bound and the column layout both assume it.
+  // A fourth sentence of a different length should fail here rather than leave `query` stale.
+  it("every sequence has the five positions the layout draws", () => {
+    for (const sequence of Object.values(SEQUENCES)) expect(sequence).toHaveLength(5);
   });
 
   it("setSentence switches the sequence and keeps the embeddings", () => {
@@ -115,6 +133,16 @@ describe("gpt scene state", () => {
     expect([...derived(setTemperature(s, 3)).pass.logits]).toEqual([...d.pass.logits]);
   });
 
+  it("pass is the forward half on its own, so a temperature move can skip it", () => {
+    const s = initialState();
+    expect(pass(s)).toEqual(derived(s).pass);
+    // Nothing in `pass` depends on the temperature, which is what lets the assembler cache it.
+    expect(pass(setTemperature(s, 2.5))).toEqual(pass(s));
+    expect([...probabilities(pass(s).logits, 2.5)]).toEqual([
+      ...derived(setTemperature(s, 2.5)).probabilities,
+    ]);
+  });
+
   it("derived feeds the toggles into the forward pass, not just the panel", () => {
     const s = initialState();
     const masked = derived(s).pass;
@@ -126,7 +154,12 @@ describe("gpt scene state", () => {
       expect(head.weights.map((row) => row.length)).toEqual([5, 5, 5, 5, 5]);
     }
     // Positional encoding reaches it too: pe(p) goes to zero when the toggle is off.
-    expect([...(derived(setPositional(s, false)).pass.pe[1] ?? [])]).toEqual([0, 0]);
-    expect([...(masked.pe[1] ?? [])]).not.toEqual([0, 0]);
+    const off = derived(setPositional(s, false)).pass;
+    const zero = Float64Array.from([0, 0]);
+    expect(off.pe).toHaveLength(5);
+    expect(off.pe[1]).toEqual(zero);
+    expect(masked.pe).toHaveLength(5);
+    expect(masked.pe[1]).toBeInstanceOf(Float64Array);
+    expect(masked.pe[1]).not.toEqual(zero);
   });
 });

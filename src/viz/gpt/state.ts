@@ -127,17 +127,25 @@ export function setResidualPath(s: GptState, on: boolean): GptState {
 }
 
 /**
- * Runs the block and the output softmax. Allocates on every call, so call it once per state
- * change rather than in a hot loop; the temperature is not an input to `forward`, so a scene
- * that memoises the pass can still move the slider without recomputing it.
+ * The expensive half: the whole block, for everything in the state that `forward` takes as input.
+ * Exported separately from `derived` so an assembler can recompute it only when one of those four
+ * inputs changed and answer a temperature move with `probabilities(cached.logits, T)` alone.
  */
-export function derived(s: GptState): Derived {
-  const sequence = SEQUENCES[s.sentence];
-  const pass = forward({
+export function pass(s: GptState): Forward {
+  return forward({
     embeddings: s.embeddings,
-    sequence,
+    sequence: SEQUENCES[s.sentence],
     positional: s.positional,
     causal: s.causal,
   });
-  return { sequence, pass, probabilities: probabilities(pass.logits, s.temperature) };
+}
+
+/** Both halves together, for callers with nothing to memoise. Allocates on every call. */
+export function derived(s: GptState): Derived {
+  const forwardPass = pass(s);
+  return {
+    sequence: SEQUENCES[s.sentence],
+    pass: forwardPass,
+    probabilities: probabilities(forwardPass.logits, s.temperature),
+  };
 }
