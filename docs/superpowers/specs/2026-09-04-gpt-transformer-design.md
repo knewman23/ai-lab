@@ -314,7 +314,7 @@ Vector magnitudes across all presets, sentences and stages run from 0.02 to 5.63
 linear scale with a hard clamp would saturate on the `spread` preset and stop responding to
 drags. `tanh` is monotone, never reaches the 0.55 ceiling — under half the 1.2 column pitch,
 so an arrow can never touch its neighbour — and still separates the common range:
-`|v| = 1.6` gives 0.37, `|v| = 2.6` gives 0.44, `|v| = 5.6` gives 0.55.
+`|v| = 1.6` gives 0.37, `|v| = 2.6` gives 0.47, `|v| = 5.6` gives 0.55.
 
 ## 5. Scene
 
@@ -487,7 +487,7 @@ src/viz/gpt/state.ts                GptState, derived, setters
 src/viz/gpt/layout.ts               constants, floorFromEmbed / embedFromFloor, glyph math
 src/viz/gpt/wall-bands.ts           band lines + focus dimming
 src/viz/gpt/columns.ts              columns, vector glyphs, selection
-src/viz/gpt/hit-boxes.ts            five column pick targets
+src/viz/gpt/column-pick.ts          five column pick targets + click discrimination
 src/viz/gpt/arcs.ts                 ribbon meshes
 src/viz/gpt/arcs-geometry.ts        pure Bézier + triangle-strip math
 src/viz/gpt/bars.ts                 probability bars
