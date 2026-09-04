@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { Graph } from "../../../src/core/math/autograd";
 import { nodeById } from "../../../src/core/math/autograd";
 import { GRAPHS } from "../../../src/core/math/graphs";
-import { WALL_H, WALL_W, Z_RANGE, layoutGraph } from "../../../src/viz/backprop/layout";
+import { WALL_H, WALL_W, Z_RANGE, layoutGraph, wallPoint } from "../../../src/viz/backprop/layout";
 import type { Positions } from "../../../src/viz/backprop/layout";
 
 function columns(pos: Positions): number[] {
@@ -112,4 +112,12 @@ describe("backprop layout", () => {
       }
     },
   );
+});
+
+describe("wallPoint", () => {
+  it("maps a layout (X, Z) to world (X, 0, Z) and throws on an unknown id", () => {
+    const positions = { a: [-3, 2] as const };
+    expect(wallPoint(positions, "a")).toEqual([-3, 0, 2]);
+    expect(() => wallPoint(positions, "zz")).toThrow(/zz/);
+  });
 });

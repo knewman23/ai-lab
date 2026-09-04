@@ -1,22 +1,12 @@
 import type { Graph } from "../../core/math/autograd";
 import { nodeById } from "../../core/math/autograd";
-import type { Segment, Vec3 } from "../shared/layer";
+import type { Segment } from "../shared/layer";
 import { segment } from "../shared/lift";
-import type { Positions } from "./layout";
-
-/** Lift off the wall toward -y, the camera side, so edges are not z-fought by the wall. */
-export const LIFT_WALL: Vec3 = [0, -0.01, 0];
-
-/** Where a node sits on the wall (y = 0), from its layout (X, Z). */
-function onWall(positions: Positions, id: string): Vec3 {
-  const p = positions[id];
-  if (p === undefined) throw new Error(`edges: node "${id}" has no layout position`);
-  return [p[0], 0, p[1]];
-}
+import { LIFT_WALL, type Positions, wallPoint } from "./layout";
 
 /** The lifted segment from `from` to `to` on the wall. */
 function edge(positions: Positions, from: string, to: string): Segment {
-  return segment(onWall(positions, from), onWall(positions, to), LIFT_WALL);
+  return segment(wallPoint(positions, from), wallPoint(positions, to), LIFT_WALL);
 }
 
 /**

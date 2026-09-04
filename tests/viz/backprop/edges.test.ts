@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import type { Graph, GraphNode } from "../../../src/core/math/autograd";
 import { GRAPHS } from "../../../src/core/math/graphs";
 import { createThemeColors } from "../../../src/core/theme";
 import { createEdges } from "../../../src/viz/backprop/edges";
@@ -81,6 +82,22 @@ describe("createEdges", () => {
     expect(edges.layers.all.object.renderOrder).toBe(2);
     expect(edges.layers.active.object.renderOrder).toBe(3);
     expect(edges.layers.all.kind).toBe("world");
+    edges.dispose();
+  });
+
+  it("throws in DEV when a graph has more edges than the buffer holds", () => {
+    const { edges } = make();
+    // 13 add nodes each fed by two leaves: 26 edges, more than the 12-edge buffer.
+    const nodes: GraphNode[] = [
+      { id: "p", label: "p", op: "leaf", inputs: [] },
+      { id: "q", label: "q", op: "leaf", inputs: [] },
+      ...Array.from({ length: 13 }, (_, i): GraphNode => {
+        return { id: `s${i}`, label: `s${i}`, op: "add", inputs: ["p", "q"] };
+      }),
+    ];
+    const big: Graph = { key: "big", title: "big", nodes, output: "s0", leaves: [], hint: "" };
+    const positions = Object.fromEntries(nodes.map((n, i) => [n.id, [i, 1] as const]));
+    expect(() => edges.set(big, positions)).toThrow(/do not fit/);
     edges.dispose();
   });
 

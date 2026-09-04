@@ -1,5 +1,6 @@
 import type { Graph } from "../../core/math/autograd";
 import { nodeById } from "../../core/math/autograd";
+import type { Vec3 } from "../shared/layer";
 
 /** Width (X extent) of the wall the graph is drawn on; columns are spread across it. */
 export const WALL_W = 10;
@@ -8,8 +9,18 @@ export const WALL_H = 6;
 /** Z of the lowest and highest rows in a multi-row column. */
 export const Z_RANGE: readonly [number, number] = [0.8, 5.2];
 
+/** Lift off the wall toward -y, the camera side, so lines drawn on it are not z-fought by the wall. */
+export const LIFT_WALL: Vec3 = [0, -0.01, 0];
+
 /** Node id → (X, Z) on the wall. */
 export type Positions = Readonly<Record<string, readonly [number, number]>>;
+
+/** Where a laid-out node sits in the world: (X, 0, Z) on the wall y = 0; throws on an unknown id. */
+export function wallPoint(positions: Positions, id: string): Vec3 {
+  const p = positions[id];
+  if (p === undefined) throw new Error(`layout: node "${id}" has no position`);
+  return [p[0], 0, p[1]];
+}
 
 /** Node id → longest path from a leaf (leaves 0). Recursion is bounded by the graph being a DAG. */
 function depths(g: Graph): ReadonlyMap<string, number> {

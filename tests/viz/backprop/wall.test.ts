@@ -1,4 +1,4 @@
-import { MeshBasicMaterial, PlaneGeometry } from "three";
+import { Box3, MeshBasicMaterial, PlaneGeometry } from "three";
 import { describe, expect, it, vi } from "vitest";
 import { createThemeColors } from "../../../src/core/theme";
 import { createWall } from "../../../src/viz/backprop/wall";
@@ -21,6 +21,21 @@ describe("createWall", () => {
     expect(m.depthWrite).toBe(false);
     expect(m.color.equals(theme.faint)).toBe(true);
     expect(wall.mesh.renderOrder).toBe(0);
+    wall.dispose();
+  });
+
+  it("covers x in [-5, 5], y = 0, z in [0, 6] once the mesh transform is applied", () => {
+    const { wall } = make();
+    wall.mesh.updateMatrixWorld(true);
+    const world = wall.mesh.geometry.clone().applyMatrix4(wall.mesh.matrixWorld);
+    const box = new Box3().setFromBufferAttribute(world.getAttribute("position") as never);
+    expect(box.min.x).toBeCloseTo(-5, 6);
+    expect(box.max.x).toBeCloseTo(5, 6);
+    expect(box.min.y).toBeCloseTo(0, 6);
+    expect(box.max.y).toBeCloseTo(0, 6);
+    expect(box.min.z).toBeCloseTo(0, 6);
+    expect(box.max.z).toBeCloseTo(6, 6);
+    world.dispose();
     wall.dispose();
   });
 

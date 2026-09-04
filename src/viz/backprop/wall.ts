@@ -3,8 +3,7 @@ import type { ThemeColors } from "../types";
 import { disposeLayers, type Layer, lineLayer, type Segment, type Vec3 } from "../shared/layer";
 import { writeWorldSegments } from "../shared/layer-write";
 import { segment } from "../shared/lift";
-import { LIFT_WALL } from "./edges-geometry";
-import { WALL_H, WALL_W } from "./layout";
+import { LIFT_WALL, WALL_H, WALL_W } from "./layout";
 
 export interface Wall {
   readonly group: Group;
