@@ -1,7 +1,7 @@
 # Backprop graph — the notebook-01 autograd DAG with stepped forward and backward passes
 
 Date: 2026-09-03
-Status: draft (revision 3, after spec review round 2)
+Status: as built (revision 4: browser-check changes to camera, colours and label styling; revision 3 after spec review round 2)
 Parent: [AI Lab design](2026-09-03-ai-lab-design.md); siblings: [Chain rule graph](2026-09-03-chain-rule-graph-design.md), [Gradient descent](2026-09-03-ai-lab-design.md)
 Registry: replaces the `machine-learning` roadmap entry `backprop-graph`
 Source material: `ai-frontier/notebooks/01-derivatives-and-the-numerical-gradient.ipynb` (the `Value`
@@ -100,12 +100,13 @@ share a position.
 
 Shared Z-up scene kit; camera on the −y side.
 
-**Wall.** `PlaneGeometry(10, 6)` at y = 0 centred (0, 0, 3), translucent (`--faint`, opacity .35,
+**Wall.** `PlaneGeometry(10, 6)` at y = 0 centred (0, 0, 3), translucent (`--faint`, opacity .18 (was .35;
+lowered in the browser check so edges and labels read),
 `DoubleSide`, `depthWrite: false`, renderOrder 0) with an outline (`--line`), as the chain rule's
 faces; reuse `createFaces`-style code but with one face (a small `wall.ts`).
 
 **Edges.** Lines on the wall (`{ depth: true }` layer, lifted 0.01 toward −y) from each input to
-its consumer, `--line`. During a backward step the edges into the active node are drawn in
+its consumer, `--soft` (the spec first said `--line`, which was near-invisible on the wall). During a backward step the edges into the active node are drawn in
 `--accent` (second layer, renderOrder 3); during a forward step likewise. Direction is implied by
 layout (left → right).
 
@@ -140,14 +141,14 @@ edge into the active node gets an `edge` label at its midpoint with the local de
 when the step advances. Every input pair in the shipped presets is distinct, so edge labels never
 coincide. CSS in `styles/panel.css` next to `.canvas-hint`: `.viz-labels` absolute inset 0 overflow hidden
 `pointer-events: none` `user-select: none`;
-spans `font: 12px var(--mono)`, `color: var(--ink)`; `.value` and `.grad` use `--soft` and
-`--accent`; `.edge` has a `--bg` pill background. `update` runs when the camera moved, the labels changed, or the canvas was resized (the projection
+spans `font: 500 13px var(--mono)`, `color: var(--ink)`, on a translucent `--bg` pill (78%) so they
+read over the wall and bars; `.op` has no pill; `.value` uses `--ink` and `.grad` `--accent`; `.edge` has a `--bg` pill background. `update` runs when the camera moved, the labels changed, or the canvas was resized (the projection
 matrix changes on resize while nothing else does; the assembler's `resize` marks labels dirty).
 A leaf edit during a backward step rewrites the active edge labels too, since they carry values.
 
-**Camera.** `frame-wall.ts`: target (0, 0, 3); position target + 12·(0.55, −1.05, 0.5) ≈ (6.6,
-−12.6, 9); the wall nearly face-on from slightly right and above, so both bar directions read.
-Tune in the browser check (spec fixes the octant +x, −y, +z).
+**Camera.** `frame-wall.ts`: target (0, 0, 3); position target + 12·(0.8, −1.05, 0.5) = (9.6, −12.6, 9): about
+35° right of face-on and 30° above, so the bars along ±y read as lengths while the graph stays
+legible (the first value, 0.55, was too face-on; 1.15 too oblique). Octant +x, −y, +z.
 
 ## 6. State (`viz/backprop/state.ts`, pure, unit-tested)
 
@@ -187,8 +188,8 @@ loop's 1 s idle cutoff never starves the timer (reduced motion: same cadence; st
 4. Buttons: Reset, Reset view.
 5. Toggles: Value bars, Grad bars, Edge derivatives.
 
-Readouts: output value (`o = 0.7071`); one row per leaf: `x1  2   ∂ −1.5` (grad shown as "—" until
-revealed).
+Readouts: output row and one row per leaf, each `<value>  ∂ <grad>` with either half "—" until the
+pass has revealed it (the output's value appears after its forward step).
 
 Explanation (KaTeX via `createEquation`): the chain rule as backprop uses it,
 `\frac{\partial L}{\partial x} = \frac{\partial L}{\partial y}\cdot\frac{\partial y}{\partial x}`;

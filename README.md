@@ -8,10 +8,11 @@ a study tool and a portfolio piece. Live at
 ![Matrix transformation](docs/screenshots/matrix-transformation-light.png)
 ![Derivative and tangent explorer](docs/screenshots/derivative-light.png)
 ![Chain rule graph](docs/screenshots/chain-rule-light.png)
+![Backprop graph](docs/screenshots/backprop-light.png)
 
 ## What's in it
 
-Four scenes so far.
+Five scenes so far.
 
 **Gradient descent** on a draggable 3D loss surface. Drag the ball anywhere on the surface
 and watch the gradient arrow and tangent plane follow it, pick SGD, momentum or Adam and
@@ -35,6 +36,13 @@ side wall and the composite y = f(g(x)) on the floor. Drag x on the front wall o
 slider; the Δu leg is shared by both walls and the Δy leg by the side wall and the floor, so
 Δy/Δx = (Δy/Δu)(Δu/Δx) is there to be read off the picture. Shrink Δx and the three secants become
 tangents while the readouts converge on the product of the derivatives. Five presets of f and g.
+
+**Backprop graph.** The `Value` autograd graph from the first ai-frontier notebook, laid out on a
+wall with a value bar and a gradient bar sticking out of every node. Step or play the forward pass
+and watch values fill in node by node; step the backward pass and watch gradients flow back along
+each edge with the local derivative written on it. Drag a leaf's bar or move its slider and every
+revealed number recomputes. Three graphs: the tanh neuron, a·b + c, and one where a node feeds two
+consumers so its gradient visibly accumulates.
 
 ## Run it
 
@@ -152,7 +160,9 @@ The registry test asserts the loaded module's `id`, `topic`, `title` and
 1. ~~Matrix transformation (linear algebra)~~ — shipped: drag the two basis vectors of a 2×2
    matrix, watch the plane and unit square deform, see the determinant as signed area and
    eigenvectors as the lines that don't turn.
-2. Backprop graph (machine learning) — the `Value` autograd graph laid out in 3D.
+2. ~~Backprop graph (machine learning)~~ — shipped: the `Value` autograd graph on a wall with value
+   and gradient bars, a stepped forward and backward pass, local derivatives on the active edges,
+   and editable leaves.
 3. Neural network (machine learning) — a small MLP with a live forward pass and training.
 4. GPT transformer (machine learning) — token embeddings, attention heads, residual stream.
 5. ~~Derivative & tangent explorer (calculus)~~ — shipped: drag a point along a curve on a
