@@ -54,6 +54,8 @@ describe("createWall", () => {
     expect(box.max.x).toBeCloseTo(4, 6);
     expect(box.min.z).toBeCloseTo(0, 6);
     expect(box.max.z).toBeCloseTo(4, 6);
+    expect(box.min.y).toBeCloseTo(0, 6);
+    expect(box.max.y).toBeCloseTo(0, 6);
     expect((wall.mesh.material as MeshBasicMaterial).opacity).toBe(0.3);
     wall.dispose();
   });

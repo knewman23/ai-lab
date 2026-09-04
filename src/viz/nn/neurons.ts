@@ -1,4 +1,5 @@
 import { Group, Mesh, MeshStandardMaterial, SphereGeometry } from "three";
+import { DOMAIN } from "../../core/math/datasets";
 import { SIZES } from "../../core/math/mlp";
 import type { ThemeColors } from "../types";
 import { LIFT_WALL, neuronPosition } from "./layout";
@@ -7,7 +8,10 @@ export interface Neurons {
   readonly group: Group;
   /** One mesh per neuron, layer-major (layer 0 first); read by tests and by the labels. */
   readonly meshes: readonly Mesh[];
-  /** Sizes and colours every neuron from one activation per layer, in `SIZES` order. */
+  /**
+   * Sizes and colours every neuron from `forward`'s output verbatim, one array
+   * per layer in `SIZES` order.
+   */
   set(activations: readonly ArrayLike<number>[]): void;
   dispose(): void;
 }
@@ -22,6 +26,11 @@ const ORDER = 10;
  * The network's neurons: one sphere per unit, sitting on the wall at its layout
  * point, its radius growing with |activation| and its colour taken from the
  * activation's sign — ink for positive, accent for negative.
+ *
+ * `set` scales the input layer itself: layer 0 arrives from `forward` as the raw
+ * probe coordinates in [−3, 3], so it is divided by `DOMAIN[1]` before sizing,
+ * while layers 1–3 are already in [−1, 1]. A caller that forgot would draw a
+ * plausible-looking wrong picture, since the radius formula clamps at |a| = 1.
  *
  * One unit-radius geometry is shared by every sphere and scaled per mesh, and
  * the two colours are two shared materials swapped onto a mesh by sign, so a
@@ -62,9 +71,13 @@ export function createNeurons(theme: ThemeColors): Neurons {
       let n = 0;
       for (let l = 0; l < SIZES.length; l++) {
         for (let i = 0; i < SIZES[l]!; i++, n++) {
-          const a = activations[l]?.[i] ?? 0;
+          // A mis-shaped array must surface as a NaN scale, not as a plausible picture.
+          const raw = activations[l]![i]!;
+          const a = l === 0 ? raw / DOMAIN[1] : raw;
           const mesh = meshes[n]!;
           mesh.scale.setScalar(BASE_RADIUS + RADIUS_GAIN * Math.min(1, Math.abs(a)));
+          // Exactly 0 takes ink -- the common case is the probe resting at the
+          // origin -- deliberately unlike the section 6 readout's "-1" tie-break.
           mesh.material = a < 0 ? accentMaterial : inkMaterial;
         }
       }

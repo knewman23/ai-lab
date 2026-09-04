@@ -1,5 +1,6 @@
-import type { Mesh, MeshStandardMaterial } from "three";
+import type { Mesh, MeshStandardMaterial, SphereGeometry } from "three";
 import { describe, expect, it, vi } from "vitest";
+import { DOMAIN } from "../../../src/core/math/datasets";
 import { SIZES } from "../../../src/core/math/mlp";
 import { createThemeColors } from "../../../src/core/theme";
 import { neuronPosition } from "../../../src/viz/nn/layout";
@@ -19,11 +20,17 @@ function make() {
   return { neurons, theme };
 }
 
-/** Layer-major (l, i) pairs in creation order, with the activation at each. */
+/**
+ * Layer-major (l, i) pairs in creation order, with the activation at each already
+ * scaled the way `set` scales it: layer 0 arrives in the probe domain [−3, 3].
+ */
 function cells(): readonly { l: number; i: number; a: number }[] {
   const out: { l: number; i: number; a: number }[] = [];
   for (let l = 0; l < SIZES.length; l++) {
-    for (let i = 0; i < SIZES[l]!; i++) out.push({ l, i, a: ACTIVATIONS[l]![i]! });
+    for (let i = 0; i < SIZES[l]!; i++) {
+      const raw = ACTIVATIONS[l]![i]!;
+      out.push({ l, i, a: l === 0 ? raw / DOMAIN[1] : raw });
+    }
   }
   return out;
 }
@@ -43,6 +50,16 @@ describe("createNeurons", () => {
     neurons.dispose();
   });
 
+  it("shares one unit-radius geometry, drawn above the flat layers", () => {
+    const { neurons } = make();
+    for (const mesh of neurons.meshes) {
+      expect((mesh.geometry as SphereGeometry).parameters.radius).toBe(1);
+      expect(mesh.renderOrder).toBe(10);
+      expect(materialOf(mesh).roughness).toBe(0.5);
+    }
+    neurons.dispose();
+  });
+
   it("scales each unit sphere to the radius its activation asks for", () => {
     const { neurons } = make();
     cells().forEach(({ a }, n) => {
@@ -52,6 +69,17 @@ describe("createNeurons", () => {
       expect(y).toBeCloseTo(r, 9);
       expect(z).toBeCloseTo(r, 9);
     });
+    neurons.dispose();
+  });
+
+  it("scales the input layer from the probe domain before sizing it", () => {
+    const { neurons } = make();
+    neurons.set([[3, -3], ...ACTIVATIONS.slice(1)]);
+    expect(neurons.meshes[0]!.scale.x).toBeCloseTo(0.22, 9);
+    expect(neurons.meshes[1]!.scale.x).toBeCloseTo(0.22, 9);
+    neurons.set([[1.5, 0], ...ACTIVATIONS.slice(1)]);
+    expect(neurons.meshes[0]!.scale.x).toBeCloseTo(0.15, 9);
+    expect(neurons.meshes[1]!.scale.x).toBeCloseTo(0.08, 9);
     neurons.dispose();
   });
 

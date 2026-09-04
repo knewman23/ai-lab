@@ -6,6 +6,8 @@ import type { Vec3 } from "../shared/layer";
 export const WALL_W = 10;
 /** Height (Z extent) of the wall. */
 export const WALL_H = 6;
+/** Translucent enough that edges and bars behind the wall stay readable. */
+export const WALL_OPACITY = 0.18;
 /** Z of the lowest and highest rows in a multi-row column. */
 export const Z_RANGE: readonly [number, number] = [0.8, 5.2];
 
