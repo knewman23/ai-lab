@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { mulberry32 } from "../../../src/core/math/prng";
+import { gaussian, mulberry32 } from "../../../src/core/math/prng";
 
 function firstThree(seed: number): number[] {
   const rand = mulberry32(seed);
@@ -26,5 +26,17 @@ describe("mulberry32", () => {
 
   it("gives different streams for different seeds", () => {
     expect(firstThree(1)).not.toEqual(firstThree(2));
+  });
+});
+
+describe("gaussian", () => {
+  it("is standard normal over 10k deterministic draws", () => {
+    const rand = mulberry32(1);
+    const n = 10_000;
+    const draws = Array.from({ length: n }, () => gaussian(rand));
+    const mean = draws.reduce((a, b) => a + b, 0) / n;
+    const variance = draws.reduce((a, b) => a + (b - mean) ** 2, 0) / (n - 1);
+    expect(Math.abs(mean)).toBeLessThan(0.03);
+    expect(Math.abs(Math.sqrt(variance) - 1)).toBeLessThan(0.03);
   });
 });

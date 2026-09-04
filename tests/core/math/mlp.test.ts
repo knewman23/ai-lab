@@ -11,7 +11,7 @@ import {
   step,
   type Params,
 } from "../../../src/core/math/mlp";
-import { DATASETS } from "../../../src/core/math/datasets";
+import { DATASETS, DOMAIN } from "../../../src/core/math/datasets";
 
 const xor = DATASETS.xor;
 
@@ -183,9 +183,13 @@ describe("boundaryGrid", () => {
       expect(v).toBeGreaterThanOrEqual(-1);
       expect(v).toBeLessThanOrEqual(1);
     }
-    expect(grid[0]).toBeCloseTo(predict(p, [-3, -3]), 6);
-    expect(grid[7]).toBeCloseTo(predict(p, [3, -3]), 6);
+    expect(grid[0]).toBeCloseTo(predict(p, [DOMAIN[0], DOMAIN[0]]), 6);
+    expect(grid[7]).toBeCloseTo(predict(p, [DOMAIN[1], DOMAIN[0]]), 6);
     expect(grid[8]).not.toBe(grid[0]);
+  });
+
+  it("rejects a grid too small to have a step", () => {
+    expect(() => boundaryGrid(initParams(1), 1)).toThrow(/n >= 2/);
   });
 
   it("defaults to a 40 × 40 grid", () => {

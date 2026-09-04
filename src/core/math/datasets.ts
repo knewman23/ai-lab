@@ -1,7 +1,22 @@
-import type { DataPoint, Dataset } from "./mlp";
 import { gaussian, mulberry32 } from "./prng";
 
 export type DatasetKey = "xor" | "moons" | "circles";
+
+/** One labelled 2D point; targets are ±1 to match the tanh output. */
+export interface DataPoint {
+  readonly x: readonly [number, number];
+  readonly y: 1 | -1;
+}
+
+/** A toy classification problem, built once at module load and never re-rolled. */
+export interface Dataset {
+  readonly key: DatasetKey;
+  readonly title: string;
+  readonly points: readonly DataPoint[];
+  /** A weight-init seed verified to train this dataset to ≥ 0.9 accuracy at the default lr. */
+  readonly startSeed: number;
+  readonly hint: string;
+}
 
 /** Ordered as in the spec's dataset table; `xor` is the default. */
 export const DATASET_KEYS = ["xor", "moons", "circles"] as const satisfies readonly DatasetKey[];
@@ -21,7 +36,11 @@ function point(x: number, y: number, label: 1 | -1, rand: () => number, sigma: n
   };
 }
 
-/** Ten points around each of the four centres (±1.5, ±1.5); the two diagonals are the two classes. */
+/**
+ * Ten points around each of the four centres (±1.5, ±1.5); the two diagonals are the two classes.
+ * A point's label comes from its cluster's quadrant, not from the signs of its own noisy
+ * coordinates, so the classes stay exactly 20/20 however far a sample wanders.
+ */
 function xorPoints(seed: number): readonly DataPoint[] {
   const rand = mulberry32(seed);
   const points: DataPoint[] = [];

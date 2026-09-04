@@ -1,4 +1,5 @@
-import type { DatasetKey } from "./datasets";
+import type { Dataset } from "./datasets";
+import { DOMAIN } from "./datasets";
 import { mulberry32 } from "./prng";
 
 /** The one architecture the scene shows: two inputs, two hidden layers of four, one output. */
@@ -10,22 +11,6 @@ export interface Params {
   readonly biases: readonly Float64Array[];
 }
 
-/** One labelled 2D point; targets are ±1 to match the tanh output. */
-export interface DataPoint {
-  readonly x: readonly [number, number];
-  readonly y: 1 | -1;
-}
-
-/** A toy classification problem, built once at module load and never re-rolled. */
-export interface Dataset {
-  readonly key: DatasetKey;
-  readonly title: string;
-  readonly points: readonly DataPoint[];
-  /** A weight-init seed verified to train this dataset to ≥ 0.9 accuracy at the default lr. */
-  readonly startSeed: number;
-  readonly hint: string;
-}
-
 /**
  * Uniform(−1, 1) weights and biases, micrograd style. The draw order is fixed so a seed pins the
  * whole parameter set: for each layer in order, the weight matrix row-major, then that layer's biases.
@@ -35,8 +20,9 @@ export function initParams(seed: number): Params {
   const weights: Float64Array[] = [];
   const biases: Float64Array[] = [];
   for (let l = 0; l + 1 < SIZES.length; l++) {
-    const inputs = SIZES[l] ?? 0;
-    const outputs = SIZES[l + 1] ?? 0;
+    const inputs = SIZES[l];
+    const outputs = SIZES[l + 1];
+    if (inputs === undefined || outputs === undefined) throw new Error(`mlp: missing layer ${l}`);
     const w = new Float64Array(outputs * inputs);
     for (let i = 0; i < w.length; i++) w[i] = 2 * rand() - 1;
     const b = new Float64Array(outputs);
@@ -150,14 +136,19 @@ export function accuracy(p: Params, d: Dataset): number {
   return correct / d.points.length;
 }
 
-/** The output over the whole domain, row-major entry `ix + n·iy`, x and y both increasing −3 → 3. */
+/**
+ * The output over `DOMAIN` × `DOMAIN`, row-major entry `ix + n·iy` with x and y both increasing
+ * from the domain's low end to its high end, so the grid matches the floor and the probe's clamp.
+ * `n` is the number of samples per axis and must be at least 2 (n − 1 is the step count).
+ */
 export function boundaryGrid(p: Params, n = 40): Float32Array {
+  if (n < 2) throw new Error(`mlp: boundaryGrid needs n >= 2, got ${n}`);
+  const [low, high] = DOMAIN;
+  const at = (i: number): number => low + ((high - low) * i) / (n - 1);
   const grid = new Float32Array(n * n);
   for (let iy = 0; iy < n; iy++) {
-    const y = -3 + (6 * iy) / (n - 1);
-    for (let ix = 0; ix < n; ix++) {
-      grid[ix + n * iy] = predict(p, [-3 + (6 * ix) / (n - 1), y]);
-    }
+    const y = at(iy);
+    for (let ix = 0; ix < n; ix++) grid[ix + n * iy] = predict(p, [at(ix), y]);
   }
   return grid;
 }

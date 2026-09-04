@@ -1,6 +1,6 @@
-import type { DatasetKey } from "../../core/math/datasets";
+import type { Dataset, DatasetKey } from "../../core/math/datasets";
 import { DATASETS, DOMAIN } from "../../core/math/datasets";
-import type { Dataset, Params } from "../../core/math/mlp";
+import type { Params } from "../../core/math/mlp";
 import { accuracy, forward, gradients, initParams, loss, step } from "../../core/math/mlp";
 
 /** Overlay toggles shown alongside the visualization. */

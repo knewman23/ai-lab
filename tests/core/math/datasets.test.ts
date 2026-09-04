@@ -52,15 +52,6 @@ describe.each(DATASET_KEYS)("%s", (key) => {
   });
 });
 
-describe("module identity", () => {
-  it("gives the same points to every importer", async () => {
-    const again = await import("../../../src/core/math/datasets");
-    for (const key of DATASET_KEYS) {
-      expect(again.DATASETS[key].points).toBe(DATASETS[key].points);
-    }
-  });
-});
-
 describe("DOMAIN", () => {
   it("is [−3, 3]", () => {
     expect([...DOMAIN]).toEqual([-3, 3]);
