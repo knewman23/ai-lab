@@ -187,6 +187,24 @@ function outAt(head: Head, i: number): Vec2 {
   return o;
 }
 
+/** `tanh(W1 x + b1)`, the four hidden activations. */
+function mlpHiddenAt(v: Vec2): Vec4 {
+  return [
+    Math.tanh(W1[0] * v[0] + W1[1] * v[1] + b1[0]),
+    Math.tanh(W1[2] * v[0] + W1[3] * v[1] + b1[1]),
+    Math.tanh(W1[4] * v[0] + W1[5] * v[1] + b1[2]),
+    Math.tanh(W1[6] * v[0] + W1[7] * v[1] + b1[3]),
+  ];
+}
+
+/** `W2 h + b2`, back down to the residual stream's two dimensions. */
+function mlpOutAt(h: Vec4): Vec2 {
+  return [
+    W2[0] * h[0] + W2[1] * h[1] + W2[2] * h[2] + W2[3] * h[3] + b2[0],
+    W2[4] * h[0] + W2[5] * h[1] + W2[6] * h[2] + W2[7] * h[3] + b2[1],
+  ];
+}
+
 const widen = (vectors: readonly (readonly number[])[]): Float64Array[] =>
   vectors.map((v) => Float64Array.from(v));
 
@@ -194,30 +212,37 @@ const widen = (vectors: readonly (readonly number[])[]): Float64Array[] =>
 export function forward(input: ForwardInput): Forward {
   const { embeddings, sequence, positional, causal } = input;
 
-  const pe: Vec2[] = sequence.map((_, p) =>
-    positional ? [PE_SCALE * Math.cos(p), PE_SCALE * Math.sin(p)] : [0, 0],
-  );
-  const x = sequence.map((token, p): Vec2 => {
+  // Each stage builds its own output and the residual point that carries it, in one pass, so no
+  // stage has to index back into the one before it.
+  const pe: Vec2[] = [];
+  const x: Vec2[] = [];
+  sequence.forEach((token, p) => {
     const e = embeddings[token];
     if (!e) throw new Error(`transformer: no embedding for token ${token}`);
-    return add(e, pe[p] ?? [0, 0]);
+    const offset: Vec2 = positional ? [PE_SCALE * Math.cos(p), PE_SCALE * Math.sin(p)] : [0, 0];
+    pe.push(offset);
+    x.push(add(e, offset));
   });
 
   const heads = [attend(x, HEADS[0], causal), attend(x, HEADS[1], causal)] as const;
-  const attnOut = x.map((_, i) => projectHeads(outAt(heads[0], i), outAt(heads[1], i)));
-  const xResid = x.map((v, i) => add(v, attnOut[i] ?? [0, 0]));
+  const attnOut: Vec2[] = [];
+  const xResid: Vec2[] = [];
+  x.forEach((v, i) => {
+    const projected = projectHeads(outAt(heads[0], i), outAt(heads[1], i));
+    attnOut.push(projected);
+    xResid.push(add(v, projected));
+  });
 
-  const mlpHidden = xResid.map((v): Vec4 => [
-    Math.tanh(W1[0] * v[0] + W1[1] * v[1] + b1[0]),
-    Math.tanh(W1[2] * v[0] + W1[3] * v[1] + b1[1]),
-    Math.tanh(W1[4] * v[0] + W1[5] * v[1] + b1[2]),
-    Math.tanh(W1[6] * v[0] + W1[7] * v[1] + b1[3]),
-  ]);
-  const mlpOut = mlpHidden.map((h): Vec2 => [
-    W2[0] * h[0] + W2[1] * h[1] + W2[2] * h[2] + W2[3] * h[3] + b2[0],
-    W2[4] * h[0] + W2[5] * h[1] + W2[6] * h[2] + W2[7] * h[3] + b2[1],
-  ]);
-  const xFinal = xResid.map((v, i) => add(v, mlpOut[i] ?? [0, 0]));
+  const mlpHidden: Vec4[] = [];
+  const mlpOut: Vec2[] = [];
+  const xFinal: Vec2[] = [];
+  for (const v of xResid) {
+    const hidden = mlpHiddenAt(v);
+    const out = mlpOutAt(hidden);
+    mlpHidden.push(hidden);
+    mlpOut.push(out);
+    xFinal.push(add(v, out));
+  }
 
   // Weight-tied unembedding: a logit is the final vector's dot product with a draggable point.
   const last = xFinal[xFinal.length - 1];
