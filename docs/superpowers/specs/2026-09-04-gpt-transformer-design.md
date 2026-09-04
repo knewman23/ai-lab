@@ -27,9 +27,11 @@ Success criteria:
 2. Every number on screen is computed from the current embeddings by the forward pass in
    `core/math/transformer.ts`; nothing is hardcoded per stage.
 3. At the `collapsed` preset with positional encoding on, head 1's attention row for the
-   last token peaks at the immediately preceding position — weights
-   `[0.115, 0.144, 0.223, 0.290, 0.227]`, a margin of 0.063 over the runner-up (asserted in
-   a test). With content stripped out, the only signal left is position, and head 1 reads it.
+   last token peaks at the immediately preceding position for **all three sentences**
+   (asserted in a test). On `cat-sat` the row is `[0.115, 0.144, 0.223, 0.290, 0.227]`. The
+   margin over the runner-up is 0.063 on `cat-sat` and `dog-ran` but only 0.036 on
+   `scrambled`, so the test's bound is 0.03, not 0.05. With content stripped out, the only
+   signal left is position, and head 1 reads it.
 4. At the `collapsed` preset with positional encoding **off**, every attention weight in
    every row of both heads is within 0.01 of uniform `1/(i+1)` (measured: 1.7e-3; asserted
    in a test). No information in, no information out.
@@ -177,10 +179,13 @@ W2 = [[0.25, -0.15, 0.30, 0.10], [0.10, 0.35, -0.20, 0.25]]
 b2 = [0.0, 0.0]
 ```
 
-These were chosen so the MLP's contribution is visible but smaller than the attention
-output — roughly a third of its length at the `tuned` preset — so the residual chain on the
-floor reads as one long arrow then one short one. A test asserts the constants are unchanged,
-so a later edit cannot silently redraw every screenshot in `docs/screenshots/`.
+These were chosen so the MLP's contribution is visible without dominating. Measured
+`|mlpOut| / |attnOut|` at the `tuned` preset runs from 0.07 to 1.47 across the fifteen
+position/sentence combinations — 0.46 at the default query (position 4 of `cat-sat`), and
+above 1 only on `scrambled`, where attention is least decisive and the MLP is doing
+proportionally more of the work. §5.7's two arrows are therefore usually long-then-short but
+not always, and the spec does not promise otherwise. A test asserts the constants are
+unchanged, so a later edit cannot silently redraw every screenshot in `docs/screenshots/`.
 
 ### 3.6 No layer norm
 
@@ -276,10 +281,13 @@ Z-up, as everywhere in this repo. The wall is the plane y = 0; the floor is z = 
 in −y in front of it, exactly as in the neural network scene.
 
 ```
-WALL_W = 6      WALL_H = 4.6      WALL_OPACITY = 0.18
+WALL_W = 6      WALL_H = 5.2      WALL_OPACITY = 0.18
 column x        [-2.4, -1.2, 0, 1.2, 2.4]
 band z          embed 0.5   attention 1.5   residual 2.5   mlp 3.4   logits 4.2
 floor           x in [-3, 3], y in [-6, 0]
+
+`WALL_H` is 5.2 rather than 4.6 because the tallest probability bar rises 0.55 above the
+logits band at z = 4.2; 4.75 plus the label pill must fit inside the wall.
 ```
 
 Two pure conversions, round-trip tested:
@@ -376,7 +384,9 @@ a short HTML label (`+ position`, `+ attention`, `+ MLP`). A hollow ring marks `
 
 This is what ties the two surfaces together: the wall shows the pipeline's shape, and this
 shows the same token's vector actually moving through embedding space toward whichever word
-comes next.
+comes next. The attention arrow is usually the longer of the two, but not always (§3.5): on
+`scrambled`, where attention is spread thin, the MLP arrow can exceed it. That is data, not
+a layout failure, and the arrows are drawn at true relative length rather than normalised.
 
 ### 5.8 Labels (`labels-sync.ts`)
 
@@ -402,8 +412,12 @@ nn scene. Returns a `Framing`.
    dragged.
 3. **Query token** — select over the five positions, defaulting to the last. Kept in sync
    with clicking a column, so the scene is usable without the 3D interaction.
-4. **Head** — select: `head 1`, `head 2`, `both` (default). `both` draws the
-   `W_O`-weighted combination `0.6 a¹ + 0.4 a²` and says so in the readout.
+4. **Head** — select: `head 1`, `head 2`, `both` (default). `both` draws a blend of the two
+   attention rows using each head's actual contribution to `attnOut`. Because `W_O` scales
+   head 1's output by 0.6 and head 2's by 0.4, *and* head 2's `W_V = 0.8 I` shrinks its
+   values first, the effective per-key coefficient is `0.6 a¹_j + 0.32 a²_j` — which sums to
+   0.92, not 1. The readout states those coefficients and says the blend is not a probability
+   distribution, because writing `0.6 a¹ + 0.4 a²` would be wrong.
 5. **Stage** — select: `all` (default), `embed + position`, `scores`, `softmax`,
    `weighted sum`, `+ residual`, `MLP`, `logits`. Dims the other bands and expands the
    focused stage's equation and numbers in the readout.
@@ -486,9 +500,10 @@ be useful to a later scene it can move to `shared/` then, not now.
 4. Weight tying: `logits[v]` equals `dot(xFinal[last], embedding[v])` for all `v`.
 5. A hand-computed fixture — two positions, head 1 only, embeddings `(1,0)` and `(0,1)`,
    positional encoding off — matches to 1e-12.
-6. `collapsed` with positional encoding on: head 1's last row equals
-   `[0.115, 0.144, 0.223, 0.290, 0.227]` to 1e-3, so its argmax is position 3 and its margin
-   over the runner-up is at least 0.05 (criterion §1.3).
+6. `collapsed` with positional encoding on: for all three sentences head 1's last-row argmax
+   is position 3 and its margin over the runner-up is at least 0.03 (measured 0.063, 0.063,
+   0.036). On `cat-sat` the row equals `[0.115, 0.144, 0.223, 0.290, 0.227]` to 1e-3
+   (criterion §1.3).
 7. `collapsed` with positional encoding off: every weight in every row of both heads is
    within 0.01 of `1/(i+1)` (criterion §1.4).
 8. `tuned` with positional encoding on: head 1's last-row argmax is 1, 0 and 0 for
