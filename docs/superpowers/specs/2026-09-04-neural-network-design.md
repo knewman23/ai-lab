@@ -1,7 +1,7 @@
 # Neural network — a tiny MLP learning a 2D classification, layers on a wall, boundary on the floor
 
 Date: 2026-09-04
-Status: draft (revision 2, after spec review round 1)
+Status: approved by spec review (revision 3: per-dataset start seeds)
 Parent: [AI Lab design](2026-09-03-ai-lab-design.md); siblings: [Backprop graph](2026-09-03-backprop-graph-design.md), [Gradient descent](2026-09-03-ai-lab-design.md)
 Registry: replaces the `machine-learning` roadmap entry `neural-network`
 
@@ -48,7 +48,7 @@ export interface Params { readonly weights: readonly Float64Array[]; readonly bi
 export function initParams(seed: number): Params;              // uniform(−1, 1), micrograd style; draw order is fixed: for each layer in order, the weight matrix row-major, then that layer's biases
 export function forward(p: Params, x: readonly [number, number]): readonly Float64Array[]; // activations per layer incl. input; tanh everywhere
 export function predict(p: Params, x): number;                 // last activation
-export interface Dataset { readonly key: DatasetKey; readonly title: string; readonly points: readonly { x: [number, number]; y: 1 | -1 }[]; readonly hint: string }
+export interface Dataset { readonly key: DatasetKey; readonly title: string; readonly points: readonly { x: [number, number]; y: 1 | -1 }[]; readonly startSeed: number; readonly hint: string }
 export function loss(p: Params, d: Dataset): number;           // mean (predict − y)²
 export function gradients(p: Params, d: Dataset): Params;      // ∂/∂θ of `loss` exactly: analytic backprop through the tanh layers, including the factor 2 from the square and the 1/N average
 export function step(p: Params, g: Params, lr: number): Params; // p − lr·g, new arrays
@@ -68,16 +68,22 @@ Datasets (seed 1, coordinates within the domain, targets ±1):
 | `moons` | 60 | the classic pair: upper arc centre (−0.8, −0.5), radius 1.6, θ evenly spaced over [0, π], y = +1; lower arc centre (0.8, 0.5), θ over [π, 2π], y = −1; 30 each, Gaussian σ 0.2 | a curved boundary |
 | `circles` | 60 | inner disc radius ≤ 0.8 (+1) and ring radius 1.8–2.4 (−1), σ 0.15 | a closed boundary |
 
-Training: `lr` default 0.1 (log slider 0.001 … 0.5). One epoch = one full-batch step. Weight init
-seed starts at 1; Reset uses seed + 1 so a second run looks different but is still reproducible. The
-datasets are fixed data, not re-rolled by Reset.
+Each dataset carries a `startSeed`: a weight-init seed verified to train it to ≥ 0.9 accuracy at the
+default learning rate. Some seeds stall (a 2-4-4-1 net on `moons` plateaus at 0.83 from seed 1), and
+the first thing a visitor sees should not be a stuck network, so `initialState()` and `setDataset`
+both take the new dataset's `startSeed` rather than carrying the old seed across. Reset still walks
+forward from there (seed + 1), which is where a stalling run can legitimately turn up; the hint says
+to press Reset again.
+
+Training: `lr` default 0.1 (log slider 0.001 … 0.5). One epoch = one full-batch step. Reset uses seed + 1 so a second run looks different but is
+still reproducible. The datasets are fixed data, not re-rolled by Reset.
 
 Tests: `mulberry32(1)` yields a fixed first three values (recorded once) and is in [0, 1); `initParams`
 shapes (4×2, 4×4, 1×4) and range; `forward` layer count 4 and |a| ≤ 1; `gradients` matches central
 differences of `loss` (h 1e-5, rel 1e-4) for every weight and bias on `xor` at seed 1; `step`
 returns new arrays with `p − lr·g`; `loss` falls monotonically over the first 20 epochs on `xor` at
-lr 0.1 seed 1 and `accuracy ≥ 0.9` within 300 epochs (checked in a scratch run: 0.9 by epoch 106 at
-lr 0.05, sooner at 0.1; every seed 1–12 passes); each dataset has the stated size, class
+lr 0.1 from `DATASETS.xor.startSeed` and `accuracy ≥ 0.9` within 300 epochs; the same accuracy bound
+from each dataset's own `startSeed` at the default lr; each dataset has the stated size, class
 balance within ±2, all points in the domain, and is identical across two constructions;
 `boundaryGrid` has n² entries in [−1, 1] and entry (0, 0) equals `predict` at (−3, −3).
 
@@ -135,16 +141,17 @@ instance `--ink` (+1) / `--accent` (−1) with `instanceColor.needsUpdate` and, 
 notes, `frustumCulled = false` plus `computeBoundingSphere()` after the matrices; re-coloured on a
 theme "change"; toggle "Data".
 
-**Probe** (`probe.ts`): a sphere r 0.12 `--soft` on the floor at the probe position, draggable on the
+**Probe** (`probe.ts`): a sphere r 0.12 `--soft` standing on the floor at the probe position (raised
+its own radius, 0.12, in z so it rests on the plane), draggable on the
 plane z = 0 (`getPlaneZ: () => 0`), clamped to the domain; a hit sphere r 0.25; a label "probe → <output>" at the sphere (`value`
 kind). Dragging the probe re-runs `forward` for its position and re-colours the wall's
 activations; it never changes the parameters.
 
 **Training** (`state.ts`): `NnState { dataset: DatasetKey; seed: number; params: Params; epoch:
 number; lr: number; playing: boolean; probe: [number, number]; show: { weights, data, boundary } }`.
-Reducers: `initialState()` (xor, seed 1, `initParams(1)`, epoch 0, lr 0.1, not playing, probe
-(0, 0), all shown); `setDataset(s, key)` (params re-initialised with the current seed, epoch 0,
-playing false); `trainEpoch(s)` (params ← step(params, gradients(params, dataset), lr), epoch + 1);
+Reducers: `initialState()` (xor, seed `DATASETS.xor.startSeed`, `initParams` of it, epoch 0, lr 0.1, not playing, probe
+(0, 0), all shown); `setDataset(s, key)` (seed ← that dataset's `startSeed`, params re-initialised
+from it, epoch 0, playing false); `trainEpoch(s)` (params ← step(params, gradients(params, dataset), lr), epoch + 1);
 `setLr(s, lr)` (clamp); `setPlaying`; `setProbe(s, p)` (clamp to the domain); `setShow`;
 `reset(s)` (seed + 1, re-init, epoch 0, playing false; lr, probe, show kept). `derived(s)`:
 `dataset`, `loss`, `accuracy`, `probeActivations = forward(params, probe)` and `probeOutput`. The
@@ -219,5 +226,5 @@ seed separates it cleanly; that is expected, not a failure.
 - **Floor repaint cost**: 1600 forward passes per epoch at 10 Hz is ~16k tanh-layer evaluations per
   second; trivial. The colour attribute upload is 1600 × 3 floats per epoch.
 - **Occlusion**: the floor is nearer the camera than the wall, so at a low orbit angle the floor's
-  far half can cover the wall's bottom row of neurons. Acceptable; orbit resolves it, and the home
-  camera is 30° above.
+  far half can cover the wall's bottom row of neurons. From the home camera (27° above) it does not:
+  the sight line to the wall's base still clears the floor's near edge. Orbit resolves the rest.
