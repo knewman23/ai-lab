@@ -2,15 +2,13 @@ import type { Op } from "../../core/math/autograd";
 import { fmt } from "../../ui/readout";
 import type { LabelLayer } from "../shared/labels";
 import type { Vec3 } from "../shared/layer";
-import { barTransform } from "./bars-geometry";
+import { barTransform, BAR_DX } from "./bars-geometry";
 import { edgeLabel } from "./explanation";
 import { type Positions, wallPoint } from "./layout";
 import type { Derived, ShowKey } from "./state";
 
 /** How far above the sphere (along +z) a node's name hangs. */
 const NODE_LIFT = 0.3;
-/** Offset of the value bar (−) and the grad bar (+) from the node's X; matches bars.ts. */
-const BAR_DX = 0.12;
 
 const OP_SYMBOL: Readonly<Record<Exclude<Op, "leaf">, string>> = {
   add: "+",

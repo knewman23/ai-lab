@@ -1,11 +1,17 @@
-import { BoxGeometry, Mesh, MeshBasicMaterial } from "three";
+import { BoxGeometry, Mesh, MeshBasicMaterial, Raycaster, Vector3 } from "three";
 import { describe, expect, it, vi } from "vitest";
 import { backward, forward, revealed, starts } from "../../../src/core/math/autograd";
 import { GRAPHS } from "../../../src/core/math/graphs";
 import { createThemeColors } from "../../../src/core/theme";
 import { createBars } from "../../../src/viz/backprop/bars";
-import { barTransform, EASE_MS, ease, Eased } from "../../../src/viz/backprop/bars-geometry";
-import { layoutGraph } from "../../../src/viz/backprop/layout";
+import {
+  BAR_DX,
+  barTransform,
+  EASE_MS,
+  ease,
+  Eased,
+} from "../../../src/viz/backprop/bars-geometry";
+import { layoutGraph, wallPoint } from "../../../src/viz/backprop/layout";
 
 const neuron = GRAPHS.neuron;
 const layout = layoutGraph(neuron);
@@ -230,5 +236,50 @@ describe("createBars", () => {
     for (const spy of spies) expect(spy).toHaveBeenCalledTimes(1);
     expect(remove).toHaveBeenCalledWith("change", expect.any(Function));
     expect(bars.group.children).toHaveLength(0);
+  });
+});
+
+describe("hit box pool after a graph switch", () => {
+  it("parked boxes no longer catch the raycast, active ones still do", () => {
+    const theme = createThemeColors(() => "#1f4ed8");
+    const bars = createBars(theme, true);
+    const neuron = GRAPHS.neuron;
+    const pn = layoutGraph(neuron);
+    bars.set(
+      neuron,
+      pn,
+      forward(neuron, starts(neuron)),
+      {},
+      revealed(neuron, 0),
+      { values: true, grads: true },
+      "edit",
+    );
+    // Where neuron's 5th leaf (b) box sits before the switch.
+    const parked = bars.hitTargets[4]!.position.clone();
+
+    const ps = GRAPHS["product-sum"];
+    const pp = layoutGraph(ps);
+    bars.set(
+      ps,
+      pp,
+      forward(ps, starts(ps)),
+      {},
+      revealed(ps, 0),
+      { values: true, grads: true },
+      "edit",
+    );
+    for (const hit of bars.hitTargets) hit.updateMatrixWorld(true);
+
+    const ray = new Raycaster();
+    // A ray from the camera side straight through the parked box's old position.
+    ray.set(new Vector3(parked.x, -10, parked.z), new Vector3(0, 1, 0));
+    expect(ray.intersectObjects([...bars.hitTargets], false)).toHaveLength(0);
+
+    const [ax, , az] = wallPoint(pp, bars.leafIds[0]!);
+    ray.set(new Vector3(ax - BAR_DX, -10, az), new Vector3(0, 1, 0));
+    const hits = ray.intersectObjects([...bars.hitTargets], false);
+    expect(hits).toHaveLength(1);
+    expect(bars.hitTargets.indexOf(hits[0]!.object as never)).toBe(0);
+    bars.dispose();
   });
 });

@@ -1,4 +1,6 @@
 /** World units of bar per unit of value: |value| ≤ 10 fills 3 units. */
+/** Horizontal offset of the value bar (−) and grad bar (+) from the node's X. */
+export const BAR_DX = 0.12;
 export const S_VALUE = 0.3;
 /** World units of bar per unit of gradient: |grad| ≤ 2 fills 3 units. */
 export const S_GRAD = 1.5;

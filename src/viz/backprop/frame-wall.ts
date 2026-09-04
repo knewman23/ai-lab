@@ -10,8 +10,7 @@ const SCALE = 12;
  * The scene's home camera. It looks at the 10x6 wall (y = 0) from the -y side,
  * about 35 degrees to the right of face-on and 30 degrees above, so the value
  * and gradient bars along +-y read as lengths rather than dots while the graph
- * on the wall stays legible. (Tuned in the browser check: the spec's 0.55 x
- * offset was too face-on, 1.15 too oblique.)
+ * on the wall stays legible.
  */
 export function frameWall(): Framing {
   return {

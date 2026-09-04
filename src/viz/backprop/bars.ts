@@ -1,7 +1,7 @@
 import { BoxGeometry, Group, Mesh, MeshStandardMaterial } from "three";
 import type { Graph, Revealed, Values } from "../../core/math/autograd";
 import type { ThemeColors } from "../types";
-import { type BarKind, barTransform, Eased } from "./bars-geometry";
+import { type BarKind, barTransform, Eased, BAR_DX } from "./bars-geometry";
 import { createHitBoxes } from "./hit-boxes";
 import type { Positions } from "./layout";
 import { wallPoint } from "./layout";
@@ -25,7 +25,7 @@ export interface Bars {
   readonly bars: ReadonlyMap<string, BarPair>;
   /**
    * Places every bar; a value bar shows iff its value is revealed, a grad bar iff `id in grads`.
-   * On `"step"` (a pass step, a graph switch, mount) changed or newly revealed bars ease; on
+   * On `"step"` (a pass step or a graph switch; the assembler mounts with `"edit"`) changed or newly revealed bars ease; on
    * `"edit"` (a leaf edit) every change is instant.
    */
   set(
@@ -42,8 +42,6 @@ export interface Bars {
   dispose(): void;
 }
 
-/** Offset of the value bar (−) and the grad bar (+) from the node's X. */
-const BAR_DX = 0.12;
 const BAR_SIDE = 0.16;
 
 /** One bar's mesh plus the eased length that drives it. */

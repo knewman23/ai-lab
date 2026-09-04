@@ -8,7 +8,7 @@ import { createUsageHint, type UsageHint } from "../shared/hint";
 import { createLabelLayer } from "../shared/labels";
 import type { Visualization, VizHost, VizInstance } from "../types";
 import { createBars, type SetCause } from "./bars";
-import { S_VALUE } from "./bars-geometry";
+import { S_VALUE, BAR_DX } from "./bars-geometry";
 import { createEdges } from "./edges";
 import { frameWall } from "./frame-wall";
 import { syncLabels } from "./labels-sync";
@@ -40,9 +40,6 @@ const HINT = {
     "Orbit to read the bars: value on the left of each node, gradient on the right; a bar pointing at you is positive.",
   ],
 };
-
-/** Offset of a leaf's value bar from its node's X; matches bars.ts. */
-const BAR_DX = 0.12;
 
 /**
  * The drag plane's normal, reused across pointerdowns. drag.ts calls `normal(i)`
@@ -112,8 +109,6 @@ function mount(host: VizHost): VizInstance {
 
   let state: BpState = initialState();
   let dirty = true;
-  let labelsDirty = true;
-  let resized = false;
   /** Canvas size in CSS pixels for label projection; the canvas's own size until the shell resizes. */
   let width = 0;
   let height = 0;
@@ -156,7 +151,6 @@ function mount(host: VizHost): VizInstance {
 
     panel?.render(state, d);
     dirty = true;
-    labelsDirty = true;
   }
 
   let detachDrag: (() => void) | undefined;
@@ -188,7 +182,11 @@ function mount(host: VizHost): VizInstance {
       // motion maps to bar length at roughly 1:1 from any orbit.
       plane: {
         normal: (index: number) => {
-          const [x, , z] = wallPoint(positions, bars.leafIds[index]!);
+          // Parked pool boxes sit on another layer, so an undefined id cannot occur;
+          // the guard keeps a stray hit from throwing inside the pointer handler.
+          const id = bars.leafIds[index];
+          if (id === undefined) return NORMAL;
+          const [x, , z] = wallPoint(positions, id);
           return NORMAL.set(
             kit.camera.position.x - (x - BAR_DX),
             0,
@@ -196,15 +194,19 @@ function mount(host: VizHost): VizInstance {
           ).normalize();
         },
         getOffset: (index: number) => {
-          const [x, , z] = wallPoint(positions, bars.leafIds[index]!);
+          const id = bars.leafIds[index];
+          if (id === undefined) return 0;
+          const [x, , z] = wallPoint(positions, id);
           return NORMAL.x * (x - BAR_DX) + NORMAL.z * z;
         },
       },
       // p[1] is the hit's world y; positive values point toward −y. setLeaf clamps.
       onDrag: (index: number, p: Vec2) => {
         // The first move of a bar is proof the hint has been read.
+        const id = bars.leafIds[index];
+        if (id === undefined) return;
         hint?.hide();
-        apply(setLeaf(state, bars.leafIds[index]!, -p[1] / S_VALUE), "edit");
+        apply(setLeaf(state, id, -p[1] / S_VALUE), "edit");
       },
     });
   } catch (error) {
@@ -238,7 +240,8 @@ function mount(host: VizHost): VizInstance {
       }
       const easing = bars.update(dt * 1000);
 
-      if (dirty || moved || easing || labelsDirty || resized) {
+      // Labels re-project on every render: the camera, a bar length or the canvas size changed.
+      if (dirty || moved || easing) {
         const canvas = host.renderer.domElement;
         const w = width || canvas.clientWidth;
         const h = height || canvas.clientHeight;
@@ -247,8 +250,6 @@ function mount(host: VizHost): VizInstance {
       }
       const rendered = dirty || moved || easing;
       dirty = false;
-      labelsDirty = false;
-      resized = false;
       // True while playing too, so the loop never idles out from under the step timer.
       return rendered || state.playing;
     },
@@ -258,7 +259,6 @@ function mount(host: VizHost): VizInstance {
       height = h;
       kit.camera.aspect = w / h;
       kit.camera.updateProjectionMatrix();
-      resized = true;
       dirty = true;
     },
 

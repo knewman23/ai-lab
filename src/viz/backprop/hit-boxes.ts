@@ -29,8 +29,12 @@ const MAX_LEAVES = Math.max(...Object.values(GRAPHS).map((g) => g.leaves.length)
 /**
  * The drag targets for leaf value bars: 0.4 × 6.4 × 0.4 boxes with an invisible *material*
  * on a visible mesh, so the raycast hits them whichever way three treats invisible objects.
- * Boxes not in use by the current graph have `visible = false`, which the raycast skips.
+ * Boxes not in use by the current graph move to layer 1: three's Raycaster tests layers, not
+ * `visible`, so a parked box must leave layer 0 to stop catching the pointer.
  */
+/** The layer the shared drag raycasts (three's default); parked boxes sit on `PARKED_LAYER`. */
+const ACTIVE_LAYER = 0;
+const PARKED_LAYER = 1;
 export function createHitBoxes(): HitBoxes {
   const geometry = new BoxGeometry(HIT_W, HIT_H, HIT_W);
   const material = new MeshBasicMaterial({ visible: false });
@@ -48,7 +52,9 @@ export function createHitBoxes(): HitBoxes {
       leafIds.length = 0;
       for (const leaf of g.leaves) leafIds.push(leaf.id);
       targets.forEach((hit, i) => {
-        hit.visible = i < leafIds.length;
+        const active = i < leafIds.length;
+        hit.visible = active;
+        hit.layers.set(active ? ACTIVE_LAYER : PARKED_LAYER);
         group.add(hit);
       });
     },
