@@ -12,6 +12,9 @@ export interface BarPair {
   readonly grad: Mesh;
 }
 
+/** Why `Bars.set` is being called; decides whether changes ease or jump. */
+export type SetCause = "step" | "edit";
+
 export interface Bars {
   readonly group: Group;
   /** Invisible pick volumes, one per leaf in `leafIds` order, for the drag raycast. */
@@ -20,7 +23,11 @@ export interface Bars {
   readonly leafIds: readonly string[];
   /** Node id → its bars, for the current graph; read by tests. */
   readonly bars: ReadonlyMap<string, BarPair>;
-  /** Places every bar; a value bar shows iff its value is revealed, a grad bar iff `id in grads`. */
+  /**
+   * Places every bar; a value bar shows iff its value is revealed, a grad bar iff `id in grads`.
+   * On `"step"` (a pass step, a graph switch, mount) changed or newly revealed bars ease; on
+   * `"edit"` (a leaf edit) every change is instant.
+   */
   set(
     g: Graph,
     positions: Positions,
@@ -28,6 +35,7 @@ export interface Bars {
     grads: Values,
     revealed: Revealed,
     show: { readonly values: boolean; readonly grads: boolean },
+    cause: SetCause,
   ): void;
   /** Advances the eased lengths; true while any bar is still moving. */
   update(dtMs: number): boolean;
@@ -53,9 +61,9 @@ interface Bar {
 /**
  * Two boxes per node scaled along y: the value bar (`--soft`) at X − 0.12 and the grad bar
  * (`--accent`) at X + 0.12, pointing toward −y for positive quantities and +y for negative.
- * All bars share one geometry and one material per kind (visibility is per mesh). A bar eases
- * in from 0 when a step reveals it and jumps when an already-revealed value changes (a leaf
- * edit); under `reducedMotion` everything jumps. Hit boxes (`hit-boxes.ts`) are rebuilt with the graph.
+ * All bars share one geometry and one material per kind (visibility is per mesh). On a step a
+ * bar eases (from 0 when newly revealed, else from its current length, so an accumulating
+ * gradient animates); a leaf edit jumps; under `reducedMotion` everything jumps. Hit boxes (`hit-boxes.ts`) are rebuilt with the graph.
  */
 export function createBars(theme: ThemeColors, reducedMotion: boolean): Bars {
   const barGeometry = new BoxGeometry(BAR_SIDE, 1, BAR_SIDE);
@@ -105,16 +113,12 @@ export function createBars(theme: ThemeColors, reducedMotion: boolean): Bars {
     bar.mesh.position.set(bar.x, bar.negative ? length / 2 : -length / 2, bar.z);
   }
 
-  /** Retargets one bar for quantity `v`, easing only when this call reveals it. */
-  function place(bar: Bar, v: number, revealed: boolean, shown: boolean): void {
+  /** Retargets one bar for quantity `v`; on a step it eases (from 0 when newly revealed). */
+  function place(bar: Bar, v: number, revealed: boolean, shown: boolean, cause: SetCause): void {
     const t = barTransform(bar.kind, v, revealed);
     bar.negative = v < 0;
-    if (t.visible && !bar.revealed) {
-      bar.length.set(0, { instant: true });
-      bar.length.set(t.length);
-    } else {
-      bar.length.set(t.length, { instant: true });
-    }
+    if (t.visible && !bar.revealed) bar.length.set(0, { instant: true });
+    bar.length.set(t.length, { instant: cause === "edit" || !t.visible });
     bar.revealed = t.visible;
     bar.mesh.visible = shown && t.visible;
     apply(bar);
@@ -126,19 +130,20 @@ export function createBars(theme: ThemeColors, reducedMotion: boolean): Bars {
     leafIds: hits.leafIds,
     bars: pairs,
 
-    set(g, positions, values, grads, revealed, show): void {
+    set(g, positions, values, grads, revealed, show, cause): void {
       if (g.key !== currentKey) rebuild(g);
       let i = 0;
       for (const node of g.nodes) {
         const id = node.id;
         const [x, , z] = wallPoint(positions, id);
+        // `all` holds two bars per node in node order: value then grad (see rebuild).
         const value = all[i++]!;
         const grad = all[i++]!;
         value.x = x - BAR_DX;
         grad.x = x + BAR_DX;
         value.z = grad.z = z;
-        place(value, values[id] ?? 0, revealed.values.has(id), show.values);
-        place(grad, grads[id] ?? 0, id in grads, show.grads);
+        place(value, values[id] ?? 0, revealed.values.has(id), show.values, cause);
+        place(grad, grads[id] ?? 0, id in grads, show.grads, cause);
       }
       hits.place(positions, BAR_DX);
     },

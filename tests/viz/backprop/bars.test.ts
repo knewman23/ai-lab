@@ -62,6 +62,13 @@ describe("Eased", () => {
     expect(e.advance(16)).toBe(false);
   });
 
+  it("settles immediately when the target is already the value", () => {
+    const e = new Eased(false);
+    e.set(0);
+    expect(e.moving).toBe(false);
+    expect(e.advance(16)).toBe(false);
+  });
+
   it("treats every set as instant under reduced motion", () => {
     const e = new Eased(true);
     e.set(2);
@@ -78,7 +85,7 @@ function make(reducedMotion = true) {
 describe("createBars", () => {
   it("places x1's value bar at X - 0.12 scaled to 0.3 * |value|", () => {
     const { bars } = make();
-    bars.set(neuron, layout, values, noGrads, leavesOnly, SHOW);
+    bars.set(neuron, layout, values, noGrads, leavesOnly, SHOW, "step");
     const bar = bars.bars.get("x1")!.value;
     expect(bar.visible).toBe(true);
     expect(bar.position.x).toBeCloseTo(layout.x1![0] - 0.12);
@@ -90,9 +97,9 @@ describe("createBars", () => {
 
   it("hides a grad bar while its gradient is unknown and shows it once it lands", () => {
     const { bars } = make();
-    bars.set(neuron, layout, values, noGrads, leavesOnly, SHOW);
+    bars.set(neuron, layout, values, noGrads, leavesOnly, SHOW, "step");
     expect(bars.bars.get("x1")!.grad.visible).toBe(false);
-    bars.set(neuron, layout, values, allGrads, everything, SHOW);
+    bars.set(neuron, layout, values, allGrads, everything, SHOW, "step");
     const grad = bars.bars.get("x1")!.grad;
     expect(grad.visible).toBe(true);
     expect(grad.position.x).toBeCloseTo(layout.x1![0] + 0.12);
@@ -103,7 +110,7 @@ describe("createBars", () => {
 
   it("hides every value bar when show.values is off", () => {
     const { bars } = make();
-    bars.set(neuron, layout, values, allGrads, everything, { values: false, grads: true });
+    bars.set(neuron, layout, values, allGrads, everything, { values: false, grads: true }, "step");
     for (const pair of bars.bars.values()) {
       expect(pair.value.visible).toBe(false);
       expect(pair.grad.visible).toBe(true);
@@ -113,16 +120,28 @@ describe("createBars", () => {
 
   it("colours value bars --soft and grad bars --accent", () => {
     const { bars, theme } = make();
-    bars.set(neuron, layout, values, noGrads, leavesOnly, SHOW);
+    bars.set(neuron, layout, values, noGrads, leavesOnly, SHOW, "step");
     const pair = bars.bars.get("x1")!;
     expect((pair.value.material as MeshBasicMaterial).color.equals(theme.soft)).toBe(true);
     expect((pair.grad.material as MeshBasicMaterial).color.equals(theme.accent)).toBe(true);
     bars.dispose();
   });
 
-  it("eases a newly revealed bar in from 0 when motion is allowed", () => {
+  it("recolours on theme change", () => {
+    const { bars, theme } = make();
+    bars.set(neuron, layout, values, noGrads, leavesOnly, SHOW, "step");
+    theme.soft.set("#123456");
+    theme.accent.set("#abcdef");
+    theme.dispatchEvent(new Event("change"));
+    const pair = bars.bars.get("x1")!;
+    expect((pair.value.material as MeshBasicMaterial).color.getHexString()).toBe("123456");
+    expect((pair.grad.material as MeshBasicMaterial).color.getHexString()).toBe("abcdef");
+    bars.dispose();
+  });
+
+  it("eases on a step and jumps on an edit", () => {
     const { bars } = make(false);
-    bars.set(neuron, layout, values, noGrads, leavesOnly, SHOW);
+    bars.set(neuron, layout, values, noGrads, leavesOnly, SHOW, "step");
     const bar = bars.bars.get("x1")!.value;
     expect(bar.scale.y).toBe(0);
     expect(bars.update(150)).toBe(true);
@@ -130,8 +149,13 @@ describe("createBars", () => {
     expect(bar.position.y).toBeCloseTo(-(0.6 * 0.875) / 2);
     expect(bars.update(150)).toBe(false);
     expect(bar.scale.y).toBeCloseTo(0.6);
-    // A leaf edit on an already-revealed bar jumps.
-    bars.set(neuron, layout, { ...values, x1: 4 }, noGrads, leavesOnly, SHOW);
+    // A changed, already-revealed bar eases on a step (an accumulating gradient)...
+    bars.set(neuron, layout, { ...values, x1: 3 }, noGrads, leavesOnly, SHOW, "step");
+    expect(bar.scale.y).toBeCloseTo(0.6);
+    expect(bars.update(300)).toBe(false);
+    expect(bar.scale.y).toBeCloseTo(0.9);
+    // ...and jumps on a leaf edit.
+    bars.set(neuron, layout, { ...values, x1: 4 }, noGrads, leavesOnly, SHOW, "edit");
     expect(bar.scale.y).toBeCloseTo(1.2);
     expect(bars.update(16)).toBe(false);
     bars.dispose();
@@ -139,7 +163,7 @@ describe("createBars", () => {
 
   it("has an invisible 0.4 x 6.4 x 0.4 hit box per leaf, in leaf order", () => {
     const { bars } = make();
-    bars.set(neuron, layout, values, noGrads, leavesOnly, SHOW);
+    bars.set(neuron, layout, values, noGrads, leavesOnly, SHOW, "step");
     expect(bars.leafIds).toEqual(["x1", "w1", "x2", "w2", "b"]);
     expect(bars.hitTargets).toHaveLength(5);
     bars.hitTargets.forEach((hit, i) => {
@@ -159,20 +183,40 @@ describe("createBars", () => {
 
   it("rebuilds for another graph and returns false from update when nothing moves", () => {
     const { bars } = make();
-    bars.set(neuron, layout, values, noGrads, leavesOnly, SHOW);
+    bars.set(neuron, layout, values, noGrads, leavesOnly, SHOW, "step");
     const g = GRAPHS["product-sum"];
     const pos = layoutGraph(g);
-    bars.set(g, pos, forward(g, starts(g)), {}, revealed(g, 0), SHOW);
+    bars.set(g, pos, forward(g, starts(g)), {}, revealed(g, 0), SHOW, "step");
     expect(bars.bars.size).toBe(5);
     expect(bars.leafIds).toEqual(["a", "b", "c"]);
-    expect(bars.group.children.filter((o) => o instanceof Mesh)).toHaveLength(13);
+    // 10 bars plus the fixed pool of 5 hit boxes.
+    expect(bars.group.children.filter((o) => o instanceof Mesh)).toHaveLength(15);
     expect(bars.update(16)).toBe(false);
+    bars.dispose();
+  });
+
+  it("keeps the hit box pool's identity across a graph switch, hiding unused boxes", () => {
+    const { bars } = make();
+    bars.set(neuron, layout, values, noGrads, leavesOnly, SHOW, "step");
+    const targets = bars.hitTargets;
+    const leafIds = bars.leafIds;
+    const meshes = [...targets];
+    const g = GRAPHS["product-sum"];
+    const pos = layoutGraph(g);
+    bars.set(g, pos, forward(g, starts(g)), {}, revealed(g, 0), SHOW, "step");
+    expect(bars.hitTargets).toBe(targets);
+    expect(bars.leafIds).toBe(leafIds);
+    expect(targets).toHaveLength(5);
+    targets.forEach((hit, i) => expect(hit).toBe(meshes[i]));
+    expect(targets.map((hit) => hit.visible)).toEqual([true, true, true, false, false]);
+    expect(targets[0]!.position.x).toBeCloseTo(pos.a![0] - 0.12);
+    expect(targets[0]!.position.z).toBeCloseTo(pos.a![1]);
     bars.dispose();
   });
 
   it("dispose releases geometries and materials and drops the theme listener", () => {
     const { bars, theme } = make();
-    bars.set(neuron, layout, values, noGrads, leavesOnly, SHOW);
+    bars.set(neuron, layout, values, noGrads, leavesOnly, SHOW, "step");
     const remove = vi.spyOn(theme, "removeEventListener");
     const pair = bars.bars.get("x1")!;
     const spies = [

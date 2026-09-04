@@ -52,10 +52,10 @@ export class Eased {
     return this.elapsed < EASE_MS;
   }
 
-  /** Starts easing toward `target` from wherever the value is now; `instant` jumps there. */
+  /** Starts easing toward `target` from wherever the value is now; `instant` (or no change) jumps there. */
   set(target: number, options: { readonly instant?: boolean } = {}): void {
     this.target = target;
-    if (options.instant === true || this.reducedMotion) {
+    if (options.instant === true || this.reducedMotion || target === this.current) {
       this.from = this.current = target;
       this.elapsed = EASE_MS;
       return;

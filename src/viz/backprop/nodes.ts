@@ -1,4 +1,4 @@
-import { Group, Mesh, MeshStandardMaterial, SphereGeometry } from "three";
+import { type Color, Group, Mesh, MeshStandardMaterial, SphereGeometry } from "three";
 import type { Graph, GraphNode } from "../../core/math/autograd";
 import type { ThemeColors } from "../types";
 import type { Positions } from "./layout";
@@ -25,7 +25,7 @@ function roleOf(g: Graph, node: GraphNode): Role {
   return node.op === "leaf" ? "leaf" : "op";
 }
 
-function colourOf(theme: ThemeColors, role: Role) {
+function colourOf(theme: ThemeColors, role: Role): Color {
   return role === "leaf" ? theme.ink : role === "op" ? theme.soft : theme.accent;
 }
 
