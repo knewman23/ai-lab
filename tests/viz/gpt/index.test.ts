@@ -359,6 +359,24 @@ describe("gptTransformer.mount", () => {
     viz.dispose();
   });
 
+  it("drops the labels it cannot draw legibly, keeping the first band name", () => {
+    const { host: h } = host();
+    const viz = gptTransformer.mount(h);
+    // Every label drawn wide enough to cover the whole canvas, so all 29 fight for one space.
+    for (const span of h.canvasContainer.querySelectorAll<HTMLElement>(".viz-labels span")) {
+      span.getBoundingClientRect = (): DOMRect => new DOMRect(0, 0, 4 * SIZE, 4 * SIZE);
+    }
+    viz.resize(SIZE, SIZE);
+    viz.update(0.016);
+
+    const shown = [...h.canvasContainer.querySelectorAll<HTMLElement>(".viz-labels span")].filter(
+      (span) => !span.hidden,
+    );
+    expect(shown.map((span) => span.textContent)).toEqual(["embed + position"]);
+
+    viz.dispose();
+  });
+
   it("re-aims the camera when the canvas changes shape", () => {
     const { host: h, frames } = host();
     const viz = gptTransformer.mount(h);

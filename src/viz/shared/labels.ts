@@ -1,4 +1,5 @@
 import { Vector3, type Camera } from "three";
+import { declutter, type LabelBox } from "./declutter";
 import type { Vec3 } from "./layer";
 
 /** What a label names; each kind is a CSS class on its span (see `.viz-labels` in panel.css). */
@@ -21,12 +22,26 @@ export interface LabelLayer {
   dispose(): void;
 }
 
+/** How the overlay is set up; every field is opt-in, so a scene may pass nothing at all. */
+export interface LabelLayerOptions {
+  /**
+   * Turns on the declutter pass: the rank of a label id, lower being the one that stays when two
+   * labels would print over each other. Without it every label is drawn wherever it lands.
+   */
+  readonly rank?: (id: string) => number;
+}
+
 interface Entry {
   readonly el: HTMLSpanElement;
   world: Vec3;
   /** The last written pixel position, so the transform is only touched when it moves. */
   px: number;
   py: number;
+  /** The rank the declutter pass places this label at; NaN when the layer does not declutter. */
+  readonly rank: number;
+  /** The drawn size, measured once per text and kind and NaN until then. */
+  w: number;
+  h: number;
 }
 
 /** Anchors: `op` labels sit centred on their point; everything else hangs its baseline above it. */
@@ -34,6 +49,28 @@ const ANCHOR_OP = "translate(-50%, -50%)";
 const ANCHOR_ABOVE = "translate(-50%, -100%)";
 
 const scratch = new Vector3();
+
+/**
+ * The screen rectangle a label covers when its point lands on (`px`, `py`), measuring the span
+ * the first time it is asked and reusing that until the text or kind changes. Measuring costs a
+ * layout, so it must not run per frame; the size of a span depends on its text, not its place.
+ */
+function boxOf(id: string, entry: Entry, px: number, py: number): LabelBox {
+  if (Number.isNaN(entry.w)) {
+    const rect = entry.el.getBoundingClientRect();
+    entry.w = rect.width;
+    entry.h = rect.height;
+  }
+  const half = entry.el.className === "op" ? entry.h / 2 : entry.h;
+  return {
+    id,
+    rank: entry.rank,
+    left: px - entry.w / 2,
+    top: py - half,
+    right: px + entry.w / 2,
+    bottom: py - half + entry.h,
+  };
+}
 
 /**
  * The CSS pixel position of a world point on a `w` x `h` canvas, or null when
@@ -57,7 +94,8 @@ export function projectToPixels(
  * `.viz-canvas`) and returns the layer that manages spans inside it. Text is
  * kept as HTML rather than sprites so it follows the theme through CSS.
  */
-export function createLabelLayer(host: HTMLElement): LabelLayer {
+export function createLabelLayer(host: HTMLElement, options?: LabelLayerOptions): LabelLayer {
+  const rankOf = options?.rank;
   const root = document.createElement("div");
   root.className = "viz-labels";
   host.append(root);
@@ -68,11 +106,15 @@ export function createLabelLayer(host: HTMLElement): LabelLayer {
     set(id, text, world, kind): void {
       const existing = entries.get(id);
       if (existing) {
-        if (existing.el.textContent !== text) existing.el.textContent = text;
+        if (existing.el.textContent !== text) {
+          existing.el.textContent = text;
+          existing.w = NaN;
+        }
         if (existing.el.className !== kind) {
           // A new kind may mean a new anchor, so force the transform to be rewritten.
           existing.el.className = kind;
           existing.px = NaN;
+          existing.w = NaN;
         }
         existing.world = world;
         return;
@@ -81,7 +123,15 @@ export function createLabelLayer(host: HTMLElement): LabelLayer {
       el.className = kind;
       el.textContent = text;
       root.append(el);
-      entries.set(id, { el, world, px: NaN, py: NaN });
+      entries.set(id, {
+        el,
+        world,
+        px: NaN,
+        py: NaN,
+        rank: rankOf === undefined ? NaN : rankOf(id),
+        w: NaN,
+        h: NaN,
+      });
     },
 
     remove(id): void {
@@ -94,20 +144,31 @@ export function createLabelLayer(host: HTMLElement): LabelLayer {
     update(camera, w, h): void {
       if (w <= 0 || h <= 0) return;
       camera.updateMatrixWorld();
-      for (const entry of entries.values()) {
+      const boxes: LabelBox[] = [];
+      for (const [id, entry] of entries) {
         const p = projectToPixels(entry.world, camera, w, h);
         if (p === null) {
           entry.el.hidden = true;
           continue;
         }
+        // Shown before it is measured: a hidden span has no size to read.
         entry.el.hidden = false;
         const px = Math.round(p[0]);
         const py = Math.round(p[1]);
+        if (rankOf !== undefined) boxes.push(boxOf(id, entry, px, py));
         if (px === entry.px && py === entry.py) continue;
         entry.px = px;
         entry.py = py;
         const anchor = entry.el.className === "op" ? ANCHOR_OP : ANCHOR_ABOVE;
         entry.el.style.transform = `${anchor} translate(${String(px)}px, ${String(py)}px)`;
+      }
+      // Empty whenever the layer does not declutter, and whenever nothing is on screen.
+      if (boxes.length === 0) return;
+      const kept = declutter(boxes);
+      for (const box of boxes) {
+        const entry = entries.get(box.id);
+        if (entry === undefined) throw new Error(`labels: the placed label "${box.id}" is gone`);
+        entry.el.hidden = !kept.has(box.id);
       }
     },
 

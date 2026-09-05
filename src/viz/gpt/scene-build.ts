@@ -14,6 +14,7 @@ import { createBars } from "./bars";
 import { createColumnHits } from "./column-pick";
 import { createColumns } from "./columns";
 import { createFloorEmbed } from "./floor-embed";
+import { labelRank } from "./label-rank";
 import { WALL_H, WALL_OPACITY, WALL_W } from "./layout";
 import { createResidualPath } from "./residual-path";
 import { createWallBands } from "./wall-bands";
@@ -100,7 +101,8 @@ export function buildScene(host: VizHost, reducedMotion: boolean): GptScene {
     });
 
     // Before the hint, so the hint is the later sibling and paints on top.
-    const labels = createLabelLayer(host.canvasContainer);
+    // Ranked, so the overlay's five families give way to each other rather than overprint.
+    const labels = createLabelLayer(host.canvasContainer, { rank: labelRank });
     built.push(() => {
       labels.dispose();
     });
