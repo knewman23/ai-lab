@@ -6,6 +6,7 @@
 
 import type { HeadPass } from "../../core/math/transformer";
 import { VOCAB } from "../../core/math/transformer";
+import type { Vec2 } from "../../core/math/numeric";
 import { fmt } from "../../ui/readout";
 import {
   BLEND,
@@ -15,6 +16,7 @@ import {
   SINGLE_KEY,
   WEIGHT_BLEND,
 } from "./explanation";
+import { vec2At, type PassReader } from "./pass-read";
 import type { Derived, GptState, HeadKey, StageKey } from "./state";
 
 export type ReadoutRow = readonly [key: string, text: string];
@@ -49,8 +51,14 @@ function pick<T>(items: ArrayLike<T>, i: number, what: string): T {
   return item;
 }
 
-const vec = (v: ArrayLike<number>): string =>
-  `(${fmt(pick(v, 0, "component"))}, ${fmt(pick(v, 1, "component"))})`;
+/** The readout reads by sequence position, so a bad index names the query the viewer chose. */
+const READER: PassReader = { owner: "gpt readouts", slot: "position" };
+
+const pair = ([a, b]: Vec2): string => `(${fmt(a)}, ${fmt(b)})`;
+
+/** One stage's vector at a position, formatted. Throws through `vec2At` rather than defaulting. */
+const vec = (rows: readonly Float64Array[], i: number, field: string): string =>
+  pair(vec2At(rows, i, field, READER));
 
 const nums = (v: ArrayLike<number>): string => Array.from(v, (n) => fmt(n)).join(", ");
 
@@ -93,15 +101,15 @@ function weightedRows(s: GptState, d: Derived): ReadoutRow[] {
   const rows = heads(s, d).flatMap(({ n, head }): ReadoutRow[] => {
     const terms = Array.from(
       weightRow(head, s),
-      (w, j) => `${fmt(w)} × ${vec(pick(head.v, j, "value"))}`,
+      (w, j) => `${fmt(w)} × ${vec(head.v, j, "value")}`,
     );
     return [
       [`Head ${n + 1} terms`, terms.join(" + ")],
-      [`Head ${n + 1} total`, vec(pick(head.out, s.query, "head output"))],
+      [`Head ${n + 1} total`, vec(head.out, s.query, "head output")],
     ];
   });
   if (s.head !== "both") return rows;
-  return [...rows, ["attnOut", vec(pick(d.pass.attnOut, s.query, "attnOut"))]];
+  return [...rows, ["attnOut", vec(d.pass.attnOut, s.query, "attnOut")]];
 }
 
 /** The three likeliest next words, "the 0.7892, sat 0.1306, cat 0.0414". */
@@ -117,9 +125,9 @@ const ROWS: Readonly<Record<StageKey, (s: GptState, d: Derived) => ReadoutRow[]>
     const token = pick(d.sequence, s.query, "token");
     const word = pick(VOCAB, token, "word");
     return [
-      ["Embedding", `${word} ${vec(pick(s.embeddings, token, "embedding"))}`],
-      [`pe(${s.query})`, vec(pick(d.pass.pe, s.query, "pe"))],
-      [`x(${s.query})`, vec(pick(d.pass.x, s.query, "x"))],
+      ["Embedding", `${word} ${pair(pick(s.embeddings, token, "embedding"))}`],
+      [`pe(${s.query})`, vec(d.pass.pe, s.query, "pe")],
+      [`x(${s.query})`, vec(d.pass.x, s.query, "x")],
     ];
   },
   scores: (s, d) =>
@@ -130,14 +138,14 @@ const ROWS: Readonly<Record<StageKey, (s: GptState, d: Derived) => ReadoutRow[]>
   softmax: weightRows,
   weighted: weightedRows,
   residual: (s, d) => [
-    [`x(${s.query})`, vec(pick(d.pass.x, s.query, "x"))],
-    ["attnOut", vec(pick(d.pass.attnOut, s.query, "attnOut"))],
-    [`x'(${s.query})`, vec(pick(d.pass.xResid, s.query, "xResid"))],
+    [`x(${s.query})`, vec(d.pass.x, s.query, "x")],
+    ["attnOut", vec(d.pass.attnOut, s.query, "attnOut")],
+    [`x'(${s.query})`, vec(d.pass.xResid, s.query, "xResid")],
   ],
   mlp: (s, d) => [
     ["tanh(W₁x' + b₁)", nums(pick(d.pass.mlpHidden, s.query, "hidden"))],
-    ["W₂h + b₂", vec(pick(d.pass.mlpOut, s.query, "mlpOut"))],
-    [`x''(${s.query})`, vec(pick(d.pass.xFinal, s.query, "xFinal"))],
+    ["W₂h + b₂", vec(d.pass.mlpOut, s.query, "mlpOut")],
+    [`x''(${s.query})`, vec(d.pass.xFinal, s.query, "xFinal")],
   ],
   logits: (_s, d) =>
     ranked(d).map((v) => [
