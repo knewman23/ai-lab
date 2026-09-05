@@ -173,6 +173,14 @@ git show --stat HEAD
 
 - [ ] **Step 3: Run the full suite.** Run: `rtk proxy pnpm vitest run`. Expected: PASS, no `it.each([])` error.
 
+- [ ] **Step 3b: Settle the off-floor `xFinal` (open layout decision, found in Task 5).** The residual path is drawn in embedding coordinates on the floor, but `xFinal` is not bounded by the embedding domain — it is `x + attnOut + mlpOut`, and magnitudes reach 5.63. On `cat-sat` at `tuned` it maps to y = **+0.69**: past the floor's near edge (y ∈ [−6, 0]) and *behind the wall plane at y = 0*, so the hollow ring marking the vector that produces every logit would be occluded. Task 5 drew it at its true position per §5.7 rather than bending the module, which was right.
+
+  Decide this **from the render, not from arithmetic** — look at it first, then pick:
+  (a) leave it, if a path running off the floor edge reads as informative rather than broken;
+  (b) shift the floor mapping's origin in −y so the reachable range clears the wall, updating `floorFromEmbed`/`embedFromFloor` and their tests;
+  (c) keep the arrows true but draw the ring at the floor boundary with a marker indicating the true point lies beyond.
+  Do **not** clamp the arrows themselves — §5.7's true relative length is the scene's central idea and is defended by four tests.
+
 - [ ] **Step 4: Browser validation** (required before merge — see the owner's standing instruction). `pnpm dev`, then via the Chrome DevTools MCP: open `#/machine-learning/gpt-transformer`; screenshot light and dark into `docs/screenshots/`; drag a vocabulary word and confirm the bars respond; click each column and confirm the arcs move; step the stage selector through all eight values; toggle positional encoding off and confirm the two `the` columns' glyphs collapse together; toggle the causal mask off and confirm the last row widens to five arcs; switch to `collapsed` and confirm head 1's thickest arc is the one to the preceding column; confirm the console is clean. If Chrome refuses with "browser already running", kill processes using `user-data-dir=~/.cache/chrome-devtools-mcp`, remove the profile's `Singleton*` files and retry.
 
 - [ ] **Step 5: Docs.** Move the scene from in-flight to live in `README.md` and `docs/roadmap.md` (its "In flight" list drops to walkthrough mode alone).
