@@ -25,20 +25,9 @@ describe("registry", () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 
-  const roadmapExpectations: ReadonlyArray<{
-    id: string;
-    topic: string;
-  }> = [{ id: "gpt-transformer", topic: "machine-learning" }];
-
-  it.each(roadmapExpectations)(
-    "has roadmap entry $id under $topic with status soon",
-    ({ id, topic }) => {
-      const entry = findEntry(topic, id);
-      expect(entry).toBeDefined();
-      expect(entry?.status).toBe("soon");
-      expect(entry?.topic).toBe(topic);
-    },
-  );
+  it("has no roadmap entries left: every registered scene is built", () => {
+    expect(REGISTRY.filter((entry) => entry.status === "soon")).toEqual([]);
+  });
 
   it("loads the gradient descent visualization from its own chunk", async () => {
     await loadReady("machine-learning", "gradient-descent");
@@ -66,6 +55,13 @@ describe("registry", () => {
   it("loads the backprop graph from its own chunk", async () => {
     await loadReady("machine-learning", "backprop-graph");
     const summary = findEntry("machine-learning", "backprop-graph")?.summary;
+    expect(summary).not.toContain("roadmap");
+    expect(summary).not.toContain("soon");
+  });
+
+  it("loads the GPT transformer from its own chunk", async () => {
+    await loadReady("machine-learning", "gpt-transformer");
+    const summary = findEntry("machine-learning", "gpt-transformer")?.summary;
     expect(summary).not.toContain("roadmap");
     expect(summary).not.toContain("soon");
   });

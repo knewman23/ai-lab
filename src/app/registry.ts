@@ -64,8 +64,9 @@ export const REGISTRY: readonly RegistryEntry[] = [
     topic: "machine-learning",
     title: "GPT transformer",
     summary:
-      "Explore token embeddings, attention heads as weighted arcs, and the residual stream of a GPT-style transformer.",
-    status: "soon",
+      "Drag eight word embeddings across the floor and watch one transformer block respond: attention arcs between the tokens, the residual stream, and the probability of every next word.",
+    status: "ready",
+    load: () => import("../viz/gpt").then((m) => m.gptTransformer),
   },
 ];
 
