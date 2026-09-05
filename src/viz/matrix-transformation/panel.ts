@@ -77,7 +77,18 @@ export function createMtPanel(host: HTMLElement, handlers: MtPanelHandlers): MtP
     value: lastMatrix,
     onEntry: (i, v) => handlers.onEntry(i, v),
   });
-  setup.append(matrixInput.el);
+  // Wrapped like every other control: the four entries are one labelled thing, not four loose
+  // boxes, and this was the only control in any panel with no visible caption. A span rather
+  // than a <label>, since a label may only point at one of the four inputs.
+  const matrixField = document.createElement("div");
+  matrixField.className = "field";
+  matrixField.setAttribute("role", "group");
+  matrixField.setAttribute("aria-label", "Matrix entries");
+  const matrixLabel = document.createElement("span");
+  matrixLabel.className = "lbl";
+  matrixLabel.textContent = "Matrix";
+  matrixField.append(matrixLabel, matrixInput.el);
+  setup.append(matrixField);
 
   const animate = createSlider({
     label: "Animate",
@@ -135,7 +146,7 @@ export function createMtPanel(host: HTMLElement, handlers: MtPanelHandlers): MtP
 
   const controls: Readonly<Record<MtControlId, HTMLElement>> = {
     preset: preset.el,
-    matrix: matrixInput.el,
+    matrix: matrixField,
     animate: animate.el,
     reset: resetBtn.el,
     resetView: resetViewBtn.el,

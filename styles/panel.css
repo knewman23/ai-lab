@@ -1,7 +1,17 @@
 /* ---------- panel widgets ---------- */
 
-.panel-section + .panel-section {
+/*
+ * The panel's own rhythm: one gap between the blocks it stacks — the titled sections, any
+ * standalone note, and the explanation that closes it. Written over every child rather than as
+ * `.panel-section + .panel-section` because the explanation is not a section, and without this
+ * it inherited whatever margin its first child happened to carry: 8px in five scenes and none
+ * at all in the two whose prose opens with a heading.
+ */
+.panel > *:not(:first-child) {
   margin-top: 24px;
+}
+.panel > .explain > *:first-child {
+  margin-top: 0;
 }
 .panel-section h3 {
   margin: 0 0 12px;
@@ -12,6 +22,27 @@
   flex-direction: column;
   gap: 6px;
 }
+
+/*
+ * One vertical rhythm for everything stacked inside a section, whatever kind it is: a labelled
+ * field, the matrix entry grid, a row of buttons, or a line of prose.
+ *
+ * This used to be written as `.field + .field`, which only matched two labelled fields side by
+ * side, so any other kind of control between them dropped the gap to nothing: the matrix panel's
+ * preset, its entry grid and its Animate slider were touching, and so were the network's training
+ * buttons and its learning rate. Panel prose fell back to the browser's 1em instead.
+ *
+ * Switches are excluded on purpose and keep their own tighter spacing below: a column of them
+ * reads as one group rather than as separate controls.
+ */
+.panel-section > p {
+  margin: 0;
+}
+.panel-section > *:not(h3):not(.switch) + *:not(h3):not(.switch) {
+  margin-top: 14px;
+}
+
+/* Fields outside a section (a panel that stacks them directly) keep the same rhythm. */
 .field + .field {
   margin-top: 14px;
 }
