@@ -68,9 +68,10 @@ describe("what the scene draws when a step leaves the domain", () => {
     for (let i = 0; i < path.size; i += 1) {
       const point: Vec2 = [positions.getX(i), positions.getY(i)];
       expect(isInDomain(surface, point), `trail point ${i} is off the surface`).toBe(true);
-      expect(Math.abs(positions.getZ(i)), `trail point ${i} is above the scene`).toBeLessThanOrEqual(
-        ceiling + 0.1,
-      );
+      expect(
+        Math.abs(positions.getZ(i)),
+        `trail point ${i} is above the scene`,
+      ).toBeLessThanOrEqual(ceiling + 0.1);
     }
 
     pathLine.dispose();
