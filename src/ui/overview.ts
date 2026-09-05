@@ -30,12 +30,16 @@ const SECTIONS: readonly { readonly heading: string; readonly key: keyof Overvie
   { heading: "The picture to hold", key: "example" },
 ];
 
-/** Open on arrival, so the framing is read at least once; the walkthrough closes it when it starts. */
+/**
+ * Closed on arrival: the scene's controls are what a visitor came for, and an open overview is
+ * tall enough to push every one of them past the bottom of the panel. The summary line stays
+ * visible, so the framing is one click away rather than hidden.
+ */
 export function createOverview(spec: OverviewSpec): Overview {
   const el = document.createElement("details");
   el.className = "overview";
   el.dataset.role = "overview";
-  el.open = true;
+  el.open = false;
 
   const summary = document.createElement("summary");
   summary.className = "overview-summary";

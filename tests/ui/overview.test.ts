@@ -10,10 +10,18 @@ const SPEC: OverviewSpec = {
 };
 
 describe("createOverview", () => {
-  it("opens on arrival, so the framing is read at least once", () => {
+  it("starts closed, so the scene's controls are what a visitor lands on", () => {
     const overview = createOverview(SPEC);
     expect(overview.el instanceof HTMLDetailsElement).toBe(true);
-    expect((overview.el as HTMLDetailsElement).open).toBe(true);
+    expect((overview.el as HTMLDetailsElement).open).toBe(false);
+  });
+
+  it("keeps its content for the visitor who opens it", () => {
+    const el = createOverview(SPEC).el as HTMLDetailsElement;
+    el.open = true;
+    expect(el.textContent).toContain(SPEC.objective);
+    expect(el.textContent).toContain(SPEC.whereUsed);
+    expect(el.textContent).toContain(SPEC.example);
   });
 
   it("shows the summary line in the part that stays visible when closed", () => {
@@ -35,6 +43,7 @@ describe("createOverview", () => {
 
   it("collapses without losing its content, and can be opened again", () => {
     const overview = createOverview(SPEC);
+    (overview.el as HTMLDetailsElement).open = true;
     overview.collapse();
 
     const el = overview.el as HTMLDetailsElement;
