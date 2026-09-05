@@ -43,8 +43,9 @@ export const NN_STEPS: readonly Step<NnState, NnControlId>[] = [
   {
     prose:
       "Press Step to run one epoch: a full-batch pass over every point, one gradient, one update " +
-      "of every weight at the learning rate shown. Hold Play to run them at ten a second. The " +
-      "training line reports the epoch, the loss and the accuracy after each one.",
+      "of every weight at the learning rate shown. Press Play to run them at ten a second, and " +
+      "press it again to pause. The training line reports the epoch, the loss and the accuracy " +
+      "after each one.",
     enter: (s) => setDataset(s, "xor"),
     focus: "step",
   },

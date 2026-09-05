@@ -61,9 +61,9 @@ export const GD_STEPS: readonly Step<GdState, GdControlId>[] = [
   {
     prose:
       "Press Step to take one update: the parameters move against the gradient by the learning " +
-      "rate, and the new point joins the trail behind the ball. Hold Run to take them at ten a " +
-      "second. On a round bowl every step points near the centre, so the trail runs almost " +
-      "straight in and the steps shorten as the slope flattens.",
+      "rate, and the new point joins the trail behind the ball. Press Run to take them at ten a " +
+      "second, and press it again to pause. On a round bowl every step points near the centre, " +
+      "so the trail runs almost straight in and the steps shorten as the slope flattens.",
     enter: (s) => advance(s, BOWL_STEPS),
     focus: "step",
   },
