@@ -230,6 +230,37 @@ function drag(
   canvas.dispatchEvent(pointer("pointerup", to[0], to[1]));
 }
 
+/** The drawn size every label is given in the declutter test, in CSS pixels. */
+const LABEL_W = 60;
+const LABEL_H = 16;
+
+/** Where a label span sits: the pixel translate its transform ends with. */
+function labelRect(span: HTMLElement): readonly [number, number, number, number] {
+  const m = /translate\((-?[\d.]+)px, (-?[\d.]+)px\)/.exec(span.style.transform);
+  if (m?.[1] === undefined || m[2] === undefined)
+    throw new Error(`no place for "${span.textContent ?? ""}"`);
+  const x = Number(m[1]);
+  const y = Number(m[2]);
+  // Anchored above the point, centred on it; no gpt label is of the `op` kind.
+  return [x - LABEL_W / 2, y - LABEL_H, x + LABEL_W / 2, y];
+}
+
+/** True when two label spans share any pixels. */
+function touching(a: HTMLElement, b: HTMLElement): boolean {
+  const [al, at, ar, ab] = labelRect(a);
+  const [bl, bt, br, bb] = labelRect(b);
+  return al < br && bl < ar && at < bb && bt < ab;
+}
+
+/** Every unordered pair drawn from `items`. */
+function pairs<T>(items: readonly T[]): [T, T][] {
+  const out: [T, T][] = [];
+  items.forEach((item, i) => {
+    for (const other of items.slice(i + 1)) out.push([item, other]);
+  });
+  return out;
+}
+
 function labelTexts(container: HTMLElement): string[] {
   return [...container.querySelectorAll(".viz-labels span")].map((s) => s.textContent ?? "");
 }
@@ -359,23 +390,39 @@ describe("gptTransformer.mount", () => {
     viz.dispose();
   });
 
-  it("drops the labels it cannot draw legibly, keeping the first band name", () => {
-    const { host: h } = host();
-    const viz = gptTransformer.mount(h);
-    // Every label drawn wide enough to cover the whole canvas, so all 29 fight for one space.
-    for (const span of h.canvasContainer.querySelectorAll<HTMLElement>(".viz-labels span")) {
-      span.getBoundingClientRect = (): DOMRect => new DOMRect(0, 0, 4 * SIZE, 4 * SIZE);
-    }
-    viz.resize(SIZE, SIZE);
-    viz.update(0.016);
+  it.each(["tuned", "collapsed"])(
+    "moves its crowded labels apart rather than printing them over each other (%s)",
+    (preset) => {
+      const { host: h } = host();
+      const viz = gptTransformer.mount(h);
+      const embeddings = select(h.panel, "Embeddings");
+      embeddings.value = preset;
+      embeddings.dispatchEvent(new Event("change"));
 
-    const shown = [...h.canvasContainer.querySelectorAll<HTMLElement>(".viz-labels span")].filter(
-      (span) => !span.hidden,
-    );
-    expect(shown.map((span) => span.textContent)).toEqual(["embed + position"]);
+      const spans = [...h.canvasContainer.querySelectorAll<HTMLElement>(".viz-labels span")];
+      // Every label the same size, so what separates them is the pass and not their text.
+      for (const span of spans) {
+        span.getBoundingClientRect = (): DOMRect => new DOMRect(0, 0, LABEL_W, LABEL_H);
+      }
+      // The canvas the scene was measured on in the browser, rather than the square the pick
+      // tests use: how much room the labels have is the whole question here.
+      viz.resize(1600, 1000);
+      viz.update(0.016);
 
-    viz.dispose();
-  });
+      const shown = spans.filter((span) => !span.hidden);
+      const collisions = pairs(shown)
+        .filter(([a, b]) => touching(a, b))
+        .map(([a, b]) => `${a.textContent ?? ""} / ${b.textContent ?? ""}`);
+      expect(collisions).toEqual([]);
+
+      const texts = shown.map((span) => span.textContent);
+      // The residual path's three steps are one idea: all of them or none, never a fragment.
+      expect(texts).toEqual(expect.arrayContaining(["+ position", "+ attention", "+ MLP"]));
+      expect(texts).toEqual(expect.arrayContaining(["embed + position", "logits"]));
+
+      viz.dispose();
+    },
+  );
 
   it("re-aims the camera when the canvas changes shape", () => {
     const { host: h, frames } = host();

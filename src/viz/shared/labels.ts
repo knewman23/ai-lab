@@ -1,5 +1,6 @@
 import { Vector3, type Camera } from "three";
 import { declutter, type LabelBox } from "./declutter";
+import { boxOf, type Measured } from "./label-box";
 import type { Vec3 } from "./layer";
 
 /** What a label names; each kind is a CSS class on its span (see `.viz-labels` in panel.css). */
@@ -31,17 +32,18 @@ export interface LabelLayerOptions {
   readonly rank?: (id: string) => number;
 }
 
-interface Entry {
-  readonly el: HTMLSpanElement;
+interface Entry extends Measured {
   world: Vec3;
   /** The last written pixel position, so the transform is only touched when it moves. */
   px: number;
   py: number;
-  /** The rank the declutter pass places this label at; NaN when the layer does not declutter. */
-  readonly rank: number;
-  /** The drawn size, measured once per text and kind and NaN until then. */
-  w: number;
-  h: number;
+}
+
+/** One label and the point it projected to this frame, carried through the declutter pass. */
+interface Pending extends LabelBox {
+  readonly entry: Entry;
+  readonly px: number;
+  readonly py: number;
 }
 
 /** Anchors: `op` labels sit centred on their point; everything else hangs its baseline above it. */
@@ -50,26 +52,13 @@ const ANCHOR_ABOVE = "translate(-50%, -100%)";
 
 const scratch = new Vector3();
 
-/**
- * The screen rectangle a label covers when its point lands on (`px`, `py`), measuring the span
- * the first time it is asked and reusing that until the text or kind changes. Measuring costs a
- * layout, so it must not run per frame; the size of a span depends on its text, not its place.
- */
-function boxOf(id: string, entry: Entry, px: number, py: number): LabelBox {
-  if (Number.isNaN(entry.w)) {
-    const rect = entry.el.getBoundingClientRect();
-    entry.w = rect.width;
-    entry.h = rect.height;
-  }
-  const half = entry.el.className === "op" ? entry.h / 2 : entry.h;
-  return {
-    id,
-    rank: entry.rank,
-    left: px - entry.w / 2,
-    top: py - half,
-    right: px + entry.w / 2,
-    bottom: py - half + entry.h,
-  };
+/** Writes a label's transform, leaving it alone when it already sits on that pixel. */
+function place(entry: Entry, px: number, py: number): void {
+  if (px === entry.px && py === entry.py) return;
+  entry.px = px;
+  entry.py = py;
+  const anchor = entry.el.className === "op" ? ANCHOR_OP : ANCHOR_ABOVE;
+  entry.el.style.transform = `${anchor} translate(${String(px)}px, ${String(py)}px)`;
 }
 
 /**
@@ -144,7 +133,7 @@ export function createLabelLayer(host: HTMLElement, options?: LabelLayerOptions)
     update(camera, w, h): void {
       if (w <= 0 || h <= 0) return;
       camera.updateMatrixWorld();
-      const boxes: LabelBox[] = [];
+      const pending: Pending[] = [];
       for (const [id, entry] of entries) {
         const p = projectToPixels(entry.world, camera, w, h);
         if (p === null) {
@@ -155,20 +144,23 @@ export function createLabelLayer(host: HTMLElement, options?: LabelLayerOptions)
         entry.el.hidden = false;
         const px = Math.round(p[0]);
         const py = Math.round(p[1]);
-        if (rankOf !== undefined) boxes.push(boxOf(id, entry, px, py));
-        if (px === entry.px && py === entry.py) continue;
-        entry.px = px;
-        entry.py = py;
-        const anchor = entry.el.className === "op" ? ANCHOR_OP : ANCHOR_ABOVE;
-        entry.el.style.transform = `${anchor} translate(${String(px)}px, ${String(py)}px)`;
+        if (rankOf === undefined) {
+          place(entry, px, py);
+          continue;
+        }
+        pending.push({ ...boxOf(id, entry, px, py), entry, px, py });
       }
-      // Empty whenever the layer does not declutter, and whenever nothing is on screen.
-      if (boxes.length === 0) return;
-      const kept = declutter(boxes);
-      for (const box of boxes) {
-        const entry = entries.get(box.id);
-        if (entry === undefined) throw new Error(`labels: the placed label "${box.id}" is gone`);
-        entry.el.hidden = !kept.has(box.id);
+      // Empty whenever the layer does not declutter, and whenever nothing is on screen. There is
+      // no second guard on `rankOf`: two guards on one branch and neither can ever be falsified.
+      if (pending.length === 0) return;
+      const places = declutter(pending);
+      for (const label of pending) {
+        const at = places.get(label.id);
+        if (at === undefined) {
+          label.entry.el.hidden = true;
+          continue;
+        }
+        place(label.entry, label.px + at.dx, label.py + at.dy);
       }
     },
 

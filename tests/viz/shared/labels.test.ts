@@ -152,67 +152,97 @@ describe("createLabelLayer", () => {
  * measures a span once and caches it, so this must run before the update that places them.
  */
 function drawAt(host: HTMLElement, w: number, h: number): void {
-  for (const span of host.querySelectorAll("span")) {
-    span.getBoundingClientRect = (): DOMRect => new DOMRect(0, 0, w, h);
-  }
+  for (const span of host.querySelectorAll("span")) drawSpan(span, w, h);
+}
+
+/** The drawn size of one span, for a test that needs its labels to differ in size. */
+function drawSpan(span: Element, w: number, h: number): void {
+  span.getBoundingClientRect = (): DOMRect => new DOMRect(0, 0, w, h);
 }
 
 describe("createLabelLayer with a rank function", () => {
-  it("hides the worse-ranked of two labels that land on the same point", () => {
+  /** Ranks "keep" above everything else, so the other labels are the ones that give way. */
+  const byKeep = { rank: (id: string): number => (id === "keep" ? 1 : 7) };
+
+  it("moves the worse-ranked of two labels that land on the same point", () => {
     const host = document.createElement("div");
-    const layer = createLabelLayer(host, { rank: (id) => (id === "keep" ? 1 : 7) });
-    layer.set("drop", "drop", [0, 0, 0], "node");
+    const layer = createLabelLayer(host, byKeep);
+    layer.set("moved", "moved", [0, 0, 0], "node");
     layer.set("keep", "keep", [0, 0, 0], "node");
     drawAt(host, 44, 16);
     layer.update(camera(), 200, 200);
 
-    expect(host.querySelector<HTMLElement>("span.node")?.hidden).toBe(true);
-    expect(host.querySelectorAll<HTMLElement>("span")[1]?.hidden).toBe(false);
+    const spans = host.querySelectorAll<HTMLElement>("span");
+    expect(spans[1]?.hidden).toBe(false);
+    expect(pixels(spans[1] as Element)).toEqual([100, 100]);
+    // A line above the point it names, rather than dropped or printed over "keep".
+    expect(spans[0]?.hidden).toBe(false);
+    expect(pixels(spans[0] as Element)).toEqual([100, 84]);
     layer.dispose();
   });
 
-  it("keeps both labels when their rectangles stand clear of each other", () => {
+  it("hides a label only when every candidate place is covered", () => {
     const host = document.createElement("div");
-    const layer = createLabelLayer(host, { rank: (id) => (id === "keep" ? 1 : 7) });
-    layer.set("drop", "drop", [0, 0, 0], "node");
+    const layer = createLabelLayer(host, byKeep);
+    layer.set("buried", "buried", [0, 0, 0], "node");
+    // Below "buried" and drawn wider and taller than the canvas, so its box covers every place
+    // "buried" could step to, including the line below it.
+    layer.set("keep", "keep", [0, 0, -2], "node");
+    const spans = host.querySelectorAll<HTMLElement>("span");
+    drawSpan(spans[0] as Element, 44, 16);
+    drawSpan(spans[1] as Element, 600, 600);
+    layer.update(camera(), 200, 200);
+
+    expect(spans[0]?.hidden).toBe(true);
+    expect(spans[1]?.hidden).toBe(false);
+    layer.dispose();
+  });
+
+  it("leaves both labels on their points when their rectangles stand clear", () => {
+    const host = document.createElement("div");
+    const layer = createLabelLayer(host, byKeep);
+    layer.set("other", "other", [0, 0, 0], "node");
     layer.set("keep", "keep", [3, 0, 0], "node");
     drawAt(host, 44, 16);
     layer.update(camera(), 200, 200);
 
-    for (const span of host.querySelectorAll<HTMLElement>("span")) expect(span.hidden).toBe(false);
+    for (const span of host.querySelectorAll<HTMLElement>("span")) {
+      expect(span.hidden).toBe(false);
+      expect(pixels(span)[1]).toBe(100);
+    }
     layer.dispose();
   });
 
-  it("shows a label again once the crowding one is gone", () => {
+  it("puts a moved label back on its point once the crowding one is gone", () => {
     const host = document.createElement("div");
-    const layer = createLabelLayer(host, { rank: (id) => (id === "keep" ? 1 : 7) });
-    layer.set("drop", "drop", [0, 0, 0], "node");
+    const layer = createLabelLayer(host, byKeep);
+    layer.set("moved", "moved", [0, 0, 0], "node");
     layer.set("keep", "keep", [0, 0, 0], "node");
     drawAt(host, 44, 16);
     layer.update(camera(), 200, 200);
-    const dropped = host.querySelector<HTMLElement>("span");
-    expect(dropped?.hidden).toBe(true);
+    const span = host.querySelector<HTMLElement>("span");
+    expect(pixels(span as Element)).toEqual([100, 84]);
 
     layer.remove("keep");
     layer.update(camera(), 200, 200);
-    expect(dropped?.hidden).toBe(false);
+    expect(pixels(span as Element)).toEqual([100, 100]);
     layer.dispose();
   });
 
   it("re-measures a label after its text changes, so a longer word crowds more", () => {
     const host = document.createElement("div");
-    const layer = createLabelLayer(host, { rank: (id) => (id === "keep" ? 1 : 7) });
+    const layer = createLabelLayer(host, byKeep);
     layer.set("keep", "keep", [0, 0, 0], "node");
-    layer.set("drop", "drop", [1.2, 0, 0], "node");
+    layer.set("other", "other", [1.2, 0, 0], "node");
     drawAt(host, 20, 16);
     layer.update(camera(), 200, 200);
     const spans = host.querySelectorAll<HTMLElement>("span");
-    expect(spans[1]?.hidden).toBe(false);
+    expect(pixels(spans[1] as Element)).toEqual([129, 100]);
 
     layer.set("keep", "keep at length", [0, 0, 0], "node");
     drawAt(host, 120, 16);
     layer.update(camera(), 200, 200);
-    expect(spans[1]?.hidden).toBe(true);
+    expect(pixels(spans[1] as Element)).toEqual([129, 84]);
     layer.dispose();
   });
 
@@ -224,7 +254,10 @@ describe("createLabelLayer with a rank function", () => {
     drawAt(host, 44, 16);
     layer.update(camera(), 200, 200);
 
-    for (const span of host.querySelectorAll<HTMLElement>("span")) expect(span.hidden).toBe(false);
+    for (const span of host.querySelectorAll<HTMLElement>("span")) {
+      expect(span.hidden).toBe(false);
+      expect(pixels(span)).toEqual([100, 100]);
+    }
     layer.dispose();
   });
 
@@ -256,11 +289,12 @@ describe("createLabelLayer with a rank function", () => {
     layer.update(camera(), 200, 200);
     const underSpan = host.querySelectorAll<HTMLElement>("span")[1];
     expect(underSpan?.textContent).toBe("u");
-    expect(underSpan?.hidden).toBe(true);
+    // Half covered where it stands and by the line above, so it steps down instead.
+    expect(pixels(underSpan as Element)).toEqual([100, 132]);
 
     layer.set("anchor", "+", [0, 0, 0], "node");
     layer.update(camera(), 200, 200);
-    expect(underSpan?.hidden).toBe(false);
+    expect(pixels(underSpan as Element)).toEqual([100, 116]);
     layer.dispose();
   });
 });
