@@ -169,15 +169,41 @@ pointing `load` at the folder:
 The registry test asserts the loaded module's `id`, `topic`, `title` and
 `summary` match the entry, so the two copies cannot drift.
 
+### Giving it a walkthrough
+
+A walkthrough is optional, and a scene without one renders no chrome at all. To add one,
+export a control-id union from the panel with a `Record` over it — which makes the registry
+exhaustive, so a step naming a control the panel does not register fails to compile — then
+write the steps against the scene's own setters and wire them in `mount`:
+
+```ts
+const walkthrough = createWalkthrough<CubeState, CubeControlId>({
+  title: "Walk me through it",
+  steps: CUBE_STEPS,
+  initial: initialState, // must allocate on every call: goTo folds from it
+  apply,
+  focus: (id) => panel?.focus(id),
+});
+```
+
+Return it on the `VizInstance` as `walkthrough` and the shell does the rest. Two rules the
+tests enforce: each step's `enter` must be deterministic over the scene's diffing surface
+(not idempotent — a step that advances an optimizer is expected to move it), and the prose
+says what to do and what will happen, never what is on screen, since the controls stay live.
+
 ## Roadmap
 
 Seven scenes are live: derivative & tangent and the chain rule graph (calculus), matrix
 transformation (linear algebra), and gradient descent, the backprop graph, the neural network
 and the GPT transformer (machine learning).
 
-Next: walkthrough mode (shell) — optional numbered steps that reconfigure any scene.
+Every scene also ships a walkthrough: a numbered sequence that sets the scene up a step at a
+time, says in one paragraph what to do and what will happen, and outlines the control it names.
+A step is a starting position rather than a cage — the scene stays fully interactive, and
+touching a control neither exits the walkthrough nor advances it. Each step has its own URL
+(`#/<topic>/<id>/walkthrough/<n>`, 1-based), so a step can be linked to and loaded cold.
 
-After that: SVD & low-rank approximation, Taylor series, and overfitting / bias–variance /
+Next: SVD & low-rank approximation, Taylor series, and overfitting / bias–variance /
 regularization. The queue behind those, with what each scene would let you manipulate and
 what it reuses, is in [docs/roadmap.md](docs/roadmap.md).
 

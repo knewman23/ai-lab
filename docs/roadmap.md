@@ -19,13 +19,16 @@ it belongs in a scene's explanation panel, not in a scene of its own.
 | ML             | Backprop graph         | `specs/2026-09-03-backprop-graph-design.md`              |
 | ML             | Neural network         | `specs/2026-09-04-neural-network-design.md`              |
 | ML             | GPT transformer        | `specs/2026-09-04-gpt-transformer-design.md`            |
+| Shell          | Walkthrough mode       | `specs/2026-09-05-walkthrough-mode-design.md`           |
+
+All seven scenes ship a walkthrough of six steps: the scene owns its typed steps and its own
+control-id union, the shell owns the banner, the step card, Back/Next and the URL, and
+`goTo(i)` replays steps 0…i over a freshly allocated initial state, which is what makes a
+cold-loaded deep link and the Back button agree.
 
 ## In flight
 
-1. **Walkthrough mode** (shell) — optional numbered steps that drive any scene's state,
-   so a card can be read as a lesson rather than a sandbox. The GPT transformer's assembler
-   was built with this in mind: `apply(nextState)` is a single entry point over pure setters,
-   and every scene's panel already renders from state alone.
+Nothing. The next scene comes from Tier 1 below.
 
 ## Tier 1 — next up
 
@@ -44,8 +47,8 @@ and LoRA: most of a matrix's action lives in a few directions.
 Reuses `matrix-transformation`'s plane, basis vectors and presets wholesale; needs a
 `core/math/svd.ts` (a 2×2 closed form for the geometric half, one-sided Jacobi for the
 image half) and a small image shipped in `public/`. The scrub-bar-between-stages control
-is the same shape walkthrough mode wants, so build it after walkthrough if both are
-queued.
+is the same shape walkthrough mode uses, and that shell now exists: a scrubbable stage list
+can be a walkthrough script rather than a new control.
 
 Prerequisite reading order on the home page: matrix transformation → SVD.
 
