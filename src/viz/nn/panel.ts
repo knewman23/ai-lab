@@ -5,6 +5,7 @@ import { createReadout } from "../../ui/readout";
 import { createSelect } from "../../ui/select";
 import { createLogSlider } from "../../ui/slider";
 import { createToggle, type Toggle } from "../../ui/toggle";
+import { createControlFocus } from "../shared/control-focus";
 import { createNnExplanation, probeText, trainingLine } from "./explanation";
 import { initialState, LR_RANGE, type Derived, type NnState, type ShowKey } from "./state";
 
@@ -27,9 +28,28 @@ const SHOW_KEYS: readonly { key: ShowKey; label: string }[] = [
 /** The one readout row: epoch, loss and accuracy live in the training line instead. */
 const PROBE_ROW = "Probe";
 
+/**
+ * The scene's own name for each control a walkthrough step may point at. A union rather than an
+ * open string, so a step naming a control this panel does not register is a compile error.
+ */
+export type NnControlId =
+  | "dataset"
+  | "step"
+  | "play"
+  | "reset"
+  | "lr"
+  | "resetView"
+  | "showWeights"
+  | "showData"
+  | "showBoundary";
+
 export interface NnPanel {
   el: HTMLElement;
+  /** Exhaustive by construction: a union member with no element fails to compile. */
+  readonly controls: Readonly<Record<NnControlId, HTMLElement>>;
   render(state: NnState, d: Derived): void;
+  /** Outlines one control, or clears the outline. */
+  focus(id: NnControlId | undefined): void;
   dispose(): void;
 }
 
@@ -99,6 +119,28 @@ export function createNnPanel(host: HTMLElement, handlers: NnPanelHandlers): NnP
   panel.section("Readouts").append(readout.el);
 
   const explanation = createNnExplanation(panel.el);
+  // Marked so the shell can collapse it while a walkthrough's step card, which occupies the
+  // same place in the panel, is showing.
+  explanation.el.dataset.role = "explanation";
+
+  const toggleFor = (key: ShowKey): HTMLElement => {
+    const toggle = toggles.get(key);
+    if (!toggle) throw new Error(`nn panel: the "${key}" toggle was never built`);
+    return toggle.el;
+  };
+
+  const controls: Readonly<Record<NnControlId, HTMLElement>> = {
+    dataset: datasetSelect.el,
+    step: stepBtn.el,
+    play: playBtn.el,
+    reset: resetBtn.el,
+    lr: lrSlider.el,
+    resetView: resetViewBtn.el,
+    showWeights: toggleFor("weights"),
+    showData: toggleFor("data"),
+    showBoundary: toggleFor("boundary"),
+  };
+  const focus = createControlFocus(controls);
 
   function render(state: NnState, d: Derived): void {
     if (datasetSelect.value !== state.dataset) datasetSelect.value = state.dataset;
@@ -119,6 +161,8 @@ export function createNnPanel(host: HTMLElement, handlers: NnPanelHandlers): NnP
 
   return {
     el: panel.el,
+    controls,
+    focus,
     render,
     dispose(): void {
       host.replaceChildren();

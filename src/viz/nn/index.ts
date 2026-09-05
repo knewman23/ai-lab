@@ -13,7 +13,9 @@ import { frameNn } from "./frame-nn";
 import { syncLabels } from "./labels-sync";
 import { inputFromFloor, WALL_H, WALL_OPACITY, WALL_W } from "./layout";
 import { createNeurons } from "./neurons";
-import { createNnPanel, type NnPanel } from "./panel";
+import { createNnPanel, type NnControlId, type NnPanel } from "./panel";
+import { createWalkthrough } from "../shared/walkthrough";
+import { NN_STEPS, NN_WALKTHROUGH_TITLE } from "./walkthrough";
 import { createPoints } from "./points";
 import { createProbe } from "./probe";
 import {
@@ -223,7 +225,20 @@ function mount(host: VizHost): VizInstance {
 
   apply(state);
 
+  const walkthrough = createWalkthrough<NnState, NnControlId>({
+    title: NN_WALKTHROUGH_TITLE,
+    steps: NN_STEPS,
+    initial: initialState,
+    apply,
+    focus: (id) => panel?.focus(id),
+    frame: () => {
+      goHome();
+    },
+  });
+
   return {
+    walkthrough,
+
     update(dt: number): boolean {
       // Damping keeps the camera moving for a moment after the pointer stops.
       const moved = kit.controls.update(dt);
