@@ -34,9 +34,9 @@ export const GD_STEPS: readonly Step<GdState, GdControlId>[] = [
   {
     prose:
       "The surface is one loss over two parameters, x and y: height is the loss at that point, " +
-      "and the contour rings on it are lines of equal loss. The Surface select swaps the " +
-      "function underneath everything else in this panel, so every later step can be tried again " +
-      "on a harder shape.",
+      "and the rings drawn on the plane beneath it are its contours, the lines along which the " +
+      "loss does not change. The Surface select swaps the function under everything else in this " +
+      "panel, so every later step can be tried again on a harder shape.",
     enter: (s) => setSurface(s, "bowl"),
     focus: "surface",
   },

@@ -20,9 +20,10 @@ const NARROW_DX = 0.02;
 export const CHAIN_STEPS: readonly Step<ChainState, ChainControlId>[] = [
   {
     prose:
-      "Three graphs share one corner. The floor carries u as a function of x, the side wall " +
-      "carries y as a function of u, and the back wall carries the composition y(x) directly. " +
-      "The Composition select swaps all three at once, since they are three views of one chain.",
+      "Three graphs share one corner. From the opening view the right-hand wall carries u as a " +
+      "function of x, the left-hand wall carries y as a function of u, and the floor carries the " +
+      "composition y(x) directly. The Composition select swaps all three at once, since they are " +
+      "three views of one chain.",
     enter: (s) => setComp(s, "sin3x"),
     focus: "comp",
   },
@@ -36,18 +37,19 @@ export const CHAIN_STEPS: readonly Step<ChainState, ChainControlId>[] = [
   },
   {
     prose:
-      "Turn the connectors on. They carry the same Δu from the floor's graph up to the side " +
-      "wall's, which is the whole trick of the chain rule: the output of the inner function is " +
-      "the input of the outer one, so one leg is shared between two right-angled triangles.",
+      "Turn the connectors on. They carry the same Δu from the right-hand wall's graph across to " +
+      "the left-hand wall's, which is the whole trick of the chain rule: the output of the inner " +
+      "function is the input of the outer one, so one leg is shared between two right-angled " +
+      "triangles.",
     enter: (s) => setShow(setX(s, X_AT), "connectors", true),
     focus: "showConnectors",
   },
   {
     prose:
-      "Turn the Δ triangles on to see both of them at once. On the floor the legs are Δx and Δu; " +
-      "on the side wall they are that same Δu and the Δy it produces; on the back wall the single " +
-      "triangle has legs Δx and Δy. Read the ratios in the panel and multiply the first two: the " +
-      "product is the third, exactly, for any step size.",
+      "Turn the Δ triangles on to see both of them at once. On the right-hand wall the legs are " +
+      "Δx and Δu; on the left-hand wall they are that same Δu and the Δy it produces; on the " +
+      "floor the single triangle has legs Δx and Δy. Read the ratios in the panel and multiply " +
+      "the first two: the product is the third, exactly, for any step size.",
     enter: (s) =>
       setShow(setShow(setDx(setX(s, X_AT), WIDE_DX), "triangles", true), "secants", true),
     focus: "showTriangles",

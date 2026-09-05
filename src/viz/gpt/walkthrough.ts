@@ -31,10 +31,12 @@ export const GPT_STEPS: readonly Step<GptState, GptControlId>[] = [
   },
   {
     prose:
-      "The wall is one block, left to right: embed and position, scores, softmax, the weighted " +
-      "sum, the residual add, the MLP, then logits. Step the Stage select rightwards to walk it " +
-      "end to end — each choice dims the other bands, expands one, and prints that stage's own " +
-      "numbers in the readout below.",
+      "Each column on the wall is one token of the sentence, and the bands stacked above them " +
+      "are what the block does to every column in turn: embed and position at the bottom, then " +
+      "attention, the residual add, the MLP, and the logits at the top. Pick one from the Stage " +
+      "select to dim the rest and print that stage's numbers below — attention holds three of " +
+      "the entries, the raw scores, the softmax over them and the weighted sum, so those three " +
+      "light the same band and change only what the readout prints.",
     enter: (s) => setStage(s, "embed"),
     focus: "stage",
   },

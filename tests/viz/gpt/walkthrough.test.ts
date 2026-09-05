@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { EMBEDDING_PRESETS } from "../../../src/core/math/transformer";
 import { createGptPanel, type GptPanelHandlers } from "../../../src/viz/gpt/panel";
 import { GPT_STEPS } from "../../../src/viz/gpt/walkthrough";
+import { BAND_Z, COLUMN_X, bandForStage } from "../../../src/viz/gpt/layout";
 import { derived, initialState, type GptState } from "../../../src/viz/gpt/state";
 import { expectStepProse } from "../shared/prose-lint";
 
@@ -85,6 +86,22 @@ describe("the GPT walkthrough", () => {
 
   it.each(INDICES)("step %i's prose says what to do, not what is on screen", (index) => {
     expectStepProse(stepAt(index).prose, `gpt step ${index}`);
+  });
+
+  it("pins the wall layout the second step describes", () => {
+    // "embed and position at the bottom, then attention, the residual add, the MLP, and the
+    // logits at the top": the bands stack upwards in that order, and left to right is the
+    // sequence of tokens, not the pipeline.
+    const bands = [BAND_Z.embed, BAND_Z.attention, BAND_Z.residual, BAND_Z.mlp, BAND_Z.logits];
+    expect(bands).toEqual([...bands].sort((a, b) => a - b));
+    expect(new Set(bands).size).toBe(bands.length);
+    expect([...COLUMN_X]).toEqual([...COLUMN_X].sort((a, b) => a - b));
+
+    // "attention holds three of the entries ... so those three light the same band".
+    expect(bandForStage("scores")).toBe("attention");
+    expect(bandForStage("softmax")).toBe("attention");
+    expect(bandForStage("weighted")).toBe("attention");
+    expect(bandForStage("all")).toBeNull();
   });
 
   it("pins the state at the collapsed step", () => {

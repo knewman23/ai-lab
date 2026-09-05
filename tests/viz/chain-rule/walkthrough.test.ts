@@ -4,6 +4,8 @@ import { createChainPanel, type ChainPanelHandlers } from "../../../src/viz/chai
 import { CHAIN_STEPS } from "../../../src/viz/chain-rule/walkthrough";
 import { derived, initialState, type ChainState } from "../../../src/viz/chain-rule/state";
 import { describeScriptContract } from "../shared/walkthrough-contract";
+import { COMPOSITIONS } from "../../../src/core/math/compositions";
+import { floorLocal, frontLocal, sideLocal } from "../../../src/viz/chain-rule/display";
 
 function mountPanel() {
   const handlers: ChainPanelHandlers = {
@@ -34,6 +36,17 @@ function at(index: number): ChainState {
 }
 
 describe("the chain rule walkthrough's claims", () => {
+  it("pins which graph each face carries, as the first step describes", () => {
+    const comp = COMPOSITIONS.sin3x;
+    // "the right-hand wall carries u as a function of x": the front face plots x across and
+    // scaled u up. The camera's home view puts that wall on the right (frame-corner.ts).
+    expect(frontLocal(comp, 1.5, 0.4)).toEqual([1.5, comp.su * 0.4]);
+    // "the left-hand wall carries y as a function of u".
+    expect(sideLocal(comp, 0.4, -0.7)).toEqual([comp.sy * -0.7, comp.su * 0.4]);
+    // "the floor carries the composition y(x) directly".
+    expect(floorLocal(comp, 1.5, -0.7)).toEqual([1.5, comp.sy * -0.7]);
+  });
+
   it("shows both triangles and the shared leg by the fourth step", () => {
     const state = at(3);
 

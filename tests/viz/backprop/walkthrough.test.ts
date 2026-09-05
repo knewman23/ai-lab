@@ -4,6 +4,14 @@ import { createBpPanel, type BpPanelHandlers } from "../../../src/viz/backprop/p
 import { BP_STEPS } from "../../../src/viz/backprop/walkthrough";
 import { derived, initialState, stepForward, type BpState } from "../../../src/viz/backprop/state";
 import { describeScriptContract } from "../shared/walkthrough-contract";
+import { GRAPHS, GRAPH_KEYS } from "../../../src/core/math/graphs";
+import { layoutGraph, type Positions } from "../../../src/viz/backprop/layout";
+
+function nodeAt(positions: Positions, id: string): readonly [number, number] {
+  const p = positions[id];
+  if (p === undefined) throw new Error(`no layout position for "${id}"`);
+  return p;
+}
 
 function mountPanel() {
   const handlers: BpPanelHandlers = {
@@ -62,6 +70,25 @@ describe("the backprop walkthrough's claims", () => {
     expect(state.step).toBe(0);
     expect(d.phase).toBe("idle");
     expect(d.current).toBeNull();
+  });
+
+  it("puts the leaves in the leftmost column, as the first step says", () => {
+    for (const key of GRAPH_KEYS) {
+      const graph = GRAPHS[key];
+      const positions = layoutGraph(graph);
+      const xOf = (id: string): number => nodeAt(positions, id)[0];
+      const leafX = graph.leaves.map((leaf) => xOf(leaf.id));
+      const others = graph.nodes.filter((node) => node.op !== "leaf").map((node) => xOf(node.id));
+
+      // Every leaf shares one X, and every computed node sits to the right of it.
+      expect(
+        new Set(leafX.map((x) => x.toFixed(6))).size,
+        `${key}: leaves are not one column`,
+      ).toBe(1);
+      const column = leafX[0];
+      if (column === undefined) throw new Error(`${key}: no leaves`);
+      for (const x of others) expect(x).toBeGreaterThan(column);
+    }
   });
 
   it("evaluates the product before the sum that uses it, as step 2 says", () => {

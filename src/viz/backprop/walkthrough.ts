@@ -31,9 +31,10 @@ const SHARED_PASS = 8;
 export const BP_STEPS: readonly Step<BpState, BpControlId>[] = [
   {
     prose:
-      "The bottom row holds the leaves: the numbers this graph is evaluated at, and the only " +
-      "things here that are given rather than computed. Drag a leaf slider and every node above " +
-      "it recomputes, because each one is a function of what feeds it.",
+      "The leftmost column holds the leaves: the numbers this graph is evaluated at, and the " +
+      "only things here that are given rather than computed. Every other node sits one column " +
+      "further right than the deepest input feeding it, so the graph reads left to right. Drag " +
+      "a leaf slider and everything downstream recomputes.",
     enter: (s) => setGraph(s, "product-sum"),
     focus: "leaves",
   },
