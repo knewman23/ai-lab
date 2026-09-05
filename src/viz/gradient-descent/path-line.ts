@@ -14,7 +14,7 @@ import {
 import { disposeObject } from "../../core/scene";
 import type { RingBuffer } from "../../core/math/ring-buffer";
 import type { Vec2 } from "../../core/math/numeric";
-import type { Surface } from "../../core/math/surfaces";
+import { clampToDomain, type Surface } from "../../core/math/surfaces";
 import type { ThemeColors } from "../types";
 
 export interface PathLine {
@@ -73,7 +73,9 @@ export function createPathLine(theme: ThemeColors, capacity = 2000): PathLine {
 
   function writeStep(p: Vec2, age: number, i: number): void {
     if (i >= activeCount) return;
-    const [x, y] = p;
+    // Clamped for the same reason the marker is: the trail's last point may be the step that
+    // left the domain, and the surface is unbounded out there.
+    const [x, y] = clampToDomain(activeSurface, p);
     const z = activeSurface.scale * activeSurface.f(x, y) + 0.01;
     scratchColor.lerpColors(theme.faint, theme.accent, age);
 

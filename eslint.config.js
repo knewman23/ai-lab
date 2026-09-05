@@ -4,7 +4,8 @@ import globals from "globals";
 
 export default tseslint.config(
   {
-    ignores: ["dist/", "public/", "node_modules/"],
+    // `tmp/` is scratch: the visual-verify output and one-off audit harnesses live there.
+    ignores: ["dist/", "public/", "node_modules/", "tmp/"],
   },
   {
     files: ["eslint.config.js"],

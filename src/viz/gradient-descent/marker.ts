@@ -11,7 +11,7 @@ import {
 } from "three";
 import { magnitude } from "../../core/math/numeric";
 import type { Vec2 } from "../../core/math/numeric";
-import type { Surface } from "../../core/math/surfaces";
+import { clampToDomain, type Surface } from "../../core/math/surfaces";
 import type { ThemeColors } from "../types";
 import { disposeArrow, fadeArrow, overlayArrow } from "../shared/arrow";
 
@@ -109,7 +109,11 @@ export function createMarker(theme: ThemeColors): Marker {
     hitTarget,
 
     setPosition(surface: Surface, pos: Vec2): void {
-      const [x, y] = pos;
+      // A step that leaves the domain is a state the panel reports, but every surface here is
+      // unbounded outside its domain — Rosenbrock passes z = 1000 a couple of units out — so
+      // drawing that point at its true height throws the ball clean out of the frame. The
+      // surface only exists over its domain, so the ball is drawn at the edge it left by.
+      const [x, y] = clampToDomain(surface, pos);
       const s = surface.scale;
       origin.set(x, y, s * surface.f(x, y));
       ball.position.copy(origin);
