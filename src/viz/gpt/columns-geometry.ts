@@ -7,7 +7,9 @@
 import type { Vec2 } from "../../core/math/numeric";
 import type { Forward } from "../../core/math/transformer";
 import type { Segment, Vec3 } from "../shared/layer";
+import { type ArrowHead, arrowSegments as arrow, WALL_AXES } from "./arrow-head";
 import { BAND_Z, type BandKey, columnX, glyphLength } from "./layout";
+import { vec2At } from "./pass-read";
 
 /**
  * Toward the camera, which looks at the wall from −y, and further off it than the bands' 0.01
@@ -16,13 +18,7 @@ import { BAND_Z, type BandKey, columnX, glyphLength } from "./layout";
  */
 const LIFT = -0.02;
 
-/**
- * How an arrow's head is drawn. A `closed` head is a filled-looking triangle — its two barbs
- * joined at the base — and marks one of the three stream states; an `open` head is the two
- * barbs alone and marks a delta, what a stage *adds*. The two never look alike, which is the
- * distinction §1's "watch the vector get edited as it climbs" rests on.
- */
-export type ArrowHead = "closed" | "open";
+export type { ArrowHead } from "./arrow-head";
 
 /** Which `Forward` fields a column reads; §5.3's table names one per band. */
 type GlyphField = "x" | "attnOut" | "xResid" | "mlpOut" | "xFinal";
@@ -42,9 +38,8 @@ export const GLYPH_BANDS = [
   { band: "logits", field: "xFinal", head: "closed" },
 ] as const satisfies readonly GlyphBand[];
 
-/** Barb length as a fraction of the shaft, and how far the barbs sweep off it. */
-const HEAD_FRACTION = 0.32;
-const HEAD_ANGLE = 0.42;
+/** How this module names itself and its positions when a read fails. */
+const READER = { owner: "gpt columns", slot: "column" } as const;
 
 /** Endpoints one column can need: the stem, plus five glyphs of four segments each. */
 export const COLUMN_ENDPOINTS = 2 + GLYPH_BANDS.length * 8;
@@ -64,10 +59,12 @@ export function bandPoint(i: number, band: BandKey): Vec3 {
 }
 
 /**
- * An arrow from `at` along `v`, drawn at `glyphLength(|v|)` so a big vector reads as big
- * without ever reaching the neighbouring column. The vector's y becomes the wall's z, so the
- * glyph is the embedding-space vector standing up on the wall. A zero vector has no direction
- * to point in and draws nothing rather than a degenerate spike.
+ * An arrow from `at` along `v`, drawn at `glyphLength(|v|)` so a big vector reads as big without
+ * ever reaching the neighbouring column. The vector's y becomes the wall's z, so the glyph is the
+ * embedding-space vector standing up on the wall. A zero vector has no direction to point in and
+ * draws nothing rather than a degenerate spike.
+ *
+ * The length is already capped by `glyphLength`, so the head needs no cap of its own.
  */
 export function arrowSegments(at: Vec3, v: Vec2, head: ArrowHead): Segment[] {
   const magnitude = Math.hypot(v[0], v[1]);
@@ -75,42 +72,12 @@ export function arrowSegments(at: Vec3, v: Vec2, head: ArrowHead): Segment[] {
   // Also catches a NaN vector, which must not reach the buffer: it would poison the layer's
   // bounding sphere and take the whole column off screen.
   if (!(length > 0)) return [];
-
-  const ux = v[0] / magnitude;
-  const uz = v[1] / magnitude;
-  const tip: Vec3 = [at[0] + length * ux, at[1], at[2] + length * uz];
-
-  const barb = length * HEAD_FRACTION;
-  const ends: Vec3[] = [];
-  for (const sign of [1, -1]) {
-    const c = Math.cos(sign * HEAD_ANGLE);
-    const s = Math.sin(sign * HEAD_ANGLE);
-    // The shaft direction reversed, then rotated off the shaft by the head angle.
-    ends.push([tip[0] + barb * (-ux * c + uz * s), tip[1], tip[2] + barb * (-ux * s - uz * c)]);
-  }
-
-  const [first, second] = ends;
-  if (first === undefined || second === undefined) {
-    throw new Error("gpt columns: an arrowhead needs both of its barbs");
-  }
-  const segments: Segment[] = [
-    [at, tip],
-    [tip, first],
-    [tip, second],
+  const tip: Vec3 = [
+    at[0] + (length * v[0]) / magnitude,
+    at[1],
+    at[2] + (length * v[1]) / magnitude,
   ];
-  if (head === "closed") segments.push([first, second]);
-  return segments;
-}
-
-/** Reads one 2-vector out of a pass. Throws rather than defaulting: a short row is a bug. */
-function vectorAt(rows: readonly Float64Array[], i: number, field: GlyphField): Vec2 {
-  const row = rows[i];
-  if (row === undefined) throw new Error(`gpt columns: no ${field} vector at column ${i}`);
-  const [a, b] = row;
-  if (a === undefined || b === undefined) {
-    throw new Error(`gpt columns: ${field} at column ${i} is not a 2-vector`);
-  }
-  return [a, b];
+  return arrow(at, tip, { axes: WALL_AXES, head, maxBarb: Infinity });
 }
 
 /**
@@ -120,7 +87,7 @@ function vectorAt(rows: readonly Float64Array[], i: number, field: GlyphField): 
 export function columnSegments(f: Forward, i: number): Segment[] {
   const segments: Segment[] = [columnStem(i)];
   for (const { band, field, head } of GLYPH_BANDS) {
-    segments.push(...arrowSegments(bandPoint(i, band), vectorAt(f[field], i, field), head));
+    segments.push(...arrowSegments(bandPoint(i, band), vec2At(f[field], i, field, READER), head));
   }
   return segments;
 }

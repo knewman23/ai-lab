@@ -8,7 +8,9 @@
 import type { Vec2 } from "../../core/math/numeric";
 import type { Forward } from "../../core/math/transformer";
 import type { Segment, Vec3 } from "../shared/layer";
+import { ARROW_ENDPOINTS, arrowSegments, FLOOR_AXES } from "./arrow-head";
 import { floorFromEmbed } from "./layout";
+import { vec2At } from "./pass-read";
 
 /** The three steps, in the order they are chained. */
 export type StepKey = "position" | "attention" | "mlp";
@@ -22,33 +24,22 @@ export const STEP_LABELS = ["+ position", "+ attention", "+ MLP"] as const;
 export const PATH_LIFT = 0.01;
 
 /**
- * Arrowhead barbs: a fraction of the shaft, but never longer than `HEAD_MAX`. Unlike the wall
- * glyphs, these arrows are drawn at true length and a long one would otherwise grow a head the
- * size of the step it is measuring.
+ * Longest a barb may grow. Unlike the wall glyphs, these arrows are drawn at true length, so
+ * without a cap a long step would grow a head the size of the step it is measuring.
  */
-const HEAD_FRACTION = 0.32;
 const HEAD_MAX = 0.18;
-const HEAD_ANGLE = 0.42;
 
 /** The ring that marks `xFinal`, and how many segments it is drawn in. */
 export const RING_RADIUS = 0.14;
 export const RING_SEGMENTS = 24;
 
-/** Endpoints one step can need: shaft, two barbs, and the base joining them. */
-export const STEP_ENDPOINTS = 8;
+/** Endpoints one step can need: an arrow's shaft, two barbs, and the base joining them. */
+export const STEP_ENDPOINTS = ARROW_ENDPOINTS;
 /** Endpoints the ring needs: a closed polyline of `RING_SEGMENTS` segments. */
 export const RING_ENDPOINTS = RING_SEGMENTS * 2;
 
-/** Reads one 2-vector out of a pass. Throws rather than defaulting: a short row is a bug. */
-function vectorAt(rows: readonly Float64Array[], i: number, field: string): Vec2 {
-  const row = rows[i];
-  if (row === undefined) throw new Error(`gpt residual path: no ${field} at position ${i}`);
-  const [a, b] = row;
-  if (a === undefined || b === undefined) {
-    throw new Error(`gpt residual path: ${field} at position ${i} is not a 2-vector`);
-  }
-  return [a, b];
-}
+/** How this module names itself and its positions when a read fails. */
+const READER = { owner: "gpt residual path", slot: "position" } as const;
 
 /**
  * The four floor points the chain runs through: the token's embedding, then the stream after
@@ -62,13 +53,13 @@ function vectorAt(rows: readonly Float64Array[], i: number, field: string): Vec2
  * layout failure, and forcing a long-then-short pair here would be a lie about it.
  */
 export function pathPoints(f: Forward, query: number): Vec3[] {
-  const x = vectorAt(f.x, query, "x");
-  const pe = vectorAt(f.pe, query, "pe");
+  const x = vec2At(f.x, query, "x", READER);
+  const pe = vec2At(f.pe, query, "pe", READER);
   const stages: Vec2[] = [
     [x[0] - pe[0], x[1] - pe[1]],
     x,
-    vectorAt(f.xResid, query, "xResid"),
-    vectorAt(f.xFinal, query, "xFinal"),
+    vec2At(f.xResid, query, "xResid", READER),
+    vec2At(f.xFinal, query, "xFinal", READER),
   ];
   return stages.map((e) => {
     const [px, py] = floorFromEmbed(e);
@@ -77,38 +68,11 @@ export function pathPoints(f: Forward, query: number): Vec3[] {
 }
 
 /**
- * One arrow on the floor, shaft first so a reader of the buffer can take segment 0 as the step's
- * whole reach. A step of zero length draws nothing rather than a degenerate spike — which is
- * what the position step does whenever positional encoding is switched off.
+ * One step of the chain as an arrow on the floor: a closed head, capped so a long step does not
+ * outgrow it, in the floor's (x, y) rather than the wall's (x, z).
  */
-export function arrowSegments(from: Vec3, to: Vec3): Segment[] {
-  const dx = to[0] - from[0];
-  const dy = to[1] - from[1];
-  const length = Math.hypot(dx, dy);
-  // Also catches a NaN step, which must not reach the buffer: it would poison the layer's
-  // bounding sphere and take the whole floor off screen.
-  if (!(length > 0)) return [];
-
-  const ux = dx / length;
-  const uy = dy / length;
-  const barb = Math.min(HEAD_MAX, HEAD_FRACTION * length);
-  const ends: Vec3[] = [];
-  for (const sign of [1, -1]) {
-    const c = Math.cos(sign * HEAD_ANGLE);
-    const s = Math.sin(sign * HEAD_ANGLE);
-    // The shaft direction reversed, then rotated off the shaft by the head angle.
-    ends.push([to[0] + barb * (-ux * c + uy * s), to[1] + barb * (-ux * s - uy * c), PATH_LIFT]);
-  }
-  const [first, second] = ends;
-  if (first === undefined || second === undefined) {
-    throw new Error("gpt residual path: an arrowhead needs both of its barbs");
-  }
-  return [
-    [from, to],
-    [to, first],
-    [to, second],
-    [first, second],
-  ];
+export function stepArrow(from: Vec3, to: Vec3): Segment[] {
+  return arrowSegments(from, to, { axes: FLOOR_AXES, head: "closed", maxBarb: HEAD_MAX });
 }
 
 /** The hollow ring marking where the token ended up, as a closed polyline. */
@@ -141,7 +105,7 @@ export function pathDrawing(f: Forward, query: number): PathDrawing {
     if (from === undefined || to === undefined) {
       throw new Error(`gpt residual path: the chain has no step ${s}`);
     }
-    return arrowSegments(from, to);
+    return stepArrow(from, to);
   });
   const end = points[STEPS.length];
   if (end === undefined) throw new Error("gpt residual path: the chain has no end point");

@@ -6,9 +6,9 @@ import {
   SEQUENCES,
 } from "../../../src/core/math/transformer";
 import { pathDrawing, STEPS } from "../../../src/viz/gpt/residual-path-geometry";
-import type { Layer, Segment, Vec3 } from "../../../src/viz/shared/layer";
+import type { Layer, Segment } from "../../../src/viz/shared/layer";
 import { createResidualPath } from "../../../src/viz/gpt/residual-path";
-import { testTheme } from "./helpers";
+import { drawn, testTheme } from "./helpers";
 
 function pass(sentence: keyof typeof SEQUENCES, positional = true): Forward {
   return forward({
@@ -27,18 +27,6 @@ function make() {
   const path = createResidualPath(theme);
   path.set(CAT_SAT, LAST);
   return { path, theme, repaint };
-}
-
-/** The segments a layer is actually drawing. */
-function drawn(layer: Layer): Segment[] {
-  const out: Segment[] = [];
-  const point = (at: number): Vec3 => [
-    layer.positions[at * 3]!,
-    layer.positions[at * 3 + 1]!,
-    layer.positions[at * 3 + 2]!,
-  ];
-  for (let n = 0; n < layer.geometry.drawRange.count; n += 2) out.push([point(n), point(n + 1)]);
-  return out;
 }
 
 function expectSegments(layer: Layer, want: readonly Segment[]): void {

@@ -7,13 +7,13 @@ import {
 } from "../../../src/core/math/transformer";
 import { floorFromEmbed } from "../../../src/viz/gpt/layout";
 import {
-  arrowSegments,
   pathDrawing,
   pathPoints,
   RING_ENDPOINTS,
   RING_SEGMENTS,
   ringSegments,
   STEP_ENDPOINTS,
+  stepArrow,
   STEP_LABELS,
   STEPS,
 } from "../../../src/viz/gpt/residual-path-geometry";
@@ -106,9 +106,9 @@ describe("pathPoints", () => {
   });
 });
 
-describe("arrowSegments", () => {
+describe("stepArrow", () => {
   it("emits the shaft first, then a closed head", () => {
-    const segments = arrowSegments([0, 0, 0.01], [1, 0, 0.01]);
+    const segments = stepArrow([0, 0, 0.01], [1, 0, 0.01]);
     expect(segments).toHaveLength(4);
     expect(segments[0]).toEqual([
       [0, 0, 0.01],
@@ -126,8 +126,8 @@ describe("arrowSegments", () => {
   it("caps the head so a long step does not grow a head the size of itself", () => {
     const barb = (length: number): number =>
       length2([
-        arrowSegments([0, 0, 0.01], [length, 0, 0.01])[1]![0],
-        arrowSegments([0, 0, 0.01], [length, 0, 0.01])[1]![1],
+        stepArrow([0, 0, 0.01], [length, 0, 0.01])[1]![0],
+        stepArrow([0, 0, 0.01], [length, 0, 0.01])[1]![1],
       ]);
     // A short step's head is a fraction of it; a long one's stops growing at 0.18.
     expect(barb(0.3)).toBeCloseTo(0.32 * 0.3, 9);
@@ -135,8 +135,8 @@ describe("arrowSegments", () => {
   });
 
   it("draws nothing for a step of zero length or a non-finite one", () => {
-    expect(arrowSegments([1, 1, 0.01], [1, 1, 0.01])).toEqual([]);
-    expect(arrowSegments([1, 1, 0.01], [NaN, 1, 0.01])).toEqual([]);
+    expect(stepArrow([1, 1, 0.01], [1, 1, 0.01])).toEqual([]);
+    expect(stepArrow([1, 1, 0.01], [NaN, 1, 0.01])).toEqual([]);
   });
 
   it("points its head along the step, whichever way the step runs", () => {
@@ -146,7 +146,7 @@ describe("arrowSegments", () => {
       [0, 1],
       [0, -1],
     ] as const) {
-      const [shaft, barbA, barbB] = arrowSegments([0, 0, 0.01], [to[0], to[1], 0.01]);
+      const [shaft, barbA, barbB] = stepArrow([0, 0, 0.01], [to[0], to[1], 0.01]);
       // Both barbs fall on the near side of the tip: the head opens back down the shaft.
       for (const barb of [barbA!, barbB!]) {
         const along = (barb[1][0] - shaft![1][0]) * to[0] + (barb[1][1] - shaft![1][1]) * to[1];

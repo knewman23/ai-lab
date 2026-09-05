@@ -14,9 +14,9 @@ import {
   VOCAB,
 } from "../../../src/core/math/transformer";
 import { placements, POINT_RADIUS } from "../../../src/viz/gpt/floor-embed-geometry";
-import type { Layer, Segment, Vec3 } from "../../../src/viz/shared/layer";
+import type { Layer, Segment } from "../../../src/viz/shared/layer";
 import { createFloorEmbed } from "../../../src/viz/gpt/floor-embed";
-import { testTheme } from "./helpers";
+import { drawn, testTheme } from "./helpers";
 
 const PASS = forward({
   embeddings: EMBEDDING_PRESETS.tuned,
@@ -40,18 +40,6 @@ function worldBox(mesh: Mesh): Box3 {
   const box = new Box3().setFromBufferAttribute(world.getAttribute("position") as never);
   world.dispose();
   return box;
-}
-
-/** The segments a layer is actually drawing. */
-function drawn(layer: Layer): Segment[] {
-  const out: Segment[] = [];
-  const point = (at: number): Vec3 => [
-    layer.positions[at * 3]!,
-    layer.positions[at * 3 + 1]!,
-    layer.positions[at * 3 + 2]!,
-  ];
-  for (let n = 0; n < layer.geometry.drawRange.count; n += 2) out.push([point(n), point(n + 1)]);
-  return out;
 }
 
 describe("createFloorEmbed", () => {

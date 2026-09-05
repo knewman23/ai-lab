@@ -36,12 +36,13 @@ const PATH_KEYS = [...STEPS, "ring"] as const satisfies readonly PathKey[];
  * refusal to normalise the two deltas, are `residual-path-geometry.ts`'s.
  */
 export function createResidualPath(theme: ThemeColors): ResidualPath {
-  const layers = Object.fromEntries(
-    PATH_KEYS.map((key) => [
-      key,
-      lineLayer(key === "ring" ? RING_ENDPOINTS : STEP_ENDPOINTS, ORDER, { depth: true }),
-    ]),
-  ) as Record<PathKey, Layer>;
+  const step = (): Layer => lineLayer(STEP_ENDPOINTS, ORDER, { depth: true });
+  const layers: Readonly<Record<PathKey, Layer>> = {
+    position: step(),
+    attention: step(),
+    mlp: step(),
+    ring: lineLayer(RING_ENDPOINTS, ORDER, { depth: true }),
+  };
 
   const group = new Group();
   for (const key of PATH_KEYS) group.add(layers[key].object);

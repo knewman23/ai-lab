@@ -1,4 +1,4 @@
-import { DoubleSide, type MeshStandardMaterial } from "three";
+import { type BufferAttribute, DoubleSide, type MeshStandardMaterial } from "three";
 import { describe, expect, it, vi } from "vitest";
 import {
   EMBEDDING_PRESETS,
@@ -8,9 +8,8 @@ import {
   VOCAB,
 } from "../../../src/core/math/transformer";
 import { BAR_BUFFER_FLOATS, leaderSegment, writeBars } from "../../../src/viz/gpt/bars-geometry";
-import type { Layer, Segment, Vec3 } from "../../../src/viz/shared/layer";
 import { createBars } from "../../../src/viz/gpt/bars";
-import { testTheme } from "./helpers";
+import { drawn, testTheme } from "./helpers";
 
 const PASS = forward({
   embeddings: EMBEDDING_PRESETS.tuned,
@@ -27,37 +26,35 @@ function make() {
   return { bars, theme, repaint };
 }
 
-/** The segments a layer is actually drawing. */
-function drawn(layer: Layer): Segment[] {
-  const out: Segment[] = [];
-  const point = (at: number): Vec3 => [
-    layer.positions[at * 3]!,
-    layer.positions[at * 3 + 1]!,
-    layer.positions[at * 3 + 2]!,
-  ];
-  for (let n = 0; n < layer.geometry.drawRange.count; n += 2) out.push([point(n), point(n + 1)]);
-  return out;
-}
-
 describe("createBars", () => {
-  it("draws exactly what the geometry computes for the distribution", () => {
+  it("draws exactly what the geometry computes, out of the attribute the mesh is bound to", () => {
     const { bars } = make();
     const expected = new Float32Array(BAR_BUFFER_FLOATS);
     const count = writeBars(expected, PROBS);
     expect(bars.geometry.drawRange.count).toBe(count);
-    expect([...bars.positions]).toEqual([...expected]);
+    // The bound attribute, not the exported reference: binding a different array would leave
+    // `bars.positions` right and the mesh drawing something else entirely.
+    const bound = bars.geometry.getAttribute("position") as BufferAttribute;
+    expect(bound.array).toBe(bars.positions);
+    expect([...(bound.array as Float32Array)]).toEqual([...expected]);
+    // Uploaded, not just written: `needsUpdate` has no getter in three, and setting it is what
+    // bumps `version`, so a `set` that skipped it would leave the version at 0.
+    expect(bound.version).toBeGreaterThan(0);
     bars.dispose();
   });
 
   it("rewrites the buffer on a new distribution rather than rebuilding geometry", () => {
     const { bars } = make();
     const before = bars.geometry;
+    const version = (bars.geometry.getAttribute("position") as BufferAttribute).version;
     const uniform = Float64Array.from(VOCAB.map(() => 1 / VOCAB.length));
     bars.set(uniform);
     const expected = new Float32Array(BAR_BUFFER_FLOATS);
     writeBars(expected, uniform);
     expect(bars.geometry).toBe(before);
-    expect([...bars.positions]).toEqual([...expected]);
+    const bound = bars.geometry.getAttribute("position") as BufferAttribute;
+    expect([...(bound.array as Float32Array)]).toEqual([...expected]);
+    expect(bound.version).toBeGreaterThan(version);
     bars.dispose();
   });
 

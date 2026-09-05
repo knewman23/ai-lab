@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import { EMBEDDING_PRESETS, forward, SEQUENCES } from "../../../src/core/math/transformer";
 import { columnSegments } from "../../../src/viz/gpt/columns-geometry";
 import { createColumns } from "../../../src/viz/gpt/columns";
-import type { Layer, Segment, Vec3 } from "../../../src/viz/shared/layer";
-import { testTheme } from "./helpers";
+import type { Segment, Vec3 } from "../../../src/viz/shared/layer";
+import { drawn, testTheme } from "./helpers";
 
 const SEQUENCE = SEQUENCES["cat-sat"];
 const PASS = forward({
@@ -16,21 +16,6 @@ const PASS = forward({
 function make() {
   const { theme, repaint } = testTheme();
   return { columns: createColumns(theme), theme, repaint };
-}
-
-/** The segments a layer is actually drawing, rounded to the float32 the buffer holds. */
-function drawn(layer: Layer): Segment[] {
-  const count = layer.geometry.drawRange.count;
-  const out: Segment[] = [];
-  for (let n = 0; n < count; n += 2) {
-    const point = (at: number): Vec3 => [
-      layer.positions[at * 3]!,
-      layer.positions[at * 3 + 1]!,
-      layer.positions[at * 3 + 2]!,
-    ];
-    out.push([point(n), point(n + 1)]);
-  }
-  return out;
 }
 
 /** The same segments as float32, so a buffer read compares equal to a computed one. */
