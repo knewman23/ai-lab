@@ -358,3 +358,60 @@ input[type="range"]::-moz-range-track {
     flex-shrink: 0;
   }
 }
+
+/* ---------- walkthrough mode ---------- */
+
+/* The step card takes the explanation's place rather than sitting beside it. */
+.wt-active .panel-section[data-role="explanation"] {
+  display: none;
+}
+
+.wt-banner:not(:empty) {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 20px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--line);
+}
+
+.wt-progress {
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--soft);
+}
+
+.wt-step:not(:empty) {
+  margin-top: 24px;
+}
+
+.wt-card {
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-left: 2px solid var(--accent);
+  border-radius: 2px;
+  background: var(--sunken);
+}
+
+.wt-number {
+  margin: 0 0 8px;
+  color: var(--accent);
+}
+
+.wt-prose {
+  margin: 0 0 16px;
+  color: var(--ink-2);
+}
+
+.wt-card .btn-row {
+  margin: 0;
+}
+
+/* The outline a step draws around the control its prose names. */
+.is-focused {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+  border-radius: 2px;
+  background: var(--sunken);
+}
