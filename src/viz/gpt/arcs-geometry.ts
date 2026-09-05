@@ -13,6 +13,7 @@
  */
 
 import type { Forward } from "../../core/math/transformer";
+import { W_O, W_V } from "../../core/math/transformer";
 import type { Segment, Vec3 } from "../shared/layer";
 import { BAND_Z, columnX, COLUMN_X } from "./layout";
 import type { HeadKey } from "./state";
@@ -54,12 +55,16 @@ const CROSS_ARM = 0.07;
 export type Field = "weights" | "scores";
 
 /**
- * How much of each head's attention row survives into `attnOut`. `W_O` scales head 1 by 0.6 and
- * head 2 by 0.4, *and* head 2's `W_V = 0.8 I` shrinks its values first, so head 2's effective
- * coefficient is 0.32 and the blend sums to 0.92. It is a contribution, not a distribution;
- * writing 0.6 a¹ + 0.4 a² would overstate the second head.
+ * How much of each head's attention row survives into `attnOut`: its share of `W_O` times its own
+ * `W_V`. `W_O` scales head 1 by 0.6 and head 2 by 0.4, *and* head 2's `W_V = 0.8 I` shrinks its
+ * values first, so head 2's effective coefficient is 0.32 and the blend sums to 0.92. It is a
+ * contribution, not a distribution; writing 0.6 a¹ + 0.4 a² would overstate the second head.
+ *
+ * Derived rather than written out, and exported, because the readout's blend row and the
+ * explanation's copy quote these same two numbers: changing head 2's `W_V` has to move all three
+ * together or the arcs would keep drawing a coefficient the model no longer has.
  */
-export const BLEND = { head1: 0.6, head2: 0.32 } as const;
+export const BLEND = { head1: W_O[0] * W_V[0][0], head2: W_O[2] * W_V[1][0] } as const;
 
 /** One head's row for `query`. Throws rather than defaulting: a short row is a bug, not a blank. */
 function headRow(f: Forward, index: 0 | 1, query: number, field: Field): Float64Array {

@@ -8,14 +8,8 @@ import type { HeadPass } from "../../core/math/transformer";
 import { VOCAB } from "../../core/math/transformer";
 import type { Vec2 } from "../../core/math/numeric";
 import { fmt } from "../../ui/readout";
-import {
-  BLEND,
-  LAST_POSITION,
-  PROJECTION,
-  SCORE_BLEND,
-  SINGLE_KEY,
-  WEIGHT_BLEND,
-} from "./explanation";
+import { attentionRow } from "./arcs-geometry";
+import { LAST_POSITION, PROJECTION, SCORE_BLEND, SINGLE_KEY, WEIGHT_BLEND } from "./explanation";
 import { vec2At, type PassReader } from "./pass-read";
 import type { Derived, GptState, HeadKey, StageKey } from "./state";
 
@@ -79,20 +73,16 @@ const ranked = (d: Derived): number[] =>
     (a, b) => pick(d.probabilities, b, "probability") - pick(d.probabilities, a, "probability"),
   );
 
-/** `0.6 a¹ + 0.32 a²`: each key's real contribution to `attnOut`, which sums to 0.92, not 1. */
-function blend(s: GptState, d: Derived): Float64Array {
-  const a1 = weightRow(pick(d.pass.heads, 0, "head"), s);
-  const a2 = weightRow(pick(d.pass.heads, 1, "head"), s);
-  return Float64Array.from(a1, (w, j) => BLEND[0] * w + BLEND[1] * pick(a2, j, "weight"));
-}
-
 function weightRows(s: GptState, d: Derived): ReadoutRow[] {
   const selected = heads(s, d);
   const rows = selected.map(({ n, head }): ReadoutRow => [
     `Head ${n + 1} weights`,
     nums(weightRow(head, s)),
   ]);
-  if (s.head === "both") return [...rows, ["Blend", nums(blend(s, d))]];
+  // The arcs' own row, so the number under the equation is the number on the wall.
+  if (s.head === "both") {
+    return [...rows, ["Blend", nums(attentionRow(d.pass, s.query, "both", "weights"))]];
+  }
   const { head } = pick(selected, 0, "head");
   return [...rows, ["Sum", fmt(weightRow(head, s).reduce((a, b) => a + b, 0))]];
 }

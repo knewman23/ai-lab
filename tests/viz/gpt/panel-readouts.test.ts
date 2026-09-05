@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { VOCAB } from "../../../src/core/math/transformer";
 import { stageReadout } from "../../../src/viz/gpt/panel-readouts";
-import type { GptState, StageKey } from "../../../src/viz/gpt/state";
+import type { Derived, GptState, StageKey } from "../../../src/viz/gpt/state";
 import {
   derived,
   initialState,
@@ -107,6 +107,34 @@ describe("stageReadout: the §7 stage rows", () => {
     expect(readout.rows).toHaveLength(VOCAB.length);
     expect(new Map(readout.rows).get("the")).toBe("logit 4.219 → p 0.7892");
     expect(new Map(readout.rows).get("fast")).toBe("logit -4.459 → p 0.0001344");
+  });
+});
+
+describe("stageReadout: the Sum row", () => {
+  /**
+   * Replaces head 1's row for the default query. A softmax row sums to 1 in every state the panel
+   * can reach, so a Sum row hardcoded to "1" is indistinguishable from a live one through the
+   * controls; `stageReadout` is pure, so the row it claims to report can be handed to it directly.
+   */
+  function withWeightRow(d: Derived, row: readonly number[]): Derived {
+    const [head1, head2] = d.pass.heads;
+    if (!head1 || !head2) throw new Error("the pass has no heads");
+    const weights = head1.weights.map((existing, i) =>
+      i === base.query ? Float64Array.from(row) : existing,
+    );
+    return { ...d, pass: { ...d.pass, heads: [{ ...head1, weights }, head2] } };
+  }
+
+  it("reports the row's total rather than asserting it", () => {
+    const s = setHead(setStage(base, "softmax"), "head1");
+    const short = withWeightRow(derived(s), [0.25, 0.15, 0.2, 0.1, 0.1]);
+    const rows = new Map(stageReadout(s, short).rows);
+    expect(rows.get("Head 1 weights")).toBe("0.25, 0.15, 0.2, 0.1, 0.1");
+    expect(rows.get("Sum")).toBe("0.8");
+  });
+
+  it("reads 1 on a real softmax row, which is what the stage claims", () => {
+    expect(rowsAt(setHead(setStage(base, "softmax"), "head1")).get("Sum")).toBe("1");
   });
 });
 

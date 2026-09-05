@@ -9,6 +9,7 @@
 import { W_O, W_V } from "../../core/math/transformer";
 import { createEquation } from "../../ui/equation";
 import { fmt } from "../../ui/readout";
+import { BLEND } from "./arcs-geometry";
 import type { PresetKey } from "./state";
 
 /**
@@ -83,12 +84,6 @@ const PARAGRAPHS: readonly string[] = [
     "and the spread preset is there to make it obvious.",
 ];
 
-/**
- * Each head's real per-key coefficient in `attnOut`: its share of `W_O` times its own `W_V`. The
- * blend row computes with these and the caveat below quotes them, so they are defined once.
- */
-export const BLEND: readonly [number, number] = [W_O[0] * W_V[0][0], W_O[2] * W_V[1][0]];
-
 /** Position 0 reads only itself, so its row has no range to compare and its arc is full width. */
 export const SINGLE_KEY =
   "Position 0 can only read itself: one key, so the weight is exactly 1 and there is no score " +
@@ -102,9 +97,9 @@ export const SCORE_BLEND =
 
 /** Writing the blend as `0.6 a¹ + 0.4 a²` would be wrong: head 2's `W_V` shrinks its values first. */
 export const WEIGHT_BLEND =
-  `The blend weights each head by its real contribution to attnOut: ${fmt(BLEND[0])} for head 1 ` +
-  `and ${fmt(BLEND[1])} for head 2 (W_O's ${fmt(W_O[2])} times head 2's W_V = ${fmt(W_V[1][0])} I). ` +
-  `It sums to ${fmt(BLEND[0] + BLEND[1])}, not 1: a contribution, not a distribution.`;
+  `The blend weights each head by its real contribution to attnOut: ${fmt(BLEND.head1)} for head 1 ` +
+  `and ${fmt(BLEND.head2)} for head 2 (W_O's ${fmt(W_O[2])} times head 2's W_V = ${fmt(W_V[1][0])} I). ` +
+  `It sums to ${fmt(BLEND.head1 + BLEND.head2)}, not 1: a contribution, not a distribution.`;
 
 export const PROJECTION = `W_O then mixes the heads: attnOut = ${fmt(W_O[0])} o¹ + ${fmt(W_O[2])} o².`;
 
