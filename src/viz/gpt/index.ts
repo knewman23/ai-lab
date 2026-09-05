@@ -1,6 +1,6 @@
 import type { Vec2 } from "../../core/math/numeric";
 import { type Forward, probabilities, SEQUENCES } from "../../core/math/transformer";
-import { disposeObject, prefersReducedMotion } from "../../core/scene";
+import { prefersReducedMotion } from "../../core/scene";
 import { attachDrag } from "../shared/drag";
 import type { Framing } from "../shared/framing";
 import { createUsageHint, type UsageHint } from "../shared/hint";
@@ -47,22 +47,42 @@ const HINT = {
 };
 
 /**
- * Whether the four inputs `forward` takes have moved. Everything else in the state — the query,
- * the head, the focused stage, the temperature and the residual-path toggle — changes only what
- * is drawn or how the pass is read, so it must not cost a second pass.
+ * Which fields of the state `forward` takes as input. Everything marked false changes only what
+ * is drawn or how the pass is read, and must not cost a second pass.
+ *
+ * Every field is named, not just the four that matter, and the `Record<keyof GptState, …>` is
+ * the point: a field added to `GptState` and left unclassified stops this object compiling.
+ * Without that, a new input would silently join the false half by omission and the scene would
+ * quietly stop recomputing — a mistake nothing at runtime would report, since the DEV budget
+ * warning only fires for recomputing too *much*.
  */
+const FEEDS_FORWARD: Readonly<Record<keyof GptState, boolean>> = {
+  embeddings: true,
+  sentence: true,
+  positional: true,
+  causal: true,
+  preset: false,
+  query: false,
+  head: false,
+  stage: false,
+  temperature: false,
+  residualPath: false,
+};
+
+const PASS_INPUTS = Object.keys(FEEDS_FORWARD).filter(
+  (key) => FEEDS_FORWARD[key as keyof GptState],
+) as readonly (keyof GptState)[];
+
+/** Whether anything `forward` reads has moved between two states. */
 function forwardInputsMoved(a: GptState, b: GptState): boolean {
-  return (
-    a.embeddings !== b.embeddings ||
-    a.sentence !== b.sentence ||
-    a.positional !== b.positional ||
-    a.causal !== b.causal
-  );
+  return PASS_INPUTS.some((key) => a[key] !== b[key]);
 }
 
 function mount(host: VizHost): VizInstance {
-  const { kit, wall, floor, bands, columns, arcs, bars, path, hits, hitGroup, labels, unwind } =
-    buildScene(host, prefersReducedMotion());
+  const { kit, floor, bands, columns, arcs, bars, path, hits, labels, unwind } = buildScene(
+    host,
+    prefersReducedMotion(),
+  );
 
   let state: GptState = initialState();
   let dirty = true;
@@ -167,6 +187,10 @@ function mount(host: VizHost): VizInstance {
       },
     });
 
+    // Both mechanisms hear pointerdown in the capture phase and neither stops propagation, so
+    // where a floor sphere projects over a column's pick volume one press arms both. That is
+    // harmless: a press that ends as a click never moved a word, and a press that ends as a
+    // drag has travelled too far to still read as a click, so at most one of them ever fires.
     detachPick = createColumnPick({
       canvas: host.renderer.domElement,
       camera: kit.camera,
@@ -194,15 +218,16 @@ function mount(host: VizHost): VizInstance {
     update(dt: number): boolean {
       // Damping keeps the camera moving for a moment after the pointer stops.
       const moved = kit.controls.update(dt);
-      // Labels re-project on every render: the camera, the state or the canvas size changed.
-      if (dirty || moved) {
+      // The camera, the state or the canvas size changed.
+      const rendered = dirty || moved;
+      // Labels re-project on every render, so they never lag the orbit.
+      if (rendered) {
         const canvas = host.renderer.domElement;
         const w = width || canvas.clientWidth;
         const h = height || canvas.clientHeight;
         labels.update(kit.camera, w, h);
         host.renderer.render(kit.scene, kit.camera);
       }
-      const rendered = dirty || moved;
       dirty = false;
       return rendered;
     },
@@ -220,21 +245,11 @@ function mount(host: VizHost): VizInstance {
       detachPick?.();
       detachDrag?.();
       hint?.dispose();
-      labels.dispose();
-      // Scene objects first, then the panel: DOM teardown is independent of GPU
+      // `unwind` already runs every teardown in reverse of the order it built them, overlay
+      // and pick volumes included, so a second list here would only be one to forget to
+      // extend. Scene objects first, then the panel: DOM teardown is independent of GPU
       // teardown, and this matches the other scenes' order.
-      hitGroup.removeFromParent();
-      hitGroup.clear();
-      hits.dispose();
-      path.dispose();
-      bars.dispose();
-      arcs.dispose();
-      columns.dispose();
-      bands.dispose();
-      floor.dispose();
-      wall.dispose();
-      disposeObject(kit.scene);
-      kit.dispose();
+      unwind();
       panel?.dispose();
     },
   };

@@ -242,6 +242,14 @@ function select(el: HTMLElement, label: string): HTMLSelectElement {
   return found;
 }
 
+function toggle(el: HTMLElement, label: string): HTMLInputElement {
+  const found = [...el.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')].find((i) =>
+    i.parentElement?.textContent?.includes(label),
+  );
+  if (!found) throw new Error(`toggle not found: ${label}`);
+  return found;
+}
+
 function readout(el: HTMLElement): string {
   return [...el.querySelectorAll("dd")].map((d) => d.textContent ?? "").join(" ");
 }
@@ -297,11 +305,16 @@ describe("buildScene", () => {
       scene.arcs.group,
       scene.bars.group,
       scene.path.group,
-      scene.hitGroup,
     ]) {
       expect(group.parent).toBe(scene.kit.scene);
     }
-    expect(scene.hitGroup.children).toHaveLength(scene.hits.targets.length);
+
+    // The pick volumes hang off a group of their own, which hangs off the scene — never off
+    // the floor, whose bare plane a drag would raycast recursively.
+    const picks = scene.hits.targets[0]?.parent;
+    expect(picks?.children).toHaveLength(scene.hits.targets.length);
+    expect(picks).not.toBe(scene.floor.group);
+    expect(picks?.parent).toBe(scene.kit.scene);
 
     scene.unwind();
   });
@@ -427,12 +440,9 @@ describe("gptTransformer.mount", () => {
     const viz = gptTransformer.mount(h);
     expect(control.pathShown.at(-1)).toBe(true);
 
-    const toggle = [...h.panel.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')].find(
-      (i) => i.parentElement?.textContent?.includes("Residual path"),
-    );
-    if (!toggle) throw new Error("residual path toggle not found");
-    toggle.checked = false;
-    toggle.dispatchEvent(new Event("change"));
+    const path = toggle(h.panel, "Residual path");
+    path.checked = false;
+    path.dispatchEvent(new Event("change"));
 
     expect(control.pathShown.at(-1)).toBe(false);
 
@@ -476,6 +486,32 @@ describe("gptTransformer.mount", () => {
 
     viz.dispose();
   });
+
+  it.each(["Positional encoding", "Causal mask"])(
+    "runs the forward pass again when %s moves",
+    (label) => {
+      const { host: h } = host();
+      const viz = gptTransformer.mount(h);
+      // Probe from a middle token: the default query is the last position, which already sees
+      // every key, so unmasking there is a real no-op and would prove nothing about the toggle.
+      const query = select(h.panel, "Query token");
+      query.value = "1";
+      query.dispatchEvent(new Event("change"));
+
+      const passes = control.passes;
+      const before = readout(h.panel);
+
+      const control_ = toggle(h.panel, label);
+      control_.checked = false;
+      control_.dispatchEvent(new Event("change"));
+
+      // Both are inputs to `forward`, so neither can be answered from the cached pass.
+      expect(control.passes).toBe(passes + 1);
+      expect(readout(h.panel)).not.toBe(before);
+
+      viz.dispose();
+    },
+  );
 
   it("runs the forward pass again when the sentence changes", () => {
     const { host: h } = host();

@@ -29,8 +29,6 @@ export interface GptScene {
   readonly bars: ReturnType<typeof createBars>;
   readonly path: ReturnType<typeof createResidualPath>;
   readonly hits: ReturnType<typeof createColumnHits>;
-  /** The pick volumes' own parent, which the assembler detaches on the way out. */
-  readonly hitGroup: Group;
   readonly labels: LabelLayer;
   /** Tears the whole of the above down in reverse, for a failure later in the mount. */
   readonly unwind: () => void;
@@ -118,7 +116,7 @@ export function buildScene(host: VizHost, reducedMotion: boolean): GptScene {
       hitGroup,
     );
 
-    return { kit, wall, floor, bands, columns, arcs, bars, path, hits, hitGroup, labels, unwind };
+    return { kit, wall, floor, bands, columns, arcs, bars, path, hits, labels, unwind };
   } catch (error) {
     unwind();
     throw error;

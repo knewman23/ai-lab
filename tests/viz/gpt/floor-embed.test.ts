@@ -7,7 +7,7 @@ import {
   SEQUENCES,
   VOCAB,
 } from "../../../src/core/math/transformer";
-import { placements, POINT_RADIUS } from "../../../src/viz/gpt/floor-embed-geometry";
+import { placements } from "../../../src/viz/gpt/floor-embed-geometry";
 import type { Layer, Segment } from "../../../src/viz/shared/layer";
 import { createFloorEmbed } from "../../../src/viz/gpt/floor-embed";
 import { drawn, testTheme } from "./helpers";
@@ -91,7 +91,7 @@ describe("createFloorEmbed", () => {
     // floorFromEmbed((2, -2)) = (2.8, -5.8): the domain corner, inside the floor with a margin.
     expect(floor.spheres[3]!.position.x).toBeCloseTo(2.8, 9);
     expect(floor.spheres[3]!.position.y).toBeCloseTo(-5.8, 9);
-    expect(floor.spheres[3]!.position.z).toBe(POINT_RADIUS);
+    expect(floor.spheres[3]!.position.z).toBe(0.09);
     // A pick volume left behind is a word that cannot be picked up again.
     expect(floor.hitTargets[3]!.position.toArray()).toEqual(floor.spheres[3]!.position.toArray());
     floor.dispose();
