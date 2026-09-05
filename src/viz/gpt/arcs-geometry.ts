@@ -5,6 +5,11 @@
  * tested without a renderer. That matters more here than anywhere else in the scene: WebGPU's
  * `DoubleSide` path multiplies the normal by `faceDirection`, so a back-wound triangle lights
  * itself inside out and the fix is never to negate a normal but to emit the strip consistently.
+ *
+ * The module also owns the step before the shape: turning a `Forward` and a head selection into
+ * the attention row being drawn, and that row into per-arc half-widths — the blend coefficients
+ * and the score normalisation live here rather than in the wrapper, so they can be asserted as
+ * arithmetic instead of by reading vertices back out of a buffer.
  */
 
 import type { Forward } from "../../core/math/transformer";
