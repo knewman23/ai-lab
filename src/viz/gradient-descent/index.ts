@@ -9,10 +9,12 @@ import { attachDrag } from "../shared/drag";
 import { frameFor, type Framing } from "../shared/framing";
 import { createUsageHint, type UsageHint } from "../shared/hint";
 import { createMarker } from "./marker";
-import { createGdPanel, type GdPanel } from "./panel";
+import { createGdPanel, type GdControlId, type GdPanel } from "./panel";
 import { createPathLine } from "./path-line";
 import { createRunTimer } from "./run-timer";
 import { createSurfaceMesh } from "./surface-mesh";
+import { createWalkthrough } from "../shared/walkthrough";
+import { GD_STEPS, GD_WALKTHROUGH_TITLE } from "./walkthrough";
 import {
   PATH_CAPACITY,
   derived,
@@ -196,7 +198,20 @@ function mount(host: VizHost): VizInstance {
 
   apply(state);
 
+  const walkthrough = createWalkthrough<GdState, GdControlId>({
+    title: GD_WALKTHROUGH_TITLE,
+    steps: GD_STEPS,
+    initial: initialState,
+    apply,
+    focus: (id) => panel?.focus(id),
+    frame: () => {
+      goHome();
+    },
+  });
+
   return {
+    walkthrough,
+
     update(dt: number): boolean {
       if (state.running && runTimer.advance(dt) > 0) apply(step(state));
       // Damping keeps the camera moving for a moment after the pointer stops.

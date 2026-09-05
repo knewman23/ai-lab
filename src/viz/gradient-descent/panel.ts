@@ -6,6 +6,7 @@ import { createLogSlider } from "../../ui/slider";
 import { createToggle } from "../../ui/toggle";
 import { OPTIMIZER_KEYS, OPTIMIZERS, type OptimizerKey } from "../../core/math/optimizers";
 import { SURFACES, SURFACE_KEYS, type SurfaceKey } from "../../core/math/surfaces";
+import { createControlFocus } from "../shared/control-focus";
 import { createExplanation } from "./explanation";
 import type { GdState, ShowKey, derived } from "./state";
 
@@ -26,9 +27,29 @@ const SHOW_KEYS: readonly { key: ShowKey; label: string }[] = [
   { key: "path", label: "Path" },
 ];
 
+/**
+ * The scene's own name for each control a walkthrough step may point at. A union rather than an
+ * open string, so a step naming a control this panel does not register is a compile error.
+ */
+export type GdControlId =
+  | "surface"
+  | "optimizer"
+  | "lr"
+  | "step"
+  | "run"
+  | "reset"
+  | "resetView"
+  | "showTangent"
+  | "showContours"
+  | "showPath";
+
 export interface GdPanel {
   el: HTMLElement;
+  /** Exhaustive by construction: a union member with no element fails to compile. */
+  readonly controls: Readonly<Record<GdControlId, HTMLElement>>;
   render(state: GdState, d: ReturnType<typeof derived>): void;
+  /** Outlines one control, or clears the outline. */
+  focus(id: GdControlId | undefined): void;
   dispose(): void;
 }
 
@@ -113,7 +134,30 @@ export function createGdPanel(
   readoutSection.append(readout.el);
 
   const explanation = createExplanation();
+  // Marked so the shell can collapse it while a walkthrough's step card, which occupies the
+  // same place in the panel, is showing.
+  explanation.el.dataset.role = "explanation";
   panel.el.append(explanation.el);
+
+  const toggleFor = (key: ShowKey): HTMLElement => {
+    const toggle = toggles.get(key);
+    if (!toggle) throw new Error(`gd panel: the "${key}" toggle was never built`);
+    return toggle.el;
+  };
+
+  const controls: Readonly<Record<GdControlId, HTMLElement>> = {
+    surface: surface.el,
+    optimizer: optimizer.el,
+    lr: lr.el,
+    step: stepBtn.el,
+    run: runBtn.el,
+    reset: resetBtn.el,
+    resetView: resetViewBtn.el,
+    showTangent: toggleFor("tangent"),
+    showContours: toggleFor("contours"),
+    showPath: toggleFor("path"),
+  };
+  const focus = createControlFocus(controls);
 
   function render(state: GdState, d: ReturnType<typeof derived>): void {
     if (surface.value !== state.surface) surface.value = state.surface;
@@ -150,6 +194,8 @@ export function createGdPanel(
 
   return {
     el: panel.el,
+    controls,
+    focus,
     render,
     dispose(): void {
       host.replaceChildren();
