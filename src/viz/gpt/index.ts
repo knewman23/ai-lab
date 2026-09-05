@@ -252,8 +252,12 @@ function mount(host: VizHost): VizInstance {
       hitTargets: floor.hitTargets,
       // The floor is the plane z = 0, so a word drags across it at 1:1.
       getPlaneZ: () => 0,
+      // No `surfaceTarget`: that arm exists to place a point where the floor was clicked, and
+      // every word already stands on this floor. Without one, `attachDrag` never reports -1,
+      // so the index below is always one of the eight words.
       // `p` is the world (x, y) of the hit on z = 0; `embedFromFloor` clamps to the domain.
       onDrag: (index: number, p: Vec2) => {
+        if (index < 0) throw new Error("gpt: the floor drag has no surface arm to place from");
         // The first move of a word is proof the hint has been read.
         hint?.hide();
         apply(setEmbedding(state, index, embedFromFloor(p)));

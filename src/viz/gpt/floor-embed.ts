@@ -20,7 +20,12 @@ export interface FloorEmbed {
    * recursively, so it must be the bare plane and never a group the spheres hang under.
    */
   readonly mesh: Mesh;
-  /** The eight vocabulary spheres in vocabulary order: the drag's hit targets. */
+  /** The eight visible vocabulary spheres, in vocabulary order. */
+  readonly spheres: readonly Mesh[];
+  /**
+   * The invisible pick volume around each sphere, in vocabulary order: the drag's hit targets.
+   * Wider than the sphere it wraps, so grabbing a word does not demand precision.
+   */
   readonly hitTargets: readonly Mesh[];
   /** The unembedding rays, split by colour: the winning word's, and everyone else's. */
   readonly rays: Readonly<{ soft: Layer; accent: Layer }>;
@@ -34,6 +39,14 @@ const FLOOR_OPACITY = 0.55;
 
 /** The rays sit on the floor, under the spheres; both sort below the wall's own layers. */
 const RAY_ORDER = 1;
+
+/**
+ * How wide a word is to grab, as against `POINT_RADIUS`, which is how big it is to read. Two
+ * separate questions, so two separate constants, exactly as `nn/probe.ts` keeps them: a word
+ * drawn smaller must not silently become harder to catch. The ratio is that scene's — a little
+ * over double — which is what makes a drag forgiving at this camera distance.
+ */
+const PICK_RADIUS = 0.19;
 
 /** Endpoints each ray layer can need: two per ray, and only one ray is ever the winner's. */
 const SOFT_ENDPOINTS = VOCAB.length * 2;
@@ -60,9 +73,19 @@ export function createFloorEmbed(theme: ThemeColors): FloorEmbed {
 
   const pointGeometry = new SphereGeometry(POINT_RADIUS, 16, 12);
   const pointMaterial = new MeshStandardMaterial({ roughness: 0.5 });
-  const hitTargets = VOCAB.map(() => new Mesh(pointGeometry, pointMaterial));
+  const spheres = VOCAB.map(() => new Mesh(pointGeometry, pointMaterial));
+
+  // An invisible *material* on a *visible* mesh, as `nn/probe.ts` and `backprop/hit-boxes.ts`
+  // both do: three's Raycaster tests layers and materials, not `object.visible`, so the ray
+  // finds these whichever way three treats an invisible object, and nothing is drawn either way.
+  const pickGeometry = new SphereGeometry(PICK_RADIUS, 12, 8);
+  const pickMaterial = new MeshBasicMaterial({ visible: false });
+  const hitTargets = VOCAB.map(() => new Mesh(pickGeometry, pickMaterial));
+
+  // Siblings of the bare plane, never its children: `drag.ts` raycasts the surface recursively,
+  // and an invisible mesh anywhere under it would swallow the hit it was meant to find.
   const points = new Group();
-  points.add(...hitTargets);
+  points.add(...spheres, ...hitTargets);
 
   const soft = lineLayer(SOFT_ENDPOINTS, RAY_ORDER, { depth: true });
   const accent = lineLayer(ACCENT_ENDPOINTS, RAY_ORDER, { depth: true });
@@ -84,6 +107,7 @@ export function createFloorEmbed(theme: ThemeColors): FloorEmbed {
   return {
     group,
     mesh,
+    spheres,
     hitTargets,
     rays,
 
@@ -93,11 +117,13 @@ export function createFloorEmbed(theme: ThemeColors): FloorEmbed {
       const placed = placements(embeddings, probabilities);
       for (let v = 0; v < placed.length; v++) {
         const place = placed[v];
-        const sphere = hitTargets[v];
-        if (place === undefined || sphere === undefined) {
+        const sphere = spheres[v];
+        const pick = hitTargets[v];
+        if (place === undefined || sphere === undefined || pick === undefined) {
           throw new Error(`gpt floor: no place for word ${v}`);
         }
         sphere.position.set(place.at[0], place.at[1], place.at[2]);
+        pick.position.copy(sphere.position);
         if (place.ray === null) continue;
         if (place.winner) winner = [place.ray];
         else others.push(place.ray);
@@ -118,6 +144,8 @@ export function createFloorEmbed(theme: ThemeColors): FloorEmbed {
       material.dispose();
       pointGeometry.dispose();
       pointMaterial.dispose();
+      pickGeometry.dispose();
+      pickMaterial.dispose();
       disposeLayers([soft, accent]);
     },
   };

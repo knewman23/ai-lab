@@ -391,8 +391,11 @@ describe("gptTransformer.mount", () => {
     viz.update(0.016);
     const before = readout(h.panel);
 
-    // `the` starts at embedding (0, 1.6), which is floor (0, -0.76).
-    drag(h.renderer.domElement, pixelOf([0, -0.76, 0.09]), pixelOf([1.4, -4, 0.09]));
+    // `the` starts at embedding (0, 1.6), which is floor (0, -0.76). The grab is 0.15 off its
+    // centre: outside the 0.09 sphere the viewer sees, inside the wider pick volume around it.
+    // Aiming at the sphere itself would pass just as well with the drag wired to the visible
+    // meshes, and the forgiving grab is the whole point of the pick volume.
+    drag(h.renderer.domElement, pixelOf([0.15, -0.76, 0.09]), pixelOf([1.4, -4, 0.09]));
 
     expect(viz.update(0.016)).toBe(true);
     // Moving a word moves the tied unembedding, so the distribution moves with it.

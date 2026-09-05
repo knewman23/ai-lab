@@ -1,10 +1,4 @@
-import {
-  Box3,
-  type Mesh,
-  MeshBasicMaterial,
-  type MeshStandardMaterial,
-  SphereGeometry,
-} from "three";
+import { Box3, Mesh, MeshBasicMaterial, type MeshStandardMaterial, SphereGeometry } from "three";
 import { describe, expect, it, vi } from "vitest";
 import {
   EMBEDDING_PRESETS,
@@ -62,10 +56,10 @@ describe("createFloorEmbed", () => {
 
   it("puts a sphere of radius 0.09 at each word's place, in --ink", () => {
     const { floor, theme } = make();
-    expect(floor.hitTargets).toHaveLength(VOCAB.length);
+    expect(floor.spheres).toHaveLength(VOCAB.length);
     const placed = placements(EMBEDDING_PRESETS.tuned, PROBS);
-    for (let v = 0; v < floor.hitTargets.length; v++) {
-      const sphere = floor.hitTargets[v]!;
+    for (let v = 0; v < floor.spheres.length; v++) {
+      const sphere = floor.spheres[v]!;
       expect((sphere.geometry as SphereGeometry).parameters.radius).toBe(0.09);
       expect((sphere.material as MeshStandardMaterial).color.equals(theme.ink)).toBe(true);
       expect(sphere.position.toArray()).toEqual([...placed[v]!.at]);
@@ -73,25 +67,46 @@ describe("createFloorEmbed", () => {
     floor.dispose();
   });
 
-  it("moves the spheres when the embeddings move", () => {
+  it("wraps each word in a wider invisible pick volume than the sphere it draws", () => {
+    const { floor } = make();
+    expect(floor.hitTargets).toHaveLength(VOCAB.length);
+    const radius = (mesh: Mesh): number => (mesh.geometry as SphereGeometry).parameters.radius;
+    for (let v = 0; v < floor.hitTargets.length; v++) {
+      const pick = floor.hitTargets[v]!;
+      // Grabbing a word and reading it are different questions: a 0.09 sphere is fiddly to
+      // catch at this camera distance, so the two must never be folded back into one mesh.
+      expect(radius(pick)).toBeGreaterThan(radius(floor.spheres[v]!));
+      // Invisible by material, not by `visible`: three's Raycaster reads the material.
+      expect((pick.material as MeshBasicMaterial).visible).toBe(false);
+      expect(pick.visible).toBe(true);
+      expect(pick.position.toArray()).toEqual(floor.spheres[v]!.position.toArray());
+    }
+    floor.dispose();
+  });
+
+  it("moves the spheres and their pick volumes together when the embeddings move", () => {
     const { floor } = make();
     const moved = EMBEDDING_PRESETS.tuned.map((e, v) => (v === 3 ? ([2, -2] as const) : e));
     floor.set(moved, PROBS);
     // floorFromEmbed((2, -2)) = (2.8, -5.8): the domain corner, inside the floor with a margin.
-    expect(floor.hitTargets[3]!.position.x).toBeCloseTo(2.8, 9);
-    expect(floor.hitTargets[3]!.position.y).toBeCloseTo(-5.8, 9);
-    expect(floor.hitTargets[3]!.position.z).toBe(POINT_RADIUS);
+    expect(floor.spheres[3]!.position.x).toBeCloseTo(2.8, 9);
+    expect(floor.spheres[3]!.position.y).toBeCloseTo(-5.8, 9);
+    expect(floor.spheres[3]!.position.z).toBe(POINT_RADIUS);
+    // A pick volume left behind is a word that cannot be picked up again.
+    expect(floor.hitTargets[3]!.position.toArray()).toEqual(floor.spheres[3]!.position.toArray());
     floor.dispose();
   });
 
-  it("keeps the hit targets out of the surface the drag raycasts", () => {
+  it("keeps the spheres and the pick volumes out of the surface the drag raycasts", () => {
     const { floor } = make();
     // `drag.ts` raycasts `surfaceTarget` recursively for click-to-place: an invisible mesh under
     // it would swallow the click. The floor mesh is the surface, and it has no children.
     expect(floor.mesh.children).toHaveLength(0);
-    for (const sphere of floor.hitTargets) expect(sphere.parent).not.toBe(floor.mesh);
-    // They are still in the scene, under a group of their own.
-    expect(floor.hitTargets.every((sphere) => sphere.parent !== null)).toBe(true);
+    for (const mesh of [...floor.spheres, ...floor.hitTargets]) {
+      expect(mesh.parent).not.toBe(floor.mesh);
+      // Still in the scene, under a group of their own.
+      expect(mesh.parent).not.toBeNull();
+    }
     floor.dispose();
   });
 
@@ -153,9 +168,7 @@ describe("createFloorEmbed", () => {
     repaint("--soft", "#0000ff");
     repaint("--accent", "#ff0000");
     repaint("--faint", "#123456");
-    expect((floor.hitTargets[0]!.material as MeshStandardMaterial).color.equals(theme.ink)).toBe(
-      true,
-    );
+    expect((floor.spheres[0]!.material as MeshStandardMaterial).color.equals(theme.ink)).toBe(true);
     expect(floor.rays.soft.material.color.equals(theme.soft)).toBe(true);
     expect(floor.rays.accent.material.color.equals(theme.accent)).toBe(true);
     expect((floor.mesh.material as MeshBasicMaterial).color.equals(theme.faint)).toBe(true);
