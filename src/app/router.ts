@@ -3,12 +3,19 @@ import { findEntry } from "./registry";
 
 export type Route =
   | { readonly kind: "home"; readonly topic?: TopicSlug }
-  | { readonly kind: "viz"; readonly topic: string; readonly id: string };
+  | {
+      readonly kind: "viz";
+      readonly topic: string;
+      readonly id: string;
+      /** 0-based step index of a walkthrough deep link; absent for the sandbox. */
+      readonly step?: number;
+    };
 
 export type ResolvedRoute =
   | { readonly kind: "home"; readonly topic?: TopicSlug }
-  | { readonly kind: "viz"; readonly entry: LazyVisualization }
-  | { readonly kind: "redirect" };
+  | { readonly kind: "viz"; readonly entry: LazyVisualization; readonly step?: number }
+  /** Carries where to go: "redirect to the plain scene" is otherwise unrepresentable. */
+  | { readonly kind: "redirect"; readonly hash: string };
 
 function decodeSegment(segment: string): string | undefined {
   try {
@@ -16,6 +23,17 @@ function decodeSegment(segment: string): string | undefined {
   } catch {
     return undefined;
   }
+}
+
+const WALKTHROUGH_SEGMENT = "walkthrough";
+
+/** The 0-based index a 1-based URL segment names, or undefined if it names none. */
+function stepIndex(segment: string): number | undefined {
+  if (!/^\d+$/.test(segment)) {
+    return undefined;
+  }
+  const n = Number(segment);
+  return n >= 1 ? n - 1 : undefined;
 }
 
 export function parseHash(hash: string): Route {
@@ -32,7 +50,8 @@ export function parseHash(hash: string): Route {
     const known = TOPICS.find((t) => t.slug === topic);
     return known ? { kind: "home", topic: known.slug } : { kind: "home" };
   }
-  if (segments.length !== 2) {
+  const isWalkthrough = segments.length === 4 && segments[2] === WALKTHROUGH_SEGMENT;
+  if (segments.length !== 2 && !isWalkthrough) {
     return { kind: "home" };
   }
 
@@ -43,7 +62,15 @@ export function parseHash(hash: string): Route {
     return { kind: "home" };
   }
 
-  return { kind: "viz", topic, id };
+  if (!isWalkthrough) {
+    return { kind: "viz", topic, id };
+  }
+
+  // The `n` in the URL is 1-based. Anything that is not a whole step number —
+  // 0, a negative, a fraction, a word — is the plain scene rather than a 404,
+  // since the scene itself is what the visitor asked for.
+  const step = stepIndex(segments[3]!);
+  return step === undefined ? { kind: "viz", topic, id } : { kind: "viz", topic, id, step };
 }
 
 export function resolveRoute(
@@ -56,16 +83,23 @@ export function resolveRoute(
 
   const entry = find(route.topic, route.id);
   if (entry === undefined || entry.status === "soon") {
-    return { kind: "redirect" };
+    return { kind: "redirect", hash: "#/" };
   }
 
-  return { kind: "viz", entry };
+  return route.step === undefined
+    ? { kind: "viz", entry }
+    : { kind: "viz", entry, step: route.step };
 }
 
 export interface RouterDeps {
   readonly getHash: () => string;
   readonly setHash: (hash: string) => void;
   readonly addListener: (callback: () => void) => () => void;
+  /** Seam for tests: the router navigates to whatever target this hands back. */
+  readonly resolve?: (
+    route: Route,
+    find: (topic: string, id: string) => RegistryEntry | undefined,
+  ) => ResolvedRoute;
 }
 
 const defaultDeps: RouterDeps = {
@@ -82,8 +116,9 @@ const defaultDeps: RouterDeps = {
 };
 
 /**
- * On an unknown or "soon" hash, `start()` sets the hash to "#/"; the home
- * render happens on the resulting hashchange, not synchronously.
+ * On an unknown or "soon" hash, `start()` sets the hash to the redirect's
+ * target ("#/" for every case the router itself decides); the home render
+ * happens on the resulting hashchange, not synchronously.
  */
 export function createRouter(
   onChange: (route: ResolvedRoute) => void,
@@ -95,9 +130,9 @@ export function createRouter(
 
   const handleChange = (): void => {
     const route = parseHash(deps.getHash());
-    const resolved = resolveRoute(route, find);
+    const resolved = (deps.resolve ?? resolveRoute)(route, find);
     if (resolved.kind === "redirect") {
-      deps.setHash("#/");
+      deps.setHash(resolved.hash);
       return;
     }
     onChange(resolved);

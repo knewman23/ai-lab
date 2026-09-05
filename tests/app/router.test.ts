@@ -4,6 +4,7 @@ import {
   parseHash,
   resolveRoute,
   type Route,
+  type ResolvedRoute,
   type RouterDeps,
 } from "../../src/app/router";
 import type { LazyVisualization, RegistryEntry } from "../../src/viz/types";
@@ -22,6 +23,37 @@ describe("parseHash", () => {
     ["#/machine-learning", { kind: "home", topic: "machine-learning" }],
     ["#/machine-learning/", { kind: "home", topic: "machine-learning" }],
     ["#/a/b/c", { kind: "home" }],
+    [
+      "#/machine-learning/gpt-transformer/walkthrough/3",
+      { kind: "viz", topic: "machine-learning", id: "gpt-transformer", step: 2 },
+    ],
+    [
+      "#/machine-learning/gpt-transformer/walkthrough/1",
+      { kind: "viz", topic: "machine-learning", id: "gpt-transformer", step: 0 },
+    ],
+    // A step that cannot be an index at all is the plain scene, not a 404.
+    [
+      "#/machine-learning/gpt-transformer/walkthrough/0",
+      { kind: "viz", topic: "machine-learning", id: "gpt-transformer" },
+    ],
+    [
+      "#/machine-learning/gpt-transformer/walkthrough/-1",
+      { kind: "viz", topic: "machine-learning", id: "gpt-transformer" },
+    ],
+    [
+      "#/machine-learning/gpt-transformer/walkthrough/x",
+      { kind: "viz", topic: "machine-learning", id: "gpt-transformer" },
+    ],
+    [
+      "#/machine-learning/gpt-transformer/walkthrough/1.5",
+      { kind: "viz", topic: "machine-learning", id: "gpt-transformer" },
+    ],
+    // Trailing slashes are trimmed first, so this is the three-segment case: home.
+    ["#/machine-learning/gpt-transformer/walkthrough/", { kind: "home" }],
+    ["#/machine-learning/gpt-transformer/walkthrough", { kind: "home" }],
+    // A fourth segment that is not "walkthrough" is an unknown route, as today.
+    ["#/machine-learning/gpt-transformer/steps/3", { kind: "home" }],
+    ["#/a/b/c/d/e", { kind: "home" }],
   ])("parses %s", (hash, expected) => {
     expect(parseHash(hash)).toEqual(expected);
   });
@@ -86,13 +118,42 @@ describe("resolveRoute", () => {
     const find = (): RegistryEntry | undefined => soonEntry;
     expect(
       resolveRoute({ kind: "viz", topic: "machine-learning", id: "backprop-graph" }, find),
-    ).toEqual({ kind: "redirect" });
+    ).toEqual({ kind: "redirect", hash: "#/" });
   });
 
   it("resolves an unknown viz route to redirect", () => {
     const find = (): RegistryEntry | undefined => undefined;
     expect(resolveRoute({ kind: "viz", topic: "nope", id: "nope" }, find)).toEqual({
       kind: "redirect",
+      hash: "#/",
+    });
+  });
+});
+
+describe("resolveRoute with a walkthrough step", () => {
+  it("keeps the step on the resolved viz route", () => {
+    const entry: LazyVisualization = {
+      id: "gradient-descent",
+      topic: "machine-learning",
+      title: "Gradient descent",
+      summary: "A visualization.",
+      status: "ready",
+      load: () => Promise.reject(new Error("not loaded in this test")),
+    };
+    const find = (): RegistryEntry | undefined => entry;
+    expect(
+      resolveRoute(
+        { kind: "viz", topic: "machine-learning", id: "gradient-descent", step: 2 },
+        find,
+      ),
+    ).toEqual({ kind: "viz", entry, step: 2 });
+  });
+
+  it("redirects an unknown entry to home even when a step was asked for", () => {
+    const find = (): RegistryEntry | undefined => undefined;
+    expect(resolveRoute({ kind: "viz", topic: "nope", id: "nope", step: 2 }, find)).toEqual({
+      kind: "redirect",
+      hash: "#/",
     });
   });
 });
@@ -205,6 +266,33 @@ describe("createRouter", () => {
 
     expect(onChange).toHaveBeenCalledTimes(1);
     expect(deps.listeners).toHaveLength(1);
+  });
+
+  it("parses a walkthrough deep link straight through to onChange", () => {
+    const deps = makeStubDeps("#/machine-learning/gradient-descent/walkthrough/9");
+    const onChange = vi.fn();
+    const find = (): RegistryEntry | undefined => readyEntry;
+    const router = createRouter(onChange, find, deps);
+
+    router.start();
+
+    expect(onChange).toHaveBeenCalledWith({ kind: "viz", entry: readyEntry, step: 8 });
+    expect(deps.setHashCalls).toEqual([]);
+  });
+
+  it("navigates to the target the resolver names rather than a hardcoded #/", () => {
+    const target = "#/machine-learning/gradient-descent";
+    const deps = {
+      ...makeStubDeps("#/machine-learning/gradient-descent/walkthrough/2"),
+      resolve: (): ResolvedRoute => ({ kind: "redirect", hash: target }),
+    };
+    const onChange = vi.fn();
+    const router = createRouter(onChange, () => readyEntry, deps);
+
+    router.start();
+
+    expect(deps.setHashCalls).toEqual([target]);
+    expect(onChange).not.toHaveBeenCalled();
   });
 
   it("stop() invokes the remove function", () => {
