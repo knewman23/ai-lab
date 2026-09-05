@@ -18,13 +18,14 @@ it belongs in a scene's explanation panel, not in a scene of its own.
 | ML             | Gradient descent       | `specs/2026-09-03-ai-lab-design.md`                      |
 | ML             | Backprop graph         | `specs/2026-09-03-backprop-graph-design.md`              |
 | ML             | Neural network         | `specs/2026-09-04-neural-network-design.md`              |
+| ML             | GPT transformer        | `specs/2026-09-04-gpt-transformer-design.md`            |
 
 ## In flight
 
-1. **GPT transformer** (ML) — token embeddings, attention heads as weighted arcs, the
-   residual stream, and the softmax over the next token.
-2. **Walkthrough mode** (shell) — optional numbered steps that drive any scene's state,
-   so a card can be read as a lesson rather than a sandbox.
+1. **Walkthrough mode** (shell) — optional numbered steps that drive any scene's state,
+   so a card can be read as a lesson rather than a sandbox. The GPT transformer's assembler
+   was built with this in mind: `apply(nextState)` is a single entry point over pure setters,
+   and every scene's panel already renders from state alone.
 
 ## Tier 1 — next up
 

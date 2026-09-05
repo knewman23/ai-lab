@@ -10,10 +10,11 @@ a study tool and a portfolio piece. Live at
 ![Chain rule graph](docs/screenshots/chain-rule-light.png)
 ![Backprop graph](docs/screenshots/backprop-light.png)
 ![Neural network](docs/screenshots/neural-network-light.png)
+![GPT transformer](docs/screenshots/gpt-transformer-light.png)
 
 ## What's in it
 
-Six scenes so far.
+Seven scenes so far.
 
 **Gradient descent** on a draggable 3D loss surface. Drag the ball anywhere on the surface
 and watch the gradient arrow and tangent plane follow it, pick SGD, momentum or Adam and
@@ -46,6 +47,16 @@ revealed number recomputes. Three graphs: the tanh neuron, a·b + c, and one whe
 consumers so its gradient visibly accumulates.
 
 **Neural network.** A 2-4-4-1 tanh network learning to classify points in a plane. The layers stand on a wall with every weight a strut, thick for large and blue for negative, and every neuron sized by its activation. The floor in front is the input space: the training data sits on it and the network's current output is painted across it, so each gradient step visibly bends the decision boundary toward the data. Step or play the training, drag a probe across the floor to light up the activations behind any prediction, and switch between XOR, two moons and circles.
+
+**GPT transformer.** One transformer block, small enough to see every number: `d_model = 2`, so a
+token's vector is a point on a plane. Eight vocabulary words lie on the floor as draggable points —
+that floor _is_ embedding space — and the wall in front carries the pipeline: five token columns,
+five stage bands, and attention arcs fanning from the token you select back to the tokens it reads,
+thick where the weight is large. The unembedding is tied to the embedding matrix, as real GPTs do,
+so the words you drag are also the output directions: drag one toward where the last token's vector
+lands and watch its probability bar take over. Switch the embeddings to `collapsed` to strip the
+meaning out and see head 1's positional bias on its own, turn the causal mask off and watch the last
+token start reading the answer, or step the stage selector through the block one equation at a time.
 
 ## Run it
 
@@ -160,14 +171,11 @@ The registry test asserts the loaded module's `id`, `topic`, `title` and
 
 ## Roadmap
 
-Six scenes are live: derivative & tangent and the chain rule graph (calculus), matrix
-transformation (linear algebra), and gradient descent, the backprop graph and the neural
-network (machine learning).
+Seven scenes are live: derivative & tangent and the chain rule graph (calculus), matrix
+transformation (linear algebra), and gradient descent, the backprop graph, the neural network
+and the GPT transformer (machine learning).
 
-Next:
-
-1. GPT transformer (machine learning) — token embeddings, attention heads, residual stream.
-2. Walkthrough mode (shell) — optional numbered steps that reconfigure any scene.
+Next: walkthrough mode (shell) — optional numbered steps that reconfigure any scene.
 
 After that: SVD & low-rank approximation, Taylor series, and overfitting / bias–variance /
 regularization. The queue behind those, with what each scene would let you manipulate and
