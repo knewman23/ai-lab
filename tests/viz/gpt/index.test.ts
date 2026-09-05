@@ -3,6 +3,7 @@ import { BufferGeometry, Material, Mesh, type Object3D, PerspectiveCamera, Vecto
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createThemeColors } from "../../../src/core/theme";
 import { gptTransformer } from "../../../src/viz/gpt";
+import { buildScene } from "../../../src/viz/gpt/scene-build";
 import { frameGpt } from "../../../src/viz/gpt/frame-gpt";
 import { BAND_Z, columnX } from "../../../src/viz/gpt/layout";
 import type { Renderer, VizHost } from "../../../src/viz/types";
@@ -278,6 +279,46 @@ describe("gptTransformer", () => {
       "Drag eight word embeddings across the floor and watch one transformer block respond: attention arcs between the tokens, the residual stream, and the probability of every next word.",
     );
     expect(gptTransformer.status).toBe("ready");
+  });
+});
+
+describe("buildScene", () => {
+  it("hangs every drawn unit off the scene", () => {
+    const { host: h } = host();
+    const scene = buildScene(h, false);
+
+    // A unit that is built but never added is a unit the viewer never sees, and nothing
+    // downstream would notice: it disposes cleanly and draws nothing.
+    for (const group of [
+      scene.wall.group,
+      scene.floor.group,
+      scene.bands.group,
+      scene.columns.group,
+      scene.arcs.group,
+      scene.bars.group,
+      scene.path.group,
+      scene.hitGroup,
+    ]) {
+      expect(group.parent).toBe(scene.kit.scene);
+    }
+    expect(scene.hitGroup.children).toHaveLength(scene.hits.targets.length);
+
+    scene.unwind();
+  });
+
+  it("leaves nothing attached or overlaid once it unwinds", () => {
+    const { host: h } = host();
+    const scene = buildScene(h, false);
+    expect(h.canvasContainer.querySelector("div.viz-labels")).not.toBeNull();
+
+    scene.unwind();
+
+    let meshes = 0;
+    scene.kit.scene.traverse((object) => {
+      if ((object as Mesh).isMesh === true) meshes += 1;
+    });
+    expect(meshes).toBe(0);
+    expect(h.canvasContainer.querySelector("div.viz-labels")).toBeNull();
   });
 });
 

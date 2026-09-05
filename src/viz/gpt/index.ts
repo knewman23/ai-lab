@@ -1,24 +1,16 @@
-import { Group } from "three";
 import type { Vec2 } from "../../core/math/numeric";
 import { type Forward, probabilities, SEQUENCES } from "../../core/math/transformer";
-import { createSceneKit, disposeObject, prefersReducedMotion } from "../../core/scene";
+import { disposeObject, prefersReducedMotion } from "../../core/scene";
 import { attachDrag } from "../shared/drag";
 import type { Framing } from "../shared/framing";
 import { createUsageHint, type UsageHint } from "../shared/hint";
-import { createLabelLayer } from "../shared/labels";
-import { createWall } from "../shared/wall";
 import type { Visualization, VizHost, VizInstance } from "../types";
-import { createArcs } from "./arcs";
-import { createBars } from "./bars";
-import { createColumnHits, createColumnPick } from "./column-pick";
-import { createColumns } from "./columns";
-import { createFloorEmbed } from "./floor-embed";
+import { createColumnPick } from "./column-pick";
 import { frameGpt } from "./frame-gpt";
 import { syncLabels } from "./labels-sync";
-import { embedFromFloor, WALL_H, WALL_OPACITY, WALL_W } from "./layout";
+import { embedFromFloor } from "./layout";
 import { createGptPanel, type GptPanel } from "./panel";
-import { createResidualPath } from "./residual-path";
-import { createWallBands } from "./wall-bands";
+import { buildScene } from "./scene-build";
 import {
   type Derived,
   type GptState,
@@ -53,95 +45,6 @@ const HINT = {
     "Switch the embeddings to collapsed to strip the meaning out and leave only position.",
   ],
 };
-
-/**
- * Builds the scene-side objects. If any one of them throws, the ones already built are disposed
- * in reverse order before the error is rethrown, so a half-finished mount never leaks GPU
- * resources. The returned `unwind` lets the caller do the same for a failure later in the mount.
- */
-function buildScene(host: VizHost, reducedMotion: boolean) {
-  const built: Array<() => void> = [];
-  const unwind = (): void => {
-    for (let i = built.length - 1; i >= 0; i -= 1) built[i]?.();
-  };
-
-  try {
-    const kit = createSceneKit(host.renderer, host.theme, { reducedMotion });
-    built.push(() => {
-      disposeObject(kit.scene);
-      kit.dispose();
-    });
-
-    const wall = createWall(host.theme, { width: WALL_W, height: WALL_H, opacity: WALL_OPACITY });
-    built.push(() => {
-      wall.dispose();
-    });
-
-    const floor = createFloorEmbed(host.theme);
-    built.push(() => {
-      floor.dispose();
-    });
-
-    const bands = createWallBands(host.theme);
-    built.push(() => {
-      bands.dispose();
-    });
-
-    const columns = createColumns(host.theme);
-    built.push(() => {
-      columns.dispose();
-    });
-
-    const arcs = createArcs(host.theme);
-    built.push(() => {
-      arcs.dispose();
-    });
-
-    const bars = createBars(host.theme);
-    built.push(() => {
-      bars.dispose();
-    });
-
-    const path = createResidualPath(host.theme);
-    built.push(() => {
-      path.dispose();
-    });
-
-    // The column pick volumes get a group of their own rather than joining the columns': the
-    // drag raycasts the floor recursively for click-to-place, and an invisible box anywhere
-    // under a raycast surface swallows the hit it was meant to find.
-    const hits = createColumnHits();
-    const hitGroup = new Group();
-    hitGroup.add(...hits.targets);
-    built.push(() => {
-      hitGroup.removeFromParent();
-      hitGroup.clear();
-      hits.dispose();
-    });
-
-    // Before the hint, so the hint is the later sibling and paints on top.
-    const labels = createLabelLayer(host.canvasContainer);
-    built.push(() => {
-      labels.dispose();
-    });
-
-    kit.scene.add(
-      wall.group,
-      floor.group,
-      bands.group,
-      columns.group,
-      arcs.group,
-      bars.group,
-      path.group,
-      hitGroup,
-    );
-
-    return { kit, wall, floor, bands, columns, arcs, bars, path, hits, hitGroup, labels, unwind };
-  } catch (error) {
-    unwind();
-    throw error;
-  }
-}
 
 /**
  * Whether the four inputs `forward` takes have moved. Everything else in the state — the query,
