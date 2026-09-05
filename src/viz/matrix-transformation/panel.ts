@@ -1,12 +1,13 @@
 import type { Mat2 } from "../../core/math/matrix2";
 import { createButton } from "../../ui/button";
+import { createOverview } from "../../ui/overview";
 import { createPanel } from "../../ui/panel";
 import { createReadout, fmt } from "../../ui/readout";
 import { createSelect } from "../../ui/select";
 import { createSlider } from "../../ui/slider";
 import { createToggle } from "../../ui/toggle";
 import { createControlFocus } from "../shared/control-focus";
-import { createExplanation } from "./explanation";
+import { createExplanation, OVERVIEW } from "./explanation";
 import { createMatrixInput } from "./matrix-input";
 import { PRESETS, PRESET_KEYS, type PresetKey } from "./presets";
 import type { MtState, ShowKey, derived } from "./state";
@@ -57,6 +58,10 @@ function sameMatrix(a: Mat2, b: Mat2): boolean {
 export function createMtPanel(host: HTMLElement, handlers: MtPanelHandlers): MtPanel {
   const panel = createPanel();
   host.append(panel.el);
+
+  // Built before any section so it is the panel's first child, under the walkthrough banner.
+  const overview = createOverview(OVERVIEW);
+  panel.el.append(overview.el);
 
   // One "Setup" section: each widget carries its own label, so per-widget headings would repeat them.
   const setup = panel.section("Setup");

@@ -2,6 +2,25 @@ import type { Eigen } from "../../core/math/matrix2";
 import { createEquation } from "../../ui/equation";
 import { fmt } from "../../ui/readout";
 import type { MtState, derived } from "./state";
+import type { OverviewSpec } from "../../ui/overview";
+
+export const OVERVIEW: OverviewSpec = {
+  summary: "What a matrix does to space, read off the two columns it is made of",
+  objective:
+    "A matrix is a linear transformation: it sends every point somewhere, and knowing where the " +
+    "two basis vectors land tells you where everything else lands. Determinant, eigenvectors and " +
+    "orientation are all read off those two columns.",
+  whereUsed:
+    "Every frame a game renders: the graphics pipeline multiplies 4x4 matrices together to " +
+    "place, rotate and scale what is on screen. Robotics uses them to track where an arm's " +
+    "gripper is and which way it points; photo editors use them to warp images and correct lens " +
+    "distortion.",
+  example:
+    "Rotating a photograph by ten degrees is one matrix applied to every pixel coordinate. Its " +
+    "determinant is 1, which is why no area is gained or lost in the process. A matrix with " +
+    "determinant 0 flattens the picture onto a line and cannot be undone — which is what happens " +
+    "here the moment the two columns point the same way.",
+};
 
 export interface MtExplanation {
   el: HTMLElement;

@@ -2,7 +2,31 @@ import { OPTIMIZERS } from "../../core/math/optimizers";
 import { SURFACES } from "../../core/math/surfaces";
 import { createEquation } from "../../ui/equation";
 import { fmt } from "../../ui/readout";
+import type { OverviewSpec } from "../../ui/overview";
 import type { GdState, derived } from "./state";
+
+/**
+ * The panel's opening framing. The house-price case is the one every course opens with, and the
+ * last sentence is the honest half of it: with four attributes the normal equation solves the
+ * thing outright. Gradient descent earns its keep on the models that are too big for that, which
+ * is why the paragraph before it names those instead.
+ */
+export const OVERVIEW: OverviewSpec = {
+  summary: "Finding the numbers that make a model wrong as rarely as possible",
+  objective:
+    "Fitting a model means choosing weights that make its mistakes small. Gradient descent does " +
+    "the choosing from two ingredients: a measure of the error, and the slope of that error " +
+    "where it stands. Step downhill, repeat.",
+  whereUsed:
+    "Almost everything trained rather than programmed: image recognition, fraud detection, the " +
+    "recommender that ranks a feed, and the transformers behind chat assistants, where this loop " +
+    "runs for weeks across billions of weights.",
+  example:
+    "House prices: give floor area, bedrooms and age each a weight, and the error is the average " +
+    "squared gap between the price those weights predict and what each house sold for. Those " +
+    "weights are this surface's axes and the height is that error. With three attributes you " +
+    "would solve it outright — gradient descent is for the models too big for that.",
+};
 
 export interface Explanation {
   el: HTMLElement;

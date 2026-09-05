@@ -4,6 +4,24 @@ import type { GraphKey } from "../../core/math/graphs";
 import { createEquation } from "../../ui/equation";
 import { proseNum } from "../../ui/readout";
 import type { BpState, Derived } from "./state";
+import type { OverviewSpec } from "../../ui/overview";
+
+export const OVERVIEW: OverviewSpec = {
+  summary: "How a framework works out which weight to blame for the error",
+  objective:
+    "Every model is a graph of small operations. The forward pass computes the output; the " +
+    "backward pass walks the same graph in reverse, handing each node the derivative of the " +
+    "output with respect to it, so every input ends up with its share of the blame.",
+  whereUsed:
+    "This is what PyTorch's autograd is. The forward pass records a graph of the operations you " +
+    "performed, and calling .backward() walks it in reverse applying the chain rule. Every " +
+    "gradient that trains every model in the field comes out of a pass like this one.",
+  example:
+    "A single neuron: two inputs times two weights, summed with a bias, squashed by tanh. That " +
+    "is the tanh neuron in the Graph select, and it is the smallest thing containing all the " +
+    "parts — a product, a sum and a nonlinearity — which is why the frameworks' own tutorials " +
+    "start there too.",
+};
 
 /** Each preset's expression, in TeX, for the explanation. */
 export const GRAPH_TEX: Readonly<Record<GraphKey, string>> = {

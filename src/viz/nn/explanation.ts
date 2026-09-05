@@ -1,6 +1,24 @@
 import { createEquation } from "../../ui/equation";
 import { formatLr, fmt, proseNum } from "../../ui/readout";
 import type { Derived, NnState } from "./state";
+import type { OverviewSpec } from "../../ui/overview";
+
+export const OVERVIEW: OverviewSpec = {
+  summary: "Learning a boundary that no straight line could have drawn",
+  objective:
+    "A network of small units, each squashing a weighted sum, can carve a curved boundary " +
+    "between two classes. Training moves the weights until that boundary separates the data, and " +
+    "nothing about its shape is designed — all of it is learned from the examples.",
+  whereUsed:
+    "Classifiers over tabular data: fraud detection deciding whether a card transaction is " +
+    "unusual, credit scoring rating an applicant, and diagnostic models weighing a patient's " +
+    "measurements. The same shape as here — a handful of numbers in, one probability out.",
+  example:
+    "A card transaction arrives as a few numbers: amount, time of day, distance from the last " +
+    "purchase. Fraudulent and legitimate ones cannot be told apart by a single straight cut " +
+    "through those numbers, which is exactly the difficulty the four clusters on this floor are " +
+    "a miniature of.",
+};
 
 /**
  * The three rules the scene shows, in the order they are applied: a layer's activation, the loss it

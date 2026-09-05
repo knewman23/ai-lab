@@ -1,10 +1,11 @@
 import { GRAPH_KEYS, GRAPHS, type GraphKey } from "../../core/math/graphs";
 import { createButton } from "../../ui/button";
+import { createOverview } from "../../ui/overview";
 import { createPanel } from "../../ui/panel";
 import { createSelect } from "../../ui/select";
 import { createToggle, type Toggle } from "../../ui/toggle";
 import { createControlFocus } from "../shared/control-focus";
-import { createExplanation, passLine } from "./explanation";
+import { createExplanation, OVERVIEW, passLine } from "./explanation";
 import { createLeafSliders, type LeafSliders } from "./panel-leaves";
 import { createBpReadouts, type BpReadouts } from "./panel-readouts";
 import { initialState, type BpState, type Derived, type ShowKey } from "./state";
@@ -66,6 +67,10 @@ function buttonRow(label: string, ...buttons: HTMLElement[]): HTMLElement {
 export function createBpPanel(host: HTMLElement, handlers: BpPanelHandlers): BpPanel {
   const panel = createPanel();
   host.append(panel.el);
+
+  // Built before any section so it is the panel's first child, under the walkthrough banner.
+  const overview = createOverview(OVERVIEW);
+  panel.el.append(overview.el);
 
   const graphSelect = createSelect({
     label: "Graph",

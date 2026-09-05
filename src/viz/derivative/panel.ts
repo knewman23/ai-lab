@@ -1,12 +1,13 @@
 import { FNS, FN_KEYS, type FnKey } from "../../core/math/functions1d";
 import { createButton } from "../../ui/button";
+import { createOverview } from "../../ui/overview";
 import { createPanel } from "../../ui/panel";
 import { createReadout, fmt } from "../../ui/readout";
 import { createSelect } from "../../ui/select";
 import { createLogSlider } from "../../ui/slider";
 import { createToggle } from "../../ui/toggle";
 import { createControlFocus } from "../shared/control-focus";
-import { createExplanation, derivativeText } from "./explanation";
+import { createExplanation, derivativeText, OVERVIEW } from "./explanation";
 import { H_RANGE, MAX_ZOOM, type DxState, type ShowKey, type derived } from "./state";
 
 export interface DxPanelHandlers {
@@ -54,6 +55,10 @@ export interface DxPanel {
 export function createDxPanel(host: HTMLElement, handlers: DxPanelHandlers): DxPanel {
   const panel = createPanel();
   host.append(panel.el);
+
+  // Built before any section so it is the panel's first child, under the walkthrough banner.
+  const overview = createOverview(OVERVIEW);
+  panel.el.append(overview.el);
 
   // One "Setup" section: each widget carries its own label, so per-widget headings would repeat them.
   const setup = panel.section("Setup");

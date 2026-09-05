@@ -39,7 +39,13 @@ function harness() {
   const wrapper = document.createElement("div");
   const banner = document.createElement("div");
   const step = document.createElement("div");
-  wrapper.append(banner, step);
+  // The scene's own panel region, holding an overview the way a real scene's does.
+  const scene = document.createElement("div");
+  const overview = document.createElement("details");
+  overview.dataset.role = "overview";
+  overview.open = true;
+  scene.append(overview);
+  wrapper.append(banner, scene, step);
   document.body.replaceChildren(wrapper);
 
   const walkthrough = fakeWalkthrough();
@@ -51,7 +57,7 @@ function harness() {
     walkthrough,
     onStepChange,
   });
-  return { wrapper, banner, step, walkthrough, onStepChange, chrome };
+  return { wrapper, banner, step, walkthrough, onStepChange, chrome, overview };
 }
 
 function button(root: HTMLElement, label: string): HTMLButtonElement {
@@ -154,6 +160,28 @@ describe("createWalkthroughChrome", () => {
     expect(step.children).toHaveLength(0);
     expect(button(banner, walkthrough.title)).toBeDefined();
     expect(onStepChange).toHaveBeenLastCalledWith(undefined);
+  });
+
+  it("closes the scene's overview when the walkthrough starts", () => {
+    const { banner, walkthrough, overview } = harness();
+    expect(overview.open).toBe(true);
+
+    button(banner, walkthrough.title).click();
+
+    expect(overview.open).toBe(false);
+  });
+
+  it("leaves an overview the visitor opened mid-walkthrough alone", () => {
+    const { step, chrome, overview } = harness();
+
+    chrome.show(0);
+    expect(overview.open).toBe(false);
+
+    // The visitor opens it again to re-read the framing, then carries on.
+    overview.open = true;
+    button(step, "Next").click();
+
+    expect(overview.open).toBe(true);
   });
 
   it("scrolls the step card into view on each advance", () => {

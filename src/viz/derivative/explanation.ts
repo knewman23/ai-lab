@@ -2,6 +2,24 @@ import { FNS } from "../../core/math/functions1d";
 import { createEquation } from "../../ui/equation";
 import { fmt, proseNum } from "../../ui/readout";
 import type { DxState, derived } from "./state";
+import type { OverviewSpec } from "../../ui/overview";
+
+export const OVERVIEW: OverviewSpec = {
+  summary: "Reading how fast something is changing at a single instant",
+  objective:
+    "A derivative is the slope of a curve at one point: the rate something changes right now, " +
+    "rather than on average across an interval. The whole trick is that a close enough view " +
+    "makes a smooth curve indistinguishable from that one straight line.",
+  whereUsed:
+    "Speed read off a position trace, and stopping distance read off speed; how fast a drug's " +
+    "concentration falls in the bloodstream, which sets how often a dose is repeated; marginal " +
+    "cost, the price of making one more unit, which is where a production line stops.",
+  example:
+    "A car's position is logged every second. Its average speed over the last minute says little " +
+    "about the moment the brakes went on — the derivative at that instant is the number a crash " +
+    "investigator wants. One curve, two questions: a line through two points answers the first, " +
+    "the tangent at a single point answers the second.",
+};
 
 export interface DxExplanation {
   el: HTMLElement;

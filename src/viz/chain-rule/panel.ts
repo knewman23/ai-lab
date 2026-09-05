@@ -1,12 +1,13 @@
 import { COMP_KEYS, COMPOSITIONS, DX_RANGE, type CompKey } from "../../core/math/compositions";
 import { createButton } from "../../ui/button";
+import { createOverview } from "../../ui/overview";
 import { createPanel } from "../../ui/panel";
 import { fmt } from "../../ui/readout";
 import { createSelect } from "../../ui/select";
 import { createLogSlider } from "../../ui/slider";
 import { createToggle, type Toggle } from "../../ui/toggle";
 import { createControlFocus } from "../shared/control-focus";
-import { createExplanation } from "./explanation";
+import { createExplanation, OVERVIEW } from "./explanation";
 import { createChainReadouts } from "./panel-readouts";
 import { DX_DEFAULT, initialState, type ChainState, type Derived, type ShowKey } from "./state";
 
@@ -53,6 +54,10 @@ export interface ChainPanel {
 export function createChainPanel(host: HTMLElement, handlers: ChainPanelHandlers): ChainPanel {
   const panel = createPanel();
   host.append(panel.el);
+
+  // Built before any section so it is the panel's first child, under the walkthrough banner.
+  const overview = createOverview(OVERVIEW);
+  panel.el.append(overview.el);
 
   const setup = panel.section("Setup");
 

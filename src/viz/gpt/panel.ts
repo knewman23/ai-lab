@@ -6,12 +6,13 @@
 
 import { createButton } from "../../ui/button";
 import { createEquation } from "../../ui/equation";
+import { createOverview } from "../../ui/overview";
 import { createPanel } from "../../ui/panel";
 import { createReadout, proseNum, type Readout } from "../../ui/readout";
 import { createLogSlider } from "../../ui/slider";
 import { createToggle, type Toggle } from "../../ui/toggle";
 import { createControlFocus } from "../shared/control-focus";
-import { createGptExplanation, PRESET_HINTS } from "./explanation";
+import { createGptExplanation, OVERVIEW, PRESET_HINTS } from "./explanation";
 import {
   HEAD_OPTIONS,
   keyedSelect,
@@ -101,6 +102,10 @@ export interface GptPanel {
 export function createGptPanel(host: HTMLElement, handlers: GptPanelHandlers): GptPanel {
   const panel = createPanel();
   host.append(panel.el);
+
+  // Built before any section so it is the panel's first child, under the walkthrough banner.
+  const overview = createOverview(OVERVIEW);
+  panel.el.append(overview.el);
   const init = initialState();
 
   const sentence = keyedSelect("Sentence", SENTENCE_OPTIONS, init.sentence, (v) =>

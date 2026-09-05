@@ -7,7 +7,8 @@ import { createToggle } from "../../ui/toggle";
 import { OPTIMIZER_KEYS, OPTIMIZERS, type OptimizerKey } from "../../core/math/optimizers";
 import { SURFACES, SURFACE_KEYS, type SurfaceKey } from "../../core/math/surfaces";
 import { createControlFocus } from "../shared/control-focus";
-import { createExplanation } from "./explanation";
+import { createOverview } from "../../ui/overview";
+import { createExplanation, OVERVIEW } from "./explanation";
 import type { GdState, ShowKey, derived } from "./state";
 
 export interface GdPanelHandlers {
@@ -61,6 +62,10 @@ export function createGdPanel(
 ): GdPanel {
   const panel = createPanel();
   host.append(panel.el);
+
+  // Built before any section so it is the panel's first child, under the walkthrough banner.
+  const overview = createOverview(OVERVIEW);
+  panel.el.append(overview.el);
 
   // One "Setup" section: each widget carries its own label, so per-widget headings would repeat them.
   const setupSection = panel.section("Setup");

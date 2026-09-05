@@ -390,6 +390,82 @@ input[type="range"]::-moz-range-track {
   }
 }
 
+/* ---------- the panel's opening overview ---------- */
+
+/*
+ * Framing rather than a control: set on the sunken ground so it reads as a different kind of
+ * thing from the widgets below it, and quiet enough that it does not compete with them.
+ */
+.overview {
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  background: var(--sunken);
+  padding: 12px 14px;
+}
+
+.overview-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  cursor: pointer;
+  /* The marker is drawn by the rule below, so the native triangle goes. */
+  list-style: none;
+}
+.overview-summary::-webkit-details-marker {
+  display: none;
+}
+.overview-summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+/* A caret that turns, so the control reads as openable without a library. */
+.overview-line {
+  position: relative;
+  padding-right: 20px;
+  color: var(--ink-2);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.overview-line::after {
+  content: "";
+  position: absolute;
+  top: 0.45em;
+  right: 4px;
+  width: 6px;
+  height: 6px;
+  border-right: 1.5px solid var(--soft);
+  border-bottom: 1.5px solid var(--soft);
+  transform: rotate(45deg);
+  transition: transform 120ms ease;
+}
+.overview[open] .overview-line::after {
+  transform: rotate(-135deg);
+}
+@media (prefers-reduced-motion: reduce) {
+  .overview-line::after {
+    transition: none;
+  }
+}
+
+.overview-body {
+  margin-top: 14px;
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+}
+.overview-body h4 {
+  margin: 0 0 6px;
+}
+.overview-body h4 + p + h4 {
+  margin-top: 14px;
+}
+.overview-body p {
+  margin: 0;
+  color: var(--soft);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
 /* ---------- walkthrough mode ---------- */
 
 /* The step card takes the explanation's place rather than sitting beside it. The marker is on

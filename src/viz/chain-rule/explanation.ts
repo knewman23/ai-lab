@@ -1,6 +1,24 @@
 import { createEquation } from "../../ui/equation";
 import { fmt, proseNum } from "../../ui/readout";
 import type { ChainState, Derived } from "./state";
+import type { OverviewSpec } from "../../ui/overview";
+
+export const OVERVIEW: OverviewSpec = {
+  summary: "Rates that reach their answer through something else on the way",
+  objective:
+    "When x moves u and u moves y, the chain rule says the two rates multiply: dy/dx is dy/du " +
+    "times du/dx. It is how a rate of change survives being routed through an intermediate " +
+    "quantity you were not given directly.",
+  whereUsed:
+    "Training every neural network: backpropagation is this rule applied once per layer, from " +
+    "the loss back to each weight. Also any system where a change propagates — temperature moves " +
+    "pressure, pressure moves volume — and every related-rates problem in engineering.",
+  example:
+    "A balloon is inflated at a known number of litres per second and you want to know how fast " +
+    "its radius is growing. Volume depends on radius, radius depends on time, and the rate you " +
+    "want is neither of the ones you were handed. Multiplying the two links gives it, which is " +
+    "the same move backpropagation makes thousands of times per training step.",
+};
 
 /** The three prose sentences shown under the equations. */
 export interface ChainText {

@@ -1,12 +1,13 @@
 import { DATASETS, DATASET_KEYS, type DatasetKey } from "../../core/math/datasets";
 import { createButton } from "../../ui/button";
+import { createOverview } from "../../ui/overview";
 import { createPanel } from "../../ui/panel";
 import { createReadout } from "../../ui/readout";
 import { createSelect } from "../../ui/select";
 import { createLogSlider } from "../../ui/slider";
 import { createToggle, type Toggle } from "../../ui/toggle";
 import { createControlFocus } from "../shared/control-focus";
-import { createNnExplanation, probeText, trainingLine } from "./explanation";
+import { createNnExplanation, OVERVIEW, probeText, trainingLine } from "./explanation";
 import { initialState, LR_RANGE, type Derived, type NnState, type ShowKey } from "./state";
 
 export interface NnPanelHandlers {
@@ -66,6 +67,10 @@ function buttonRow(label: string, ...buttons: HTMLElement[]): HTMLElement {
 export function createNnPanel(host: HTMLElement, handlers: NnPanelHandlers): NnPanel {
   const panel = createPanel();
   host.append(panel.el);
+
+  // Built before any section so it is the panel's first child, under the walkthrough banner.
+  const overview = createOverview(OVERVIEW);
+  panel.el.append(overview.el);
 
   const init = initialState();
 

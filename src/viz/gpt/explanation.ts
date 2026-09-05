@@ -21,6 +21,24 @@ import { createEquation } from "../../ui/equation";
 import { fmt } from "../../ui/readout";
 import { BLEND } from "./arcs-geometry";
 import type { PresetKey } from "./state";
+import type { OverviewSpec } from "../../ui/overview";
+
+export const OVERVIEW: OverviewSpec = {
+  summary: "How a language model decides which word comes next",
+  objective:
+    "A transformer block lets every position read the others and edit its own vector by what it " +
+    "finds. Stack enough blocks and the running total at the last position is a summary of " +
+    "everything before it, which a final step turns back into a score for each word.",
+  whereUsed:
+    "Every current large language model, along with machine translation and the code completion " +
+    "in an editor. The same architecture reads images for self-driving perception, and amino " +
+    "acid sequences for protein structure prediction.",
+  example:
+    "Autocomplete while you type: the model reads the tokens so far, attention lets the cursor's " +
+    "position look back at a function name twenty lines up, and the output is a ranked list of " +
+    "next tokens. This scene is one block with two dimensions per vector instead of thousands, " +
+    "which is the only reason the arcs and the vectors can be drawn at all.",
+};
 
 /**
  * What a block does, in three lines: attention edits the stream, the MLP edits it again, and the

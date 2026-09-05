@@ -50,8 +50,17 @@ export function createWalkthroughChrome(deps: WalkthroughChromeDeps): Walkthroug
   }
 
   function show(next: number): void {
+    // Only when the walkthrough starts, never on a later step: a visitor who opens the overview
+    // mid-walkthrough keeps it open.
+    const starting = index === undefined;
     const view = walkthrough.goTo(next);
     index = view.index;
+
+    if (starting) {
+      for (const overview of wrapper.querySelectorAll('details[data-role="overview"]')) {
+        if (overview instanceof HTMLDetailsElement) overview.open = false;
+      }
+    }
 
     const progress = document.createElement("span");
     progress.className = "wt-progress lbl";
