@@ -103,6 +103,13 @@ styles/panel.css                     .is-focused, .wt-banner, .wt-step, .wt-acti
 - [ ] **Step 2:** Run, confirm fail.
 - [ ] **Step 3: Implement** spec §8's script: the surface → drag the ball, the gradient arrow follows → the tangent plane → step the optimizer → compare SGD and Adam on the ravine → the Rosenbrock valley.
 
+  **Every stepping step must call `state.step`, never reimplement the optimizer loop.** A
+  hand-rolled advance would make the trail the walkthrough replays and the trail live Step
+  presses produce agree only by coincidence — they would drift the moment `optimizers.ts` or the
+  domain checks change. Same class as the `initial` contract: derive from the thing itself, not
+  from a copy that happens to match today. Assert it by comparing a replayed trail against one
+  produced by calling `step` directly the same number of times.
+
   This scene is in Chunk 2 deliberately: it is the oldest and simplest, and it stresses the seam from the opposite end to the transformer. **If the abstraction has to bend to fit it, stop and report** — that is what this task is for, and bending it here is far cheaper than discovering it in five more scripts.
 - [ ] **Step 4:** Run, `pnpm check`; commit "Add the gradient descent walkthrough".
 
