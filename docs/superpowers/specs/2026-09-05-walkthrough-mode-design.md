@@ -32,7 +32,8 @@ Success criteria:
    route — proving `VizInstance.walkthrough` is genuinely optional. All seven scenes' existing
    test files must keep passing untouched.
 7. All seven live scenes ship a walkthrough.
-8. `gradient-descent`'s `step` is pure before any walkthrough uses it (§4).
+8. `enter` purity is judged against each scene's **diffing surface**: `GdState.path` is
+   documented as deliberately mutable and is excluded by name, not by accident (§4).
 
 Out of scope: authoring walkthroughs outside the codebase (no JSON, no CMS); branching or
 conditional steps; recorded animation or autoplay; per-user progress; a walkthrough that spans
@@ -129,13 +130,24 @@ and advancing gives you a clean, known scene rather than your explored one plus 
 `enter` must be pure and built from the scene's exported setters, and must not reach into the
 scene's Three.js objects.
 
-**One scene does not satisfy this today, and fixing it is a prerequisite task.**
-`src/viz/gradient-descent/state.ts:79`'s `step(s)` mutates its input — `s.path.push(pos)`, then
-returns `path: s.path`. §8's gradient-descent script needs `step` inside `enter`, which would
-violate criteria §1.4 and test §10.2 outright: the input state *is* mutated and applying twice
-does not equal applying once. `step` must be made pure (copy the path rather than push to it)
-with its own test, **before** any walkthrough uses it. A setter that mutates is a landmine
-independent of this feature; the walkthrough is only what surfaced it.
+**`gradient-descent`'s `step` mutates, and that is deliberate — do not "fix" it.**
+`state.ts:79` does `s.path.push(pos)` and returns the same buffer. Revision 2 of this spec
+called that a defect and made a purity fix a prerequisite. That was wrong: the module documents
+the choice at `state.ts:18-28` — *"`step` pushes onto the existing buffer, mutating it in place
+by design, since path history is intentionally not part of the immutable diffing surface"* —
+and a fix would copy a 2000-entry `RingBuffer` on every frame of a running optimizer, which is
+exactly the cost that design avoids.
+
+So the purity criterion is scoped rather than the code changed: **`enter` must be pure with
+respect to the state's diffing surface**, which for `GdState` excludes `path` by that module's
+own definition. §10's per-scene purity test compares every field except the documented mutable
+ones, and names them.
+
+Replay is unaffected, and this is worth stating because it is not obvious: `goTo(i)` folds from
+`initial()`, which calls `freshPath(pos)` — a *new* buffer — and each `step` inside `enter`
+pushes into that new buffer. After replaying `i` steps the path holds exactly the positions a
+viewer would have produced by pressing Step `i` times. The mutation is confined to a buffer
+created during the same fold and never touches another state object.
 
 A second scene needs care rather than a fix: `NnState.epoch` advances on wall-clock time while
 `playing`. A "press Play" step followed by any advance replays from `initialState()` and snaps
@@ -205,6 +217,20 @@ walkthrough-less scene both need `walkthrough.length`, which exists only after `
 - An `n` past the end clamps to the last step and rewrites the hash, so a stale link from an
   edited script lands on the last step rather than blank.
 - A `step` on a scene whose instance has no `walkthrough` rewrites the hash to the plain scene.
+
+**Every case, and who decides.** Ownership now differs per row, so it is tabulated rather than
+described:
+
+| Input hash                                  | Result                             | Decided by |
+| ------------------------------------------- | ---------------------------------- | ---------- |
+| `#/ml/gpt-transformer`                      | the scene, no step                 | router     |
+| `#/ml/gpt-transformer/walkthrough/3`        | the scene at step index 2          | router     |
+| `#/ml/gpt-transformer/walkthrough/0` or `/-1` or `/x` | the scene, no step       | router     |
+| `#/ml/gpt-transformer/steps/3`              | `#/` (unknown route, as today)     | router     |
+| `#/ml/unknown-scene/walkthrough/3`          | `#/` (unknown entry, as today)     | router     |
+| any other unrecognised hash                 | `#/` — **this existing behaviour and its test must stay green** | router |
+| `#/ml/gpt-transformer/walkthrough/99`       | rewritten to the last step         | viz page   |
+| `#/calculus/derivative-tangent/walkthrough/2` where that scene ships no walkthrough | rewritten to the plain scene | viz page |
 
 Advancing, going back, exiting and finishing all rewrite the hash with `replaceState` semantics
 (no new history entry per step), so Back-button behaviour stays coherent: the browser's Back
@@ -278,7 +304,6 @@ src/app/viz-page.ts                  the three panel regions; clamping and the w
                                      redirect (both need a length only mount() can supply); URL sync
 src/ui/panel.ts                      section(title, { role: "explanation" }) so the wrapper can
                                      collapse that section while a walkthrough is active
-src/viz/gradient-descent/state.ts    PREREQUISITE: make `step` pure (§4)
 src/viz/<id>/panel.ts                × 7, a ControlId union + Record registry + focus(id)
 src/viz/<id>/index.ts                × 7, wire createWalkthrough into mount
 styles/panel.css                     .is-focused, .wt-banner, .wt-step, .wt-active
@@ -309,9 +334,11 @@ work and are ignored while focus is in a form control; the card is scrolled into
 
 **Per scene, `viz/<id>/walkthrough.test.ts`** — run over every step of every scene:
 
-1. Every `enter` is pure — the input state is not mutated (deep-compare a frozen copy), and
-   applying twice equals applying once. This is the criterion `gradient-descent`'s `step`
-   currently fails.
+1. Every `enter` is pure over the scene's **diffing surface** — capture the prior state's
+   fields, apply, and compare; then assert applying twice equals once. Each scene's test names
+   the fields it excludes, and only `gradient-descent` excludes any (`path`, per `state.ts:18-28`).
+   Assert the *prior* state's fields are unchanged, not merely that a new object came back — the
+   latter agrees with itself and passes on a mutating reducer.
 2. **Every `focus` id resolves against a really-mounted panel's registry** — read
    `panel.controls` from an actual `createXPanel(...)` call, never a literal list re-stated in
    the test file. A duplicated list would agree with itself and prove nothing. The union already
@@ -334,7 +361,7 @@ work and are ignored while focus is in a form control; the card is scrolled into
 | Risk                                                                                              | Mitigation                                                                                                                                       |
 | ------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
 | ~~`focus` is an open string~~ — removed in revision 2: it is a per-scene union over a `Record` registry, so an unknown id fails to compile | §10.2 still checks a member declared but never registered, against a really-mounted panel      |
-| `gradient-descent`'s `step` mutates its input, so replay cannot reproduce its script            | Made pure as a prerequisite task with its own test (§4), before any walkthrough uses it                                                          |
+| `gradient-descent`'s `step` mutates its `path`, which reads as a purity violation               | It is a documented design decision (`state.ts:18-28`), not a defect; the criterion is scoped to the diffing surface and replay rebuilds the path correctly from a fresh buffer (§4) |
 | `nn`'s epoch advances on wall-clock time while playing, so replay un-trains the boundary        | Its script calls `trainEpoch` a fixed number of times inside `enter` rather than depending on Play (§4)                                          |
 | Replay discards a viewer's own exploration on advance                                             | Intended and stated in §4; the alternative (preserving changes) makes a step's prose unable to describe its own scene                             |
 | Seven scripts of prose is the bulk of the work and the easiest place to be glib                   | Prose is reviewed as carefully as the math, §8 fixes what each covers, and §10.3 mechanically rejects "look at the screen" phrasing               |
@@ -382,3 +409,23 @@ ids.
 The reviewer's recommendation to type the control id was taken, which is a better outcome than
 the original: it removes the coupling rather than testing around it, and lets `StepView` drop
 its `focus` member entirely.
+
+**Revision 3 (2026-09-05)** — corrects revision 2's first fix, and takes four advisory notes.
+
+Revision 2 called `gradient-descent`'s mutating `step` a defect and made a purity fix a
+prerequisite. Reading the module's own header showed that was wrong: the mutation is documented
+and deliberate (`state.ts:18-28`), and the "fix" would have copied a 2000-entry `RingBuffer` on
+every frame of a running optimizer — the exact cost the design was avoiding. The criterion is
+now scoped to each scene's diffing surface instead, with excluded fields named per scene, and
+§4 states why replay still rebuilds the path correctly. Both the reviewer and I mistook a
+considered decision for a bug because the mutation was real; only the comment above it settled
+what it meant.
+
+Also applied: §10.1 now asserts the *prior* state's fields are unchanged rather than that a new
+object came back (the latter agrees with itself); §6 gains a table naming every redirect case
+and whether the router or the viz page decides it, including an explicit row for the existing
+unknown-hash → `#/` behaviour that must stay green.
+
+§5's layout wording was checked against fix 4 and stands: the step card sits below the scene
+panel, and `.wt-active` collapses the section registered with `role: "explanation"`, so the two
+paragraphs of prose do not both show.
