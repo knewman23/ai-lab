@@ -5,6 +5,7 @@ import { fmt } from "../../ui/readout";
 import { createSelect } from "../../ui/select";
 import { createLogSlider } from "../../ui/slider";
 import { createToggle, type Toggle } from "../../ui/toggle";
+import { createControlFocus } from "../shared/control-focus";
 import { createExplanation } from "./explanation";
 import { createChainReadouts } from "./panel-readouts";
 import { DX_DEFAULT, initialState, type ChainState, type Derived, type ShowKey } from "./state";
@@ -24,9 +25,27 @@ const SHOW_KEYS: readonly { key: ShowKey; label: string }[] = [
   { key: "connectors", label: "Connectors" },
 ];
 
+/**
+ * The scene's own name for each control a walkthrough step may point at. A union rather than an
+ * open string, so a step naming a control this panel does not register is a compile error.
+ */
+export type ChainControlId =
+  | "comp"
+  | "dx"
+  | "reset"
+  | "resetView"
+  | "showTriangles"
+  | "showSecants"
+  | "showTangents"
+  | "showConnectors";
+
 export interface ChainPanel {
   el: HTMLElement;
+  /** Exhaustive by construction: a union member with no element fails to compile. */
+  readonly controls: Readonly<Record<ChainControlId, HTMLElement>>;
   render(state: ChainState, d: Derived): void;
+  /** Outlines one control, or clears the outline. */
+  focus(id: ChainControlId | undefined): void;
   dispose(): void;
 }
 
@@ -85,6 +104,27 @@ export function createChainPanel(host: HTMLElement, handlers: ChainPanelHandlers
 
   const readouts = createChainReadouts(panel);
   const explanation = createExplanation(panel.el);
+  // Marked so the shell can collapse it while a walkthrough's step card, which occupies the
+  // same place in the panel, is showing.
+  explanation.el.dataset.role = "explanation";
+
+  const toggleFor = (key: ShowKey): HTMLElement => {
+    const toggle = toggles.get(key);
+    if (!toggle) throw new Error(`chain rule panel: the "${key}" toggle was never built`);
+    return toggle.el;
+  };
+
+  const controls: Readonly<Record<ChainControlId, HTMLElement>> = {
+    comp: compSelect.el,
+    dx: dxSlider.el,
+    reset: resetBtn.el,
+    resetView: resetViewBtn.el,
+    showTriangles: toggleFor("triangles"),
+    showSecants: toggleFor("secants"),
+    showTangents: toggleFor("tangents"),
+    showConnectors: toggleFor("connectors"),
+  };
+  const focus = createControlFocus(controls);
 
   function render(state: ChainState, d: Derived): void {
     if (compSelect.value !== state.comp) compSelect.value = state.comp;
@@ -112,6 +152,8 @@ export function createChainPanel(host: HTMLElement, handlers: ChainPanelHandlers
 
   return {
     el: panel.el,
+    controls,
+    focus,
     render,
     dispose(): void {
       host.replaceChildren();
