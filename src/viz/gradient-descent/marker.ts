@@ -21,6 +21,12 @@ export interface Marker {
   readonly hitTarget: Mesh;
   setPosition(surface: Surface, pos: Vec2): void;
   setTangentVisible(on: boolean): void;
+  /**
+   * Whether the gradient geometry may be drawn at all. Off once a run has left the domain: the
+   * ball is parked at the edge it left by, and the arrows and plane there would describe a point
+   * the run is not at, while the panel reports the gradient of the point it really reached.
+   */
+  setGradientVisible(on: boolean): void;
   dispose(): void;
 }
 
@@ -97,6 +103,9 @@ export function createMarker(theme: ThemeColors): Marker {
   const normal = new Vector3();
 
   /** Points `arrow` along the tangent-plane lift of the unit xy direction (dx, dy). */
+  /** Cleared while the run is outside the domain; see `setGradientVisible`. */
+  let gradientAllowed = true;
+
   function aim(arrow: ArrowHelper, dx: number, dy: number, g: Vec2, s: number, len: number): void {
     dir.set(dx, dy, s * (g[0] * dx + g[1] * dy)).normalize();
     arrow.position.copy(origin);
@@ -122,9 +131,10 @@ export function createMarker(theme: ThemeColors): Marker {
       const g = surface.grad(x, y);
       const m = magnitude(g);
       const flat = m < FLAT;
-      gradArrow.visible = !flat;
-      descentArrow.visible = !flat;
-      if (!flat) {
+      const showArrows = !flat && gradientAllowed;
+      gradArrow.visible = showArrows;
+      descentArrow.visible = showArrows;
+      if (showArrows) {
         const len = Math.min(Math.max(ARROW_SCALE * m, MIN_LENGTH), MAX_LENGTH);
         const dx = g[0] / m;
         const dy = g[1] / m;
@@ -135,6 +145,14 @@ export function createMarker(theme: ThemeColors): Marker {
       plane.position.copy(origin);
       normal.set(-s * g[0], -s * g[1], 1).normalize();
       plane.quaternion.setFromUnitVectors(up, normal);
+    },
+
+    setGradientVisible(on: boolean): void {
+      gradientAllowed = on;
+      if (!on) {
+        gradArrow.visible = false;
+        descentArrow.visible = false;
+      }
     },
 
     setTangentVisible(on: boolean): void {

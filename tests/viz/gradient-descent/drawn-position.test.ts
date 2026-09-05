@@ -77,6 +77,32 @@ describe("what the scene draws when a step leaves the domain", () => {
     pathLine.dispose();
   });
 
+  it("draws no gradient geometry for a point the run is not at", () => {
+    const surface = SURFACES.rosenbrock;
+    const marker = createMarker(theme());
+
+    // Inside the domain the arrows are drawn.
+    marker.setPosition(surface, [-1.4, 2.1]);
+    const arrows = () =>
+      marker.group.children.filter((child) => child.type === "ArrowHelper" && child.visible).length;
+    expect(arrows()).toBeGreaterThan(0);
+
+    // Once the run has left it, they describe the clamped point rather than the reported one,
+    // and half the tangent plane hangs off the surface, so the scene draws neither.
+    marker.setGradientVisible(false);
+    expect(arrows()).toBe(0);
+
+    // And they stay hidden as the position updates, until the run is valid again.
+    marker.setPosition(surface, OUTSIDE);
+    expect(arrows()).toBe(0);
+
+    marker.setGradientVisible(true);
+    marker.setPosition(surface, [-1.4, 2.1]);
+    expect(arrows()).toBeGreaterThan(0);
+
+    marker.dispose();
+  });
+
   it("still draws an in-domain point exactly where it is", () => {
     const surface = SURFACES.bowl;
     const marker = createMarker(theme());

@@ -131,7 +131,12 @@ function mount(host: VizHost): VizInstance {
     if (isFinitePoint(state.pos)) marker.setPosition(surface, state.pos);
     path.sync(surface, state.path);
 
-    marker.setTangentVisible(state.show.tangent);
+    // A run that has left the domain is drawn as a ball parked at the edge and nothing else: the
+    // tangent plane and the gradient arrows would belong to the clamped point rather than to the
+    // one the panel is reporting, and half of the plane would hang off the surface.
+    const onSurface = state.status === "ok";
+    marker.setGradientVisible(onSurface);
+    marker.setTangentVisible(state.show.tangent && onSurface);
     contours.setVisible(state.show.contours);
     path.setVisible(state.show.path);
 
