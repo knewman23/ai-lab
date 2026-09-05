@@ -43,6 +43,17 @@ function value(values: Record<string, number>, id: string): number {
 }
 
 describe("the backprop walkthrough's claims", () => {
+  it("never asks for more presses than the graph's pass has", () => {
+    for (const [index] of BP_STEPS.entries()) {
+      const state = at(index);
+      const d = derived(state);
+      expect(state.step, `step ${index} overshot the pass`).toBeLessThanOrEqual(d.steps.length);
+    }
+    // The last step walks a whole pass, which is what makes its accumulation claim readable.
+    const last = at(BP_STEPS.length - 1);
+    expect(last.step).toBe(derived(last).steps.length);
+  });
+
   it("opens on the small graph with nothing evaluated yet", () => {
     const state = at(0);
     const d = derived(state);
