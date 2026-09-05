@@ -4,6 +4,7 @@ import { createEquation } from "../../ui/equation";
 import { fmt } from "../../ui/readout";
 import type { OverviewSpec } from "../../ui/overview";
 import type { GdState, derived } from "./state";
+import type { ControlInfo } from "../../ui/info";
 
 /**
  * The panel's opening framing. The house-price case is the one every course opens with, and the
@@ -27,6 +28,62 @@ export const OVERVIEW: OverviewSpec = {
     "weights are this surface's axes and the height is that error. With three attributes you " +
     "would solve it outright — gradient descent is for the models too big for that.",
 };
+
+/**
+ * One entry per control the panel offers, in the panel's own order. `what` says what the control
+ * changes; `why` says what to watch, and where a number came from when there is one.
+ */
+export const CONTROL_INFO = {
+  surface: {
+    what:
+      "Swaps the loss function the whole scene is drawn from. Its height is the error at each " +
+      "pair of parameters, and every other control acts on whichever one is chosen.",
+    why:
+      "Each shape is a different difficulty. The bowl is the easy case every optimizer solves; " +
+      "the elongated bowl is ten times steeper across than along, which is what makes SGD " +
+      "zigzag; Rosenbrock adds a curved valley that no single direction stays right for.",
+  },
+  optimizer: {
+    what:
+      "Chooses the rule that turns the gradient into a step. SGD steps straight down it; " +
+      "momentum accumulates a velocity; Adam scales each parameter by its own recent gradient.",
+    why:
+      "It is the clearest thing to compare on the elongated bowl. At the default rate SGD's " +
+      "narrow axis flips sign on every step while Adam moves both axes at about the same pace, " +
+      "because dividing by a running gradient size removes the difference in scale.",
+  },
+  lr: {
+    what:
+      "How far each step moves. SGD multiplies the gradient by it, so the step grows with the " +
+      "slope; Adam's step is close to this value per parameter whatever the slope is.",
+    why:
+      "The single setting most likely to break a run. Too small and it crawls; too large and it " +
+      "overshoots the valley and leaves the domain, which the status line will tell you. Each " +
+      "surface opens at a rate that suits it — Rosenbrock's is a hundred times smaller than the " +
+      "bowl's, because its gradients are two orders of magnitude larger.",
+  },
+  showTangent: {
+    what: "Draws the plane that touches the surface at the ball and matches its slope there.",
+    why:
+      "It is the only thing the gradient actually knows. The step is chosen from this flat " +
+      "approximation and nothing about the curvature around it, which is why a rate that works " +
+      "on the bowl can overshoot on a valley floor.",
+  },
+  showContours: {
+    what: "Draws lines of equal loss on the plane beneath the surface.",
+    why:
+      "The gradient always crosses them at a right angle, so where they bunch together the " +
+      "surface is steep and the steps are long. On the elongated bowl they are stretched " +
+      "ellipses, which is the same fact as the zigzag, seen from above.",
+  },
+  showPath: {
+    what: "Draws every position the run has visited since the last reset, newest brightest.",
+    why:
+      "The trail is the argument: a straight run in on the bowl, a crossing zigzag on the " +
+      "elongated one, and a quick drop into Rosenbrock's valley followed by a long crawl along " +
+      "its floor.",
+  },
+} as const satisfies Readonly<Record<string, ControlInfo>>;
 
 export interface Explanation {
   el: HTMLElement;

@@ -38,7 +38,7 @@
 .panel-section > p {
   margin: 0;
 }
-.panel-section > *:not(h3):not(.switch) + *:not(h3):not(.switch) {
+.panel-section > *:not(h3):not(.switch):not(.switch-row) + *:not(h3):not(.switch):not(.switch-row) {
   margin-top: 14px;
 }
 
@@ -149,7 +149,8 @@ input[type="range"]::-moz-range-track {
   cursor: pointer;
   padding: 4px 0;
 }
-.switch + .switch {
+.switch + .switch,
+.switch-row + .switch-row {
   margin-top: 4px;
 }
 .switch input[type="checkbox"] {
@@ -388,6 +389,79 @@ input[type="range"]::-moz-range-track {
     margin-top: 0;
     flex-shrink: 0;
   }
+}
+
+/* ---------- per-control info ---------- */
+
+/*
+ * The button sits directly after the text it belongs to rather than out at the panel's edge,
+ * where it reads as unrelated to any particular control.
+ */
+.lbl-row,
+.switch-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.lbl-row > .lbl,
+.switch-row > .switch {
+  flex: 0 1 auto;
+}
+
+.info-button {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid var(--line-2);
+  background: transparent;
+  color: var(--soft);
+  font-family: var(--sans);
+  font-size: 10px;
+  font-style: italic;
+  line-height: 1;
+  cursor: pointer;
+}
+.info-button:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.info-button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/*
+ * Positioned from script when it opens, so it needs no anchor support; `position: fixed` puts it
+ * in the top layer's coordinate space, which is what lets it escape the panel's own scrolling.
+ */
+.info-popover {
+  position: fixed;
+  margin: 0;
+  width: min(300px, calc(100vw - 24px));
+  padding: 12px 14px;
+  border: 1px solid var(--line-2);
+  border-radius: 2px;
+  background: var(--card);
+  color: var(--ink);
+  box-shadow: 0 6px 24px rgb(0 0 0 / 18%);
+}
+.info-popover h4 {
+  margin: 0 0 8px;
+}
+.info-popover p {
+  margin: 0;
+  color: var(--soft);
+  font-size: 13px;
+  line-height: 1.55;
+}
+.info-popover .info-why {
+  margin-top: 8px;
+  color: var(--ink-2);
+}
+.info-popover::backdrop {
+  background: transparent;
 }
 
 /* ---------- the panel's opening overview ---------- */

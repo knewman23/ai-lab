@@ -7,8 +7,9 @@ import { createToggle } from "../../ui/toggle";
 import { OPTIMIZER_KEYS, OPTIMIZERS, type OptimizerKey } from "../../core/math/optimizers";
 import { SURFACES, SURFACE_KEYS, type SurfaceKey } from "../../core/math/surfaces";
 import { createControlFocus } from "../shared/control-focus";
+import type { ControlInfo } from "../../ui/info";
 import { createOverview } from "../../ui/overview";
-import { createExplanation, OVERVIEW } from "./explanation";
+import { CONTROL_INFO, createExplanation, OVERVIEW } from "./explanation";
 import type { GdState, ShowKey, derived } from "./state";
 
 export interface GdPanelHandlers {
@@ -22,10 +23,10 @@ export interface GdPanelHandlers {
   onShow(key: ShowKey, on: boolean): void;
 }
 
-const SHOW_KEYS: readonly { key: ShowKey; label: string }[] = [
-  { key: "tangent", label: "Tangent plane" },
-  { key: "contours", label: "Contours" },
-  { key: "path", label: "Path" },
+const SHOW_KEYS: readonly { key: ShowKey; label: string; info: ControlInfo }[] = [
+  { key: "tangent", label: "Tangent plane", info: CONTROL_INFO.showTangent },
+  { key: "contours", label: "Contours", info: CONTROL_INFO.showContours },
+  { key: "path", label: "Path", info: CONTROL_INFO.showPath },
 ];
 
 /**
@@ -75,6 +76,7 @@ export function createGdPanel(
     options: SURFACE_KEYS.map((key) => ({ value: key, title: SURFACES[key].title })),
     value: SURFACE_KEYS[0],
     onChange: (v) => handlers.onSurface(v as SurfaceKey),
+    info: CONTROL_INFO.surface,
   });
   surfaceSection.append(surface.el);
 
@@ -84,6 +86,7 @@ export function createGdPanel(
     options: OPTIMIZER_KEYS.map((key) => ({ value: key, title: OPTIMIZERS[key].title })),
     value: OPTIMIZER_KEYS[0],
     onChange: (v) => handlers.onOptimizer(v as OptimizerKey),
+    info: CONTROL_INFO.optimizer,
   });
   optimizerSection.append(optimizer.el);
 
@@ -94,6 +97,7 @@ export function createGdPanel(
     max: 1,
     value: 0.1,
     onChange: (v) => handlers.onLr(v),
+    info: CONTROL_INFO.lr,
   });
   lrSection.append(lr.el);
 
@@ -115,11 +119,12 @@ export function createGdPanel(
 
   const showSection = panel.section("Show");
   const toggles = new Map<ShowKey, ReturnType<typeof createToggle>>();
-  for (const { key, label } of SHOW_KEYS) {
+  for (const { key, label, info } of SHOW_KEYS) {
     const toggle = createToggle({
       label,
       checked: true,
       onChange: (on) => handlers.onShow(key, on),
+      info,
     });
     toggles.set(key, toggle);
     showSection.append(toggle.el);

@@ -2,7 +2,11 @@ export interface ToggleOptions {
   label: string;
   checked: boolean;
   onChange: (checked: boolean) => void;
+  /** Adds the "what does this do?" button beside the switch. */
+  info?: ControlInfo;
 }
+
+import { createInfoButton, type ControlInfo } from "./info";
 
 export interface Toggle {
   el: HTMLElement;
@@ -10,7 +14,11 @@ export interface Toggle {
   set checked(v: boolean);
 }
 
-/** A native checkbox styled as a switch, wrapped in a clickable `<label>`. */
+/**
+ * A native checkbox styled as a switch, wrapped in a clickable `<label>`. When it carries info,
+ * the label goes inside a row alongside the button: a `<button>` may not sit inside a `<label>`
+ * that labels something else, and clicking it would toggle the switch if it did.
+ */
 export function createToggle(opts: ToggleOptions): Toggle {
   const wrap = document.createElement("label");
   wrap.className = "switch";
@@ -36,8 +44,10 @@ export function createToggle(opts: ToggleOptions): Toggle {
 
   wrap.append(input, track, text);
 
+  const el = opts.info ? withInfo(wrap, opts.label, opts.info) : wrap;
+
   return {
-    el: wrap,
+    el,
     get checked() {
       return input.checked;
     },
@@ -46,4 +56,13 @@ export function createToggle(opts: ToggleOptions): Toggle {
       input.setAttribute("aria-checked", String(v));
     },
   };
+}
+
+/** Wraps a switch in a row so its info button is a sibling rather than a child of the label. */
+function withInfo(wrap: HTMLElement, label: string, info: ControlInfo): HTMLElement {
+  const row = document.createElement("div");
+  row.className = "switch-row";
+  const { button, popover } = createInfoButton(label, info);
+  row.append(wrap, button, popover);
+  return row;
 }

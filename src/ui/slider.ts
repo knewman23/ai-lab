@@ -1,5 +1,6 @@
 import { formatLr } from "./readout";
 import { fmt } from "./readout";
+import { labelRow, type ControlInfo } from "./info";
 
 /** Native range steps, mapped log-uniformly onto [min, max]. */
 const STEPS = 1000;
@@ -19,6 +20,8 @@ export interface LogSliderOptions {
   value: number;
   onChange: (value: number) => void;
   format?: (value: number) => string;
+  /** Adds the "what does this do?" button beside the label. */
+  info?: ControlInfo;
 }
 
 export interface LogSlider {
@@ -35,6 +38,8 @@ export interface SliderOptions {
   value: number;
   onChange: (value: number) => void;
   format?: (value: number) => string;
+  /** Adds the "what does this do?" button beside the label. */
+  info?: ControlInfo;
 }
 
 export interface Slider {
@@ -62,6 +67,7 @@ function buildSlider(
   format: (value: number) => string,
   onChange: (value: number) => void,
   config: RangeConfig,
+  info: ControlInfo | undefined,
 ): { el: HTMLElement; get: () => number; set: (v: number) => void } {
   const id = `${idPrefix}-${++nextId}`;
   let current = initialValue;
@@ -88,7 +94,7 @@ function buildSlider(
   out.htmlFor = id;
 
   row.append(range, out);
-  wrap.append(labelEl, row);
+  wrap.append(labelRow(labelEl, label, info), row);
 
   function render(): void {
     range.value = config.toRange(current);
@@ -125,13 +131,21 @@ export function createLogSlider(opts: LogSliderOptions): LogSlider {
   }
   const format = opts.format ?? formatLr;
 
-  const slider = buildSlider("log-slider", opts.label, opts.value, format, onChange, {
-    min: "0",
-    max: String(STEPS),
-    step: "1",
-    toRange: (value) => String(stepFor(value, min, max)),
-    fromRange: (raw) => valueFor(Number(raw), min, max),
-  });
+  const slider = buildSlider(
+    "log-slider",
+    opts.label,
+    opts.value,
+    format,
+    onChange,
+    {
+      min: "0",
+      max: String(STEPS),
+      step: "1",
+      toRange: (value) => String(stepFor(value, min, max)),
+      fromRange: (raw) => valueFor(Number(raw), min, max),
+    },
+    opts.info,
+  );
 
   return {
     el: slider.el,
@@ -152,13 +166,21 @@ export function createLogSlider(opts: LogSliderOptions): LogSlider {
 export function createSlider(opts: SliderOptions): Slider {
   const format = opts.format ?? ((v: number) => fmt(v, 3));
 
-  const slider = buildSlider("slider", opts.label, opts.value, format, opts.onChange, {
-    min: String(opts.min),
-    max: String(opts.max),
-    step: String(opts.step),
-    toRange: (value) => String(value),
-    fromRange: (raw) => Number(raw),
-  });
+  const slider = buildSlider(
+    "slider",
+    opts.label,
+    opts.value,
+    format,
+    opts.onChange,
+    {
+      min: String(opts.min),
+      max: String(opts.max),
+      step: String(opts.step),
+      toRange: (value) => String(value),
+      fromRange: (raw) => Number(raw),
+    },
+    opts.info,
+  );
 
   return {
     el: slider.el,

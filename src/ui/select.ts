@@ -1,3 +1,5 @@
+import { labelRow, type ControlInfo } from "./info";
+
 export interface SelectOption {
   value: string;
   title: string;
@@ -9,6 +11,8 @@ export interface SelectOptions {
   options: readonly SelectOption[];
   value: string;
   onChange: (value: string) => void;
+  /** Adds the "what does this do?" button beside the label. */
+  info?: ControlInfo;
 }
 
 export interface Select {
@@ -46,7 +50,7 @@ export function createSelect(opts: SelectOptions): Select {
     opts.onChange(select.value);
   });
 
-  wrap.append(labelEl, select);
+  wrap.append(labelRow(labelEl, opts.label, opts.info), select);
 
   return {
     el: wrap,
