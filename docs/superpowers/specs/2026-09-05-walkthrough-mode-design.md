@@ -1,7 +1,7 @@
 # Walkthrough mode — numbered steps that drive any scene, owned by the scene and framed by the shell
 
 Date: 2026-09-05
-Status: proposed (revision 2 — spec review found five blocking issues; see §13)
+Status: approved (revision 4; two review rounds, seven blocking issues found and closed — see §13)
 Parent: [AI Lab design](2026-09-03-ai-lab-design.md); the last item on that design's roadmap
 Registry: no new cards. Every existing scene gains an optional walkthrough.
 
@@ -24,16 +24,20 @@ Success criteria:
    Back from a later step, or by loading the URL directly (asserted per scene in a test).
 3. A step cannot name a control that does not exist: `focus` is a per-scene union and the
    panel's registry is a `Record` over it, so an unregistered id fails to compile (§7).
-4. Every step's `enter` is pure: applying it twice to the same state gives the same result, and
-   the input state is not mutated (asserted per scene).
+4. Every step's `enter` is **deterministic over the scene's diffing surface**: two calls on the
+   same input state produce equal results, and the input state's diffed fields are unchanged
+   afterwards (asserted per scene). Note this is *not* idempotence — `enter(enter(s))` may
+   legitimately differ from `enter(s)`, because a step that advances an optimizer or trains an
+   epoch changes `pos`, `steps` and `optState` by design. Replay needs determinism; idempotence
+   would forbid every stepping step in the gradient-descent and neural-network scripts.
 5. Changing a control mid-step does not exit the walkthrough and does not change which step is
    showing.
 6. A scene with no walkthrough behaves exactly as it does today — no banner, no chrome, no
    route — proving `VizInstance.walkthrough` is genuinely optional. All seven scenes' existing
    test files must keep passing untouched.
 7. All seven live scenes ship a walkthrough.
-8. `enter` purity is judged against each scene's **diffing surface**: `GdState.path` is
-   documented as deliberately mutable and is excluded by name, not by accident (§4).
+8. The diffing surface is named per scene: `GdState.path` is documented as deliberately mutable
+   and is excluded explicitly, not by accident (§4).
 
 Out of scope: authoring walkthroughs outside the codebase (no JSON, no CMS); branching or
 conditional steps; recorded animation or autoplay; per-user progress; a walkthrough that spans
@@ -148,6 +152,14 @@ Replay is unaffected, and this is worth stating because it is not obvious: `goTo
 pushes into that new buffer. After replaying `i` steps the path holds exactly the positions a
 viewer would have produced by pressing Step `i` times. The mutation is confined to a buffer
 created during the same fold and never touches another state object.
+
+**That last sentence has a precondition, and it is a contract, not an observation:
+`initial` must allocate on every call.** Nothing in the type `initial: () => S` forbids
+`const s0 = initialState(); initial: () => s0`, and a scene author who memoized it that way
+would have every fold push into one shared buffer — the trail would grow across `goTo` calls,
+and Back would show a longer path than Next did. `createWalkthrough` documents the requirement,
+and §10 pins it: two `goTo(i)` calls must give equal path contents *and* must not be the same
+buffer instance.
 
 A second scene needs care rather than a fix: `NnState.epoch` advances on wall-clock time while
 `playing`. A "press Play" step followed by any advance replays from `initialState()` and snaps
@@ -334,11 +346,14 @@ work and are ignored while focus is in a form control; the card is scrolled into
 
 **Per scene, `viz/<id>/walkthrough.test.ts`** — run over every step of every scene:
 
-1. Every `enter` is pure over the scene's **diffing surface** — capture the prior state's
-   fields, apply, and compare; then assert applying twice equals once. Each scene's test names
-   the fields it excludes, and only `gradient-descent` excludes any (`path`, per `state.ts:18-28`).
-   Assert the *prior* state's fields are unchanged, not merely that a new object came back — the
-   latter agrees with itself and passes on a mutating reducer.
+1. Every `enter` is **deterministic** over the scene's diffing surface: call it twice on the
+   same input state and compare the two results, then assert the input's diffed fields are
+   unchanged afterwards. **Do not assert `enter(enter(s))` equals `enter(s)`** — that is
+   idempotence, and it is false by design for any step that advances an optimizer or trains
+   epochs. Assert against the *prior* state's captured fields rather than that a new object came
+   back; the latter agrees with itself and passes on a mutating reducer. Each scene's test names
+   the fields it excludes, and only `gradient-descent` excludes any (`path`, per
+   `state.ts:18-28`).
 2. **Every `focus` id resolves against a really-mounted panel's registry** — read
    `panel.controls` from an actual `createXPanel(...)` call, never a literal list re-stated in
    the test file. A duplicated list would agree with itself and prove nothing. The union already
@@ -352,7 +367,10 @@ work and are ignored while focus is in a form control; the card is scrolled into
    bend" — so §8's rule is enforced in review, and the lint only stops the obvious cases.
 
 **`viz/shared/walkthrough.test.ts` also** — changing state between `goTo` calls does not change
-`length` or the reported index (criterion §1.5).
+`length` or the reported index (criterion §1.5); and **`initial` is called afresh for every
+`goTo`**: two `goTo(i)` calls produce equal contents but not the same object identity for any
+field the scene mutates in place, so a memoized `initial` fails here rather than silently
+growing a shared buffer (§4).
 
 **Regression** — all seven scenes' existing test files must pass untouched.
 
@@ -362,6 +380,7 @@ work and are ignored while focus is in a form control; the card is scrolled into
 | ------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
 | ~~`focus` is an open string~~ — removed in revision 2: it is a per-scene union over a `Record` registry, so an unknown id fails to compile | §10.2 still checks a member declared but never registered, against a really-mounted panel      |
 | `gradient-descent`'s `step` mutates its `path`, which reads as a purity violation               | It is a documented design decision (`state.ts:18-28`), not a defect; the criterion is scoped to the diffing surface and replay rebuilds the path correctly from a fresh buffer (§4) |
+| A scene memoizes `initial`, so every fold pushes into one shared buffer and the trail grows across `goTo` calls | The contract is stated in §4 and pinned by a shared test asserting two `goTo(i)` calls are equal in content but distinct in identity |
 | `nn`'s epoch advances on wall-clock time while playing, so replay un-trains the boundary        | Its script calls `trainEpoch` a fixed number of times inside `enter` rather than depending on Play (§4)                                          |
 | Replay discards a viewer's own exploration on advance                                             | Intended and stated in §4; the alternative (preserving changes) makes a step's prose unable to describe its own scene                             |
 | Seven scripts of prose is the bulk of the work and the easiest place to be glib                   | Prose is reviewed as carefully as the math, §8 fixes what each covers, and §10.3 mechanically rejects "look at the screen" phrasing               |
@@ -429,3 +448,20 @@ unknown-hash → `#/` behaviour that must stay green.
 §5's layout wording was checked against fix 4 and stands: the step card sits below the scene
 panel, and `.wt-active` collapses the section registered with `role: "explanation"`, so the two
 paragraphs of prose do not both show.
+
+**Revision 4 (2026-09-05)** — two blocking corrections from the second review round.
+
+§1.4 and §10.1 asserted **idempotence** ("applying twice equals once"), which is false by design
+for any step that advances an optimizer or trains an epoch: `enter(enter(s))` legitimately moves
+`pos`, `steps` and `optState`, all inside the diffing surface, so no exclusion rescues it. The
+gradient-descent and neural-network scripts would have failed the very test this spec told the
+implementer to write. The property replay actually requires is **determinism** — two calls on
+the same input state agree — and both places now say so.
+
+§4's claim that the mutation "never escapes the fold" rested on an unstated precondition:
+`initial` allocating fresh on every call. The type `() => S` permits a memoized constant, which
+would make every fold share one buffer and grow the trail across `goTo` calls. That is now a
+documented contract with a test that fails a memoized `initial` rather than letting it corrupt
+quietly.
+
+The reviewer confirmed the scoped-purity reading from revision 3.
