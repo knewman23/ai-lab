@@ -8,6 +8,7 @@ import {
 } from "../viz/types";
 import type { Header } from "./header";
 import { createVizFrame, type VizFrame } from "./viz-frame";
+import { createWalkthroughChrome, type WalkthroughChrome } from "./walkthrough";
 
 /**
  * The renderer boot result; `getRenderer()` never rejects, so a viz route can
@@ -33,10 +34,17 @@ export interface VizPageDeps {
   readonly loop: Loop;
   /** Memoised: creates the renderer on the first viz route, once per page load. */
   readonly getRenderer: () => Promise<RendererResult>;
+  /**
+   * How a walkthrough writes its position back to the URL. It replaces rather
+   * than pushes, so the browser's Back button leaves the scene instead of
+   * walking the steps backwards, and no hashchange re-mounts the scene.
+   */
+  readonly replaceHash?: (hash: string) => void;
 }
 
 export interface VizPage {
-  enter(entry: LazyVisualization, token: number): Promise<void>;
+  /** `step` is the 0-based walkthrough index a deep link asked for, if any. */
+  enter(entry: LazyVisualization, token: number, step?: number): Promise<void>;
   leave(): void;
 }
 
@@ -71,6 +79,32 @@ const POKE_EVENTS = [
   "change",
 ] as const;
 
+/** The three regions the panel host is split into: the scene only ever sees the middle one. */
+interface PanelRegions {
+  readonly wrapper: HTMLElement;
+  readonly banner: HTMLElement;
+  readonly scene: HTMLElement;
+  readonly step: HTMLElement;
+}
+
+function createPanelRegions(host: HTMLElement): PanelRegions {
+  const wrapper = document.createElement("div");
+  wrapper.className = "panel-host";
+  const banner = document.createElement("div");
+  banner.className = "wt-banner";
+  const scene = document.createElement("div");
+  scene.className = "wt-scene";
+  const step = document.createElement("div");
+  step.className = "wt-step";
+  wrapper.append(banner, scene, step);
+  host.append(wrapper);
+  return { wrapper, banner, scene, step };
+}
+
+const replaceHashDefault = (hash: string): void => {
+  history.replaceState(null, "", hash);
+};
+
 /** Owns one visualization at a time: mount, size, tick, and tear down. */
 export function createVizPage(deps: VizPageDeps): VizPage {
   let current: number | null = null;
@@ -79,6 +113,8 @@ export function createVizPage(deps: VizPageDeps): VizPage {
   let observer: ResizeObserver | null = null;
   let listeners: AbortController | null = null;
   let renderer: Renderer | null = null;
+  let chrome: WalkthroughChrome | null = null;
+  const replaceHash = deps.replaceHash ?? replaceHashDefault;
   // DEV leak check. `renderer.info.memory.geometries` counts geometries uploaded and not yet
   // disposed for the renderer's whole lifetime, and three keeps some shared geometry alive on
   // purpose (ArrowHelper's module-level line and cone), so a pre-mount vs post-dispose
@@ -101,6 +137,8 @@ export function createVizPage(deps: VizPageDeps): VizPage {
   function leave(): void {
     current = null;
     stopDriving();
+    chrome?.dispose();
+    chrome = null;
 
     if (instance) {
       instance.dispose();
@@ -122,7 +160,7 @@ export function createVizPage(deps: VizPageDeps): VizPage {
     frame = null;
   }
 
-  async function enter(entry: LazyVisualization, token: number): Promise<void> {
+  async function enter(entry: LazyVisualization, token: number, step?: number): Promise<void> {
     // Self-contained: an enter() without a leave() still leaves one frame behind.
     leave();
     current = token;
@@ -168,13 +206,36 @@ export function createVizPage(deps: VizPageDeps): VizPage {
       own.canvasContainer.replaceChildren(renderer.domElement);
       currentId = entry.id;
 
+      const regions = createPanelRegions(own.panel);
       const mounted = viz.mount({
         canvasContainer: own.canvasContainer,
-        panel: own.panel,
+        panel: regions.scene,
         renderer,
         theme: deps.theme,
       });
       instance = mounted;
+
+      // Clamping and the walkthrough-less redirect live here rather than in the
+      // router: both need a length that only exists once the scene has mounted.
+      const sceneHash = `#/${entry.topic}/${entry.id}`;
+      const walkthrough = mounted.walkthrough;
+      if (walkthrough) {
+        chrome = createWalkthroughChrome({
+          wrapper: regions.wrapper,
+          banner: regions.banner,
+          step: regions.step,
+          walkthrough,
+          onStepChange: (index) => {
+            replaceHash(index === undefined ? sceneHash : `${sceneHash}/walkthrough/${index + 1}`);
+          },
+        });
+        if (step !== undefined) {
+          const clamped = Math.min(step, walkthrough.length - 1);
+          chrome.show(clamped);
+        }
+      } else if (step !== undefined) {
+        replaceHash(sceneHash);
+      }
 
       const fit = (): void => {
         const w = own.canvasContainer.clientWidth;
@@ -202,6 +263,8 @@ export function createVizPage(deps: VizPageDeps): VizPage {
       deps.loop.start();
     } catch (error) {
       stopDriving();
+      chrome?.dispose();
+      chrome = null;
       try {
         // Best effort: a viz that threw mid-mount may still hold GPU resources,
         // and its dispose() is as likely to throw as its mount() was.

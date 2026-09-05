@@ -97,7 +97,9 @@ export function createWalkthroughChrome(deps: WalkthroughChromeDeps): Walkthroug
     stepHost.replaceChildren(card);
     wrapper.classList.add("wt-active");
     onStepChange(view.index);
-    card.scrollIntoView({ block: "nearest" });
+    // The card sits low in a long panel; a viewer who scrolled up must not have
+    // to hunt for it. Optional because jsdom does not implement it.
+    card.scrollIntoView?.({ block: "nearest" });
   }
 
   function exit(): void {

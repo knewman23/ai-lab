@@ -125,7 +125,7 @@ export function createShell(root: HTMLElement, deps: ShellDeps = {}): void {
     homePage?.remove();
     homePage = null;
     token += 1;
-    vizPage.enter(route.entry, token).catch((error: unknown) => {
+    vizPage.enter(route.entry, token, route.step).catch((error: unknown) => {
       // enter() handles its own failures; this is the backstop.
       if (import.meta.env.DEV) console.error("viz route failed", error);
     });

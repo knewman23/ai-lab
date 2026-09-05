@@ -3,7 +3,9 @@ import type { Crumb } from "../../src/app/header";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Loop } from "../../src/core/loop";
 import { createVizPage, type RendererResult } from "../../src/app/viz-page";
+import { createPanel } from "../../src/ui/panel";
 import type {
+  StepView,
   LazyVisualization,
   Renderer,
   ThemeColors,
@@ -72,13 +74,16 @@ interface Harness {
   crumbs: Crumb[][];
   loop: ReturnType<typeof fakeLoop>;
   page: ReturnType<typeof createVizPage>;
+  hashes: string[];
 }
 
 function harness(rendererReady: Promise<RendererResult>): Harness {
   const main = document.createElement("div");
   const crumbs: Crumb[][] = [];
   const loop = fakeLoop();
+  const hashes: string[] = [];
   const page = createVizPage({
+    replaceHash: (hash: string) => hashes.push(hash),
     main,
     header: {
       setBreadcrumb(parts) {
@@ -89,7 +94,7 @@ function harness(rendererReady: Promise<RendererResult>): Harness {
     loop,
     getRenderer: () => rendererReady,
   });
-  return { main, crumbs, loop, page };
+  return { main, crumbs, loop, page, hashes };
 }
 
 const ok = (): Promise<RendererResult> =>
@@ -97,6 +102,8 @@ const ok = (): Promise<RendererResult> =>
 
 beforeEach(() => {
   vi.stubGlobal("ResizeObserver", FakeResizeObserver);
+  // jsdom ships no scrollIntoView; the chrome calls it on every advance.
+  Element.prototype.scrollIntoView = vi.fn();
   vi.spyOn(console, "warn").mockImplementation(() => undefined);
   vi.spyOn(console, "error").mockImplementation(() => undefined);
 });
@@ -278,5 +285,185 @@ describe("createVizPage", () => {
     page.leave();
     page.leave();
     expect(dispose).toHaveBeenCalledTimes(1);
+  });
+});
+
+/**
+ * A scene with a walkthrough: it records the indices it was replayed to, and
+ * builds a panel with an explanation section so the collapse can be checked.
+ */
+function walkingViz(prose: readonly string[]): {
+  readonly entry: LazyVisualization;
+  readonly visited: number[];
+  readonly exits: number[];
+  panelHost(): HTMLElement | undefined;
+} {
+  const visited: number[] = [];
+  const exits: number[] = [];
+  let host: HTMLElement | undefined;
+
+  const entry = lazy((vizHost) => {
+    host = vizHost.panel;
+    const panel = createPanel();
+    panel.section("Setup");
+    panel.section("What you are seeing", { role: "explanation" });
+    vizHost.panel.append(panel.el);
+    return {
+      ...fakeInstance(),
+      walkthrough: {
+        title: "Walk me through it",
+        length: prose.length,
+        goTo(index: number): StepView {
+          const text = prose[index];
+          if (text === undefined) {
+            throw new RangeError(`step index ${index} is outside 0…${prose.length - 1}`);
+          }
+          visited.push(index);
+          return { index, total: prose.length, prose: text };
+        },
+        exit(): void {
+          exits.push(visited.length);
+        },
+      },
+    };
+  }, "walker");
+
+  return { entry, visited, exits, panelHost: () => host };
+}
+
+const PROSE = ["First, drag the ball.", "Then step the optimizer.", "Now switch surfaces."];
+
+function stepButton(main: HTMLElement, label: string): HTMLButtonElement {
+  const found = [...main.querySelectorAll("button")].find((b) => b.textContent === label);
+  if (!found) {
+    throw new Error(`no "${label}" button in the panel`);
+  }
+  return found;
+}
+
+describe("createVizPage and walkthrough mode", () => {
+  it("wraps the panel in three regions and hands the scene only the middle one", async () => {
+    const { main, page } = harness(ok());
+    const scene = walkingViz(PROSE);
+
+    await page.enter(scene.entry, 1);
+
+    const wrapper = main.querySelector(".panel-host");
+    expect(wrapper?.querySelector(":scope > .wt-banner")).not.toBeNull();
+    expect(wrapper?.querySelector(":scope > .wt-scene")).not.toBeNull();
+    expect(wrapper?.querySelector(":scope > .wt-step")).not.toBeNull();
+    expect(scene.panelHost()).toBe(wrapper?.querySelector(".wt-scene"));
+  });
+
+  it("collapses the explanation section by marking the wrapper while a step shows", async () => {
+    const { main, page } = harness(ok());
+    const scene = walkingViz(PROSE);
+    await page.enter(scene.entry, 1);
+
+    const wrapper = main.querySelector(".panel-host");
+    const explanation = main.querySelector('[data-role="explanation"]');
+    expect(wrapper?.contains(explanation ?? null)).toBe(true);
+    expect(wrapper?.classList.contains("wt-active")).toBe(false);
+
+    stepButton(main, "Walk me through it").click();
+    expect(wrapper?.classList.contains("wt-active")).toBe(true);
+  });
+
+  it("renders no chrome at all for a scene without a walkthrough", async () => {
+    const { main, page } = harness(ok());
+
+    await page.enter(
+      lazy(() => fakeInstance()),
+      1,
+    );
+
+    expect(main.querySelector(".wt-banner")?.children).toHaveLength(0);
+    expect(main.querySelector(".wt-step")?.children).toHaveLength(0);
+  });
+
+  it("opens a deep-linked step on a cold load", async () => {
+    const { main, page } = harness(ok());
+    const scene = walkingViz(PROSE);
+
+    await page.enter(scene.entry, 1, 1);
+
+    expect(scene.visited).toEqual([1]);
+    expect(main.querySelector(".wt-step")?.textContent).toContain(PROSE[1]);
+  });
+
+  it("clamps a step past the end to the last one and rewrites the hash", async () => {
+    const { main, page, hashes } = harness(ok());
+    const scene = walkingViz(PROSE);
+
+    await page.enter(scene.entry, 1, 98);
+
+    expect(scene.visited).toEqual([PROSE.length - 1]);
+    expect(hashes.at(-1)).toBe("#/calculus/walker/walkthrough/3");
+    expect(main.querySelector(".wt-step")?.textContent).toContain(PROSE[PROSE.length - 1]);
+  });
+
+  it("rewrites a step on a scene that ships no walkthrough back to the plain scene", async () => {
+    const { main, page, hashes } = harness(ok());
+
+    await page.enter(
+      lazy(() => fakeInstance()),
+      1,
+      2,
+    );
+
+    expect(hashes).toEqual(["#/calculus/one"]);
+    expect(main.querySelector(".wt-step")?.children).toHaveLength(0);
+  });
+
+  it("rewrites the hash as the visitor advances, goes back, and finishes", async () => {
+    const { main, page, hashes } = harness(ok());
+    const scene = walkingViz(PROSE);
+    await page.enter(scene.entry, 1);
+
+    stepButton(main, "Walk me through it").click();
+    expect(hashes.at(-1)).toBe("#/calculus/walker/walkthrough/1");
+
+    stepButton(main, "Next").click();
+    expect(hashes.at(-1)).toBe("#/calculus/walker/walkthrough/2");
+
+    stepButton(main, "Back").click();
+    expect(hashes.at(-1)).toBe("#/calculus/walker/walkthrough/1");
+
+    stepButton(main, "Exit").click();
+    expect(hashes.at(-1)).toBe("#/calculus/walker");
+    expect(scene.exits).toHaveLength(1);
+  });
+
+  it("replaces history entries rather than pushing one per step", async () => {
+    const replaceState = vi.spyOn(window.history, "replaceState");
+    const pushState = vi.spyOn(window.history, "pushState");
+    const main = document.createElement("div");
+    // No replaceHash override: this exercises the real one.
+    const page = createVizPage({
+      main,
+      header: { setBreadcrumb: () => {} },
+      theme: new EventTarget() as ThemeColors,
+      loop: fakeLoop(),
+      getRenderer: () => ok(),
+    });
+    const scene = walkingViz(PROSE);
+
+    await page.enter(scene.entry, 1);
+    stepButton(main, "Walk me through it").click();
+
+    expect(replaceState).toHaveBeenCalledWith(null, "", "#/calculus/walker/walkthrough/1");
+    expect(pushState).not.toHaveBeenCalled();
+  });
+
+  it("drops the chrome and its key listener on leave", async () => {
+    const { main, page } = harness(ok());
+    const scene = walkingViz(PROSE);
+    await page.enter(scene.entry, 1);
+    stepButton(main, "Walk me through it").click();
+
+    page.leave();
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true }));
+
+    expect(scene.visited).toEqual([0]);
   });
 });
