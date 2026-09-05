@@ -10,6 +10,7 @@ import { createPanel } from "../../ui/panel";
 import { createReadout, proseNum, type Readout } from "../../ui/readout";
 import { createLogSlider } from "../../ui/slider";
 import { createToggle, type Toggle } from "../../ui/toggle";
+import { createControlFocus } from "../shared/control-focus";
 import { createGptExplanation, PRESET_HINTS } from "./explanation";
 import {
   HEAD_OPTIONS,
@@ -69,9 +70,30 @@ function createStageReadout(section: HTMLElement): (s: GptState, d: Derived) => 
   };
 }
 
+/**
+ * The scene's own name for each control a walkthrough step may point at. A union
+ * rather than an open string, so a step naming a control this panel does not
+ * register is a compile error rather than something a test has to catch.
+ */
+export type GptControlId =
+  | "sentence"
+  | "preset"
+  | "query"
+  | "head"
+  | "stage"
+  | "temperature"
+  | "positional"
+  | "causal"
+  | "residualPath"
+  | "resetView";
+
 export interface GptPanel {
   el: HTMLElement;
+  /** Exhaustive by construction: a union member with no element fails to compile. */
+  readonly controls: Readonly<Record<GptControlId, HTMLElement>>;
   render(state: GptState, d: Derived): void;
+  /** Outlines one control, or clears the outline. */
+  focus(id: GptControlId | undefined): void;
   dispose(): void;
 }
 
@@ -136,7 +158,23 @@ export function createGptPanel(host: HTMLElement, handlers: GptPanelHandlers): G
   panel.section("Run").append(runRow);
 
   const renderStage = createStageReadout(panel.section("Readouts"));
-  createGptExplanation(panel.el);
+  // Marked so the shell can collapse it while a walkthrough's step card, which
+  // occupies the same place in the panel, is showing.
+  createGptExplanation(panel.el).dataset.role = "explanation";
+
+  const controls: Readonly<Record<GptControlId, HTMLElement>> = {
+    sentence: sentence.el,
+    preset: preset.el,
+    query: query.el,
+    head: head.el,
+    stage: stage.el,
+    temperature: temperature.el,
+    positional: positional.el,
+    causal: causal.el,
+    residualPath: residual.el,
+    resetView: resetView.el,
+  };
+  const focus = createControlFocus(controls);
 
   // The query labels are the sentence's words, so they are rewritten only when the sentence moves.
   let labelled: SentenceKey | null = null;
@@ -149,6 +187,8 @@ export function createGptPanel(host: HTMLElement, handlers: GptPanelHandlers): G
 
   return {
     el: panel.el,
+    controls,
+    focus,
     render(state: GptState, d: Derived): void {
       sync(sentence, state.sentence);
       sync(preset, state.preset);

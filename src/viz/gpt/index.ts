@@ -9,8 +9,10 @@ import { createColumnPick } from "./column-pick";
 import { frameGpt } from "./frame-gpt";
 import { syncLabels } from "./labels-sync";
 import { embedFromFloor } from "./layout";
-import { createGptPanel, type GptPanel } from "./panel";
+import { createGptPanel, type GptControlId, type GptPanel } from "./panel";
 import { buildScene } from "./scene-build";
+import { createWalkthrough } from "../shared/walkthrough";
+import { GPT_STEPS, GPT_WALKTHROUGH_TITLE } from "./walkthrough";
 import {
   type Derived,
   type GptState,
@@ -214,7 +216,20 @@ function mount(host: VizHost): VizInstance {
 
   apply(state);
 
+  const walkthrough = createWalkthrough<GptState, GptControlId>({
+    title: GPT_WALKTHROUGH_TITLE,
+    steps: GPT_STEPS,
+    initial: initialState,
+    apply,
+    focus: (id) => panel?.focus(id),
+    frame: () => {
+      goHome();
+    },
+  });
+
   return {
+    walkthrough,
+
     update(dt: number): boolean {
       // Damping keeps the camera moving for a moment after the pointer stops.
       const moved = kit.controls.update(dt);

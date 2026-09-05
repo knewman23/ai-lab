@@ -120,8 +120,11 @@ export const PROJECTION = `W_O then mixes the heads: attnOut = ${fmt(W_O[0])} o�
 export const LAST_POSITION =
   "The logits always come from the last position's final vector, whichever query the arcs draw.";
 
-/** Appends the block's three rules and the §7 prose to `host`. Nothing here depends on the state. */
-export function createGptExplanation(host: HTMLElement): void {
+/**
+ * Appends the block's three rules and the §7 prose to `host`, and returns the
+ * element holding them so the caller can mark it. Nothing here depends on the state.
+ */
+export function createGptExplanation(host: HTMLElement): HTMLElement {
   const el = document.createElement("div");
   el.className = "explain";
   host.append(el);
@@ -137,4 +140,6 @@ export function createGptExplanation(host: HTMLElement): void {
     p.textContent = text;
     el.append(p);
   }
+
+  return el;
 }
