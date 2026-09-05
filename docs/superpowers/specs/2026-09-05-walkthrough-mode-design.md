@@ -1,7 +1,7 @@
 # Walkthrough mode — numbered steps that drive any scene, owned by the scene and framed by the shell
 
 Date: 2026-09-05
-Status: proposed
+Status: proposed (revision 2 — spec review found five blocking issues; see §13)
 Parent: [AI Lab design](2026-09-03-ai-lab-design.md); the last item on that design's roadmap
 Registry: no new cards. Every existing scene gains an optional walkthrough.
 
@@ -22,16 +22,17 @@ Success criteria:
    load, with no prior navigation.
 2. `goTo(i)` produces the same state whether reached by pressing Next `i` times, by pressing
    Back from a later step, or by loading the URL directly (asserted per scene in a test).
-3. Every step's `focus` id resolves to a control that exists in that scene's panel (asserted
-   per scene in a test). A typo fails the suite; it never silently highlights nothing.
+3. A step cannot name a control that does not exist: `focus` is a per-scene union and the
+   panel's registry is a `Record` over it, so an unregistered id fails to compile (§7).
 4. Every step's `enter` is pure: applying it twice to the same state gives the same result, and
    the input state is not mutated (asserted per scene).
 5. Changing a control mid-step does not exit the walkthrough and does not change which step is
    showing.
 6. A scene with no walkthrough behaves exactly as it does today — no banner, no chrome, no
-   route. `VizInstance.walkthrough` is optional and six of the seven scenes must keep passing
-   their existing tests untouched.
+   route — proving `VizInstance.walkthrough` is genuinely optional. All seven scenes' existing
+   test files must keep passing untouched.
 7. All seven live scenes ship a walkthrough.
+8. `gradient-descent`'s `step` is pure before any walkthrough uses it (§4).
 
 Out of scope: authoring walkthroughs outside the codebase (no JSON, no CMS); branching or
 conditional steps; recorded animation or autoplay; per-user progress; a walkthrough that spans
@@ -46,7 +47,7 @@ more than one scene; changing any scene's existing controls or math.
 | Navigating         | `goTo(i)` **replays** steps 0…i over the scene's initial state                                                                              | Step forward from the current state; snapshot each step's state                     |
 | Controls           | Stay live; touching one neither exits nor changes step                                                                                      | Any change exits; controls locked while a step shows                                |
 | Layout             | The step replaces the explanation prose at the foot of the panel; a slim banner at the top carries progress and the exit                     | A card above the controls; a translucent bar over the canvas                        |
-| Pointing           | The step names a control id; the panel outlines that control in place                                                                        | Prose alone ("use the Head select"); an arrow drawn on the canvas                   |
+| Pointing           | The step names a control from that scene's own `ControlId` union; the panel outlines it in place                                                                        | Prose alone ("use the Head select"); an arrow drawn on the canvas                   |
 | URL                | `#/<topic>/<id>/walkthrough/<n>`, 1-based, clamped                                                                                          | In-memory only; a query parameter                                                   |
 | Scope              | All seven scenes, built shell-first and proven on two before the other five are authored                                                     | Two scenes now, five later; the transformer alone                                   |
 
@@ -64,10 +65,11 @@ export interface StepView {
   readonly index: number; // 0-based
   readonly total: number;
   readonly prose: string;
-  readonly focus?: string;
 }
 
 export interface WalkthroughInstance {
+  /** Names the start control, e.g. "Walk me through it". */
+  readonly title: string;
   readonly length: number;
   /** Replays steps 0…index over the scene's initial state and returns what to display. */
   goTo(index: number): StepView;
@@ -83,24 +85,26 @@ export interface VizInstance {
 }
 ```
 
-`StepView` crosses the seam as plain data. The shell never sees a scene's state type, and a
-scene never sees the DOM chrome.
+`StepView` crosses the seam as plain data — note it carries **no `focus`**: applying the
+outline is the scene's job (§7), because only the scene knows its own control ids. The shell
+never sees a scene's state type, and a scene never sees the DOM chrome.
 
 ## 4. The step model (`src/viz/shared/walkthrough.ts`)
 
 ```ts
-export interface Step<S> {
+export interface Step<S, C extends string> {
   readonly prose: string;
   readonly enter: (state: S) => S;
-  readonly focus?: string;
+  readonly focus?: C; // that scene's own ControlId union — not an open string
   readonly framing?: Framing;
 }
 
-export function createWalkthrough<S>(opts: {
-  readonly steps: readonly Step<S>[];
+export function createWalkthrough<S, C extends string>(opts: {
+  readonly title: string;
+  readonly steps: readonly Step<S, C>[];
   readonly initial: () => S;
   readonly apply: (state: S) => void;
-  readonly focus: (id: string | undefined) => void;
+  readonly focus: (id: C | undefined) => void;
   readonly frame?: (framing: Framing) => void;
 }): WalkthroughInstance;
 ```
@@ -122,11 +126,41 @@ The cost is that a viewer's own fiddling is discarded when the step changes. Tha
 intended reading of §1's "a step is a starting position": you may explore freely within a step,
 and advancing gives you a clean, known scene rather than your explored one plus a change.
 
-`enter` must be pure and built from the scene's exported setters. It must not reach into the
-scene's Three.js objects — every existing scene already routes all state through pure setters,
-so this is a constraint the codebase already satisfies.
+`enter` must be pure and built from the scene's exported setters, and must not reach into the
+scene's Three.js objects.
+
+**One scene does not satisfy this today, and fixing it is a prerequisite task.**
+`src/viz/gradient-descent/state.ts:79`'s `step(s)` mutates its input — `s.path.push(pos)`, then
+returns `path: s.path`. §8's gradient-descent script needs `step` inside `enter`, which would
+violate criteria §1.4 and test §10.2 outright: the input state *is* mutated and applying twice
+does not equal applying once. `step` must be made pure (copy the path rather than push to it)
+with its own test, **before** any walkthrough uses it. A setter that mutates is a landmine
+independent of this feature; the walkthrough is only what surfaced it.
+
+A second scene needs care rather than a fix: `NnState.epoch` advances on wall-clock time while
+`playing`. A "press Play" step followed by any advance replays from `initialState()` and snaps
+the network back to epoch 0, un-training the boundary mid-script. The nn script must call
+`trainEpoch` a fixed number of times inside `enter` rather than depend on Play having run.
 
 ## 5. Shell chrome (`src/app/walkthrough.ts`)
+
+**Where the chrome mounts.** Scenes build their panels into `host.panel` themselves and
+`ui/panel.ts` exposes only `el` and `section()`, so the shell has no way to address "the top of
+the panel" or "the explanation's slot". Rather than give seven panels new slots, `viz-page.ts`
+wraps the panel host in three regions and passes only the middle one to the scene:
+
+```
+<div class="panel-host">
+  <div class="wt-banner">   ← shell owns
+  <div class="wt-scene">    ← passed to the scene as host.panel; unchanged from today
+  <div class="wt-step">     ← shell owns
+</div>
+```
+
+The scene's panel code is untouched. While a walkthrough is active the wrapper carries
+`.wt-active`, which collapses the scene panel's explanation section so the step card occupies
+that visual position — panels mark that section by passing `{ role: "explanation" }` to
+`section()`, the one small change `ui/panel.ts` needs.
 
 Rendered by the viz page when `instance.walkthrough` exists, per §2's layout decision:
 
@@ -134,9 +168,9 @@ Rendered by the viz page when `instance.walkthrough` exists, per §2's layout de
   Present only while a walkthrough is active.
 - **Step card**, in the slot the explanation prose occupies, containing the step number, the
   prose, **Back** and **Next**. On the last step, Next reads **Finish** and exits.
-- **Start control**, when no walkthrough is running: a single button near the top of the panel,
-  labelled with the walkthrough's own name (e.g. "Walk me through it"), absent on scenes with
-  no walkthrough.
+- **Start control**, when no walkthrough is running: a single button in the banner region,
+  labelled `walkthrough.title` (e.g. "Walk me through it"), absent on scenes with no
+  walkthrough.
 - The panel scrolls the step card into view on each advance — the card sits low in a long
   panel, and a viewer who has scrolled up must not have to hunt for the next step.
 - Keyboard: `→`/`←` advance and go back while the walkthrough is active and focus is not in a
@@ -152,13 +186,25 @@ The chrome reads from `StepView` only. It never inspects scene state.
 #/<topic>/<id>/walkthrough/<n>      n is 1-based
 ```
 
+**The router parses; it cannot validate.** Clamping an out-of-range `n` and redirecting a
+walkthrough-less scene both need `walkthrough.length`, which exists only after `mount()` —
+`resolveRoute` sees registry metadata alone. So the work splits:
+
+*Router (`parseHash`/`resolveRoute`, pure):*
+
 - `Route` gains `{ kind: "viz"; topic; id; step?: number }`; `step` is the 0-based index, or
   absent for the sandbox.
-- A non-numeric, zero or negative `n` → redirect to the scene without a step.
-- An `n` past the end clamps to the last step and **rewrites the hash**, so a stale link from an
-  edited script lands somewhere sensible rather than blank.
-- A scene with no walkthrough, given a walkthrough URL → redirect to the plain scene.
+- A non-numeric, zero or negative `n` → the same route without a `step` (the plain scene).
 - Three segments, or a third segment other than `walkthrough` → home, as today.
+- `ResolvedRoute`'s redirect arm gains a **target**: `{ kind: "redirect"; hash: string }`.
+  `createRouter` currently hardcodes `deps.setHash("#/")` (`router.ts:99-101`), so "redirect to
+  the plain scene" is unrepresentable until it does.
+
+*Viz page (post-mount):*
+
+- An `n` past the end clamps to the last step and rewrites the hash, so a stale link from an
+  edited script lands on the last step rather than blank.
+- A `step` on a scene whose instance has no `walkthrough` rewrites the hash to the plain scene.
 
 Advancing, going back, exiting and finishing all rewrite the hash with `replaceState` semantics
 (no new history entry per step), so Back-button behaviour stays coherent: the browser's Back
@@ -166,24 +212,31 @@ leaves the scene rather than walking the steps backwards.
 
 ## 7. Control focus, and the string that has to be safe
 
-A step names a control by id; the panel outlines it. Every scene's panel gains two members:
+A step names a control; the panel outlines it. **The id is a per-scene union, not an open
+string**, so a typo is a compile error rather than something a test has to catch:
 
 ```ts
-readonly controlIds: readonly string[];      // every id this panel registered
-focus(id: string | undefined): void;         // outline that control; undefined clears
+// src/viz/gpt/panel.ts
+export type GptControlId = "sentence" | "preset" | "query" | "head" | "stage" | "temperature"
+  | "positional" | "causal" | "residualPath" | "resetView";
+
+readonly controls: Readonly<Record<GptControlId, HTMLElement>>; // exhaustive by construction
+focus(id: GptControlId | undefined): void;                      // undefined clears
 ```
 
-The panel builds a `Map<string, HTMLElement>` as it creates its widgets — each `createSelect`,
-`createSlider`, `createToggle` and `createButton` call site gains an id — and `focus` toggles a
-`.is-focused` class (a 2px `--accent` outline and a slight background lift, defined once in
-`styles/panel.css`). `focus(undefined)` clears. An unknown id **throws** rather than silently
-doing nothing, consistent with the no-silent-defaults policy this codebase enforces.
+`Record<GptControlId, …>` makes the registry exhaustive: adding a union member without
+registering its element fails to compile, and `Step<S, GptControlId>` rejects any id outside
+the union. `focus` toggles a `.is-focused` class (a 2px `--accent` outline and a slight
+background lift, defined once in `styles/panel.css`).
 
-**This is the design's one stringly-typed edge, and it is deliberate**: a typed control handle
-would have to cross the same seam as the state type and would put DOM types in the step list.
-The defence is §10's test — for every scene, every step's `focus` is asserted to be a member of
-that panel's `controlIds`. A typo fails the suite. Without that test this design should not
-ship.
+The ids are the scene's own vocabulary and are namespaced away from the DOM ids `ui/select.ts`
+already mints internally (`select-1`, `select-2`, …); the two never meet.
+
+**Revision 2 note.** The first draft made `focus` an open `string` defended by a test asserting
+every id existed. A reviewer pointed out that this is precisely the coupling class this codebase
+removed eight instances of during the transformer build, and that a union removes it instead of
+testing around it. It also means `StepView` need not carry `focus` at all (§3) — the scene
+applies its own outline.
 
 ## 8. What the seven scripts cover
 
@@ -220,11 +273,15 @@ Changed:
 
 ```
 src/viz/types.ts                     StepView, WalkthroughInstance, VizInstance.walkthrough
-src/app/router.ts                    the four-segment form, clamping, redirects
-src/app/viz-page.ts                  mount the chrome when a walkthrough exists; URL sync
-src/viz/<id>/panel.ts                × 7, control ids + focus(id)
+src/app/router.ts                    the four-segment form; ResolvedRoute redirect gains a target
+src/app/viz-page.ts                  the three panel regions; clamping and the walkthrough-less
+                                     redirect (both need a length only mount() can supply); URL sync
+src/ui/panel.ts                      section(title, { role: "explanation" }) so the wrapper can
+                                     collapse that section while a walkthrough is active
+src/viz/gradient-descent/state.ts    PREREQUISITE: make `step` pure (§4)
+src/viz/<id>/panel.ts                × 7, a ControlId union + Record registry + focus(id)
 src/viz/<id>/index.ts                × 7, wire createWalkthrough into mount
-styles/panel.css                     .is-focused, the banner and the step card
+styles/panel.css                     .is-focused, .wt-banner, .wt-step, .wt-active
 README.md, docs/roadmap.md           walkthrough mode moves from in-flight to live
 ```
 
@@ -235,32 +292,50 @@ README.md, docs/roadmap.md           walkthrough mode moves from in-flight to li
 `initial()`; out-of-range indices throw; a zero-step walkthrough is rejected at construction.
 
 **`app/router.test.ts`** — the four-segment form parses to the right 0-based `step`; `n = 0`,
-negative, non-numeric and non-`walkthrough` third segments each redirect; an `n` past the end
-clamps and rewrites; a scene with no walkthrough redirects to the plain scene; existing one- and
-two-segment routes are unchanged.
+negative, non-numeric and a non-`walkthrough` third segment each yield the plain scene or home;
+`ResolvedRoute`'s redirect carries its target hash and `createRouter` navigates to it rather
+than always `#/`; existing one- and two-segment routes parse unchanged. **Clamping and the
+walkthrough-less redirect are not tested here** — they live in `viz-page.ts`, because the router
+cannot know a length that only exists after `mount()`.
+
+**`app/viz-page.test.ts`** — a `step` past the end clamps to the last and rewrites the hash; a
+`step` on a scene whose instance exposes no `walkthrough` rewrites to the plain scene; the three
+panel regions exist and the scene receives only the middle one; `.wt-active` collapses the
+section registered with `role: "explanation"`.
 
 **`app/walkthrough.test.ts`** — the banner shows `index + 1` of `total`; Next on the last step
 reads Finish and exits; Back on the first step is disabled; Exit clears the chrome; `→`/`←`/`Esc`
 work and are ignored while focus is in a form control; the card is scrolled into view on advance.
 
-**Per scene, `viz/<id>/walkthrough.test.ts`** — the four that matter, run over every step of
-every scene:
+**Per scene, `viz/<id>/walkthrough.test.ts`** — run over every step of every scene:
 
-1. **Every `focus` id is in that panel's `controlIds`** (criterion §1.3). This is the test the
-   design depends on.
-2. Every `enter` is pure — the input state is not mutated, and applying twice equals once.
-3. Every step's prose is non-empty and does not assert what is on screen (no "you can see",
-   "notice that the … is" phrasing) — steps must survive a viewer having moved something.
-4. Replay determinism: `goTo(i)` from fresh equals `goTo(i)` reached by Next `i` times.
+1. Every `enter` is pure — the input state is not mutated (deep-compare a frozen copy), and
+   applying twice equals applying once. This is the criterion `gradient-descent`'s `step`
+   currently fails.
+2. **Every `focus` id resolves against a really-mounted panel's registry** — read
+   `panel.controls` from an actual `createXPanel(...)` call, never a literal list re-stated in
+   the test file. A duplicated list would agree with itself and prove nothing. The union already
+   makes a typo a compile error; this catches a member declared but never registered.
+3. A fixture pins the **value** of the state at two chosen steps (not just that two ways of
+   reaching it agree). Given §4 folds from `initial()`, "goTo(i) fresh equals goTo(i) after i
+   Nexts" is the same expression twice and can only fail if `enter` is impure — which item 1
+   already covers. The fixture is what actually pins the script.
+4. Prose is non-empty, and a lint rejects phrasing that asserts on-screen state ("you can see",
+   "notice that"). **This is a lint, not the criterion** — it cannot catch "watch the boundary
+   bend" — so §8's rule is enforced in review, and the lint only stops the obvious cases.
 
-**Regression** — the six scenes' existing test files must pass untouched, proving
-`VizInstance.walkthrough` is genuinely optional.
+**`viz/shared/walkthrough.test.ts` also** — changing state between `goTo` calls does not change
+`length` or the reported index (criterion §1.5).
+
+**Regression** — all seven scenes' existing test files must pass untouched.
 
 ## 11. Risks
 
 | Risk                                                                                              | Mitigation                                                                                                                                       |
 | ------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `focus` is a string, the exact coupling class this codebase has removed eight instances of        | §10.1 asserts every id against the panel's registry, per scene; an unknown id throws at runtime rather than no-opping                             |
+| ~~`focus` is an open string~~ — removed in revision 2: it is a per-scene union over a `Record` registry, so an unknown id fails to compile | §10.2 still checks a member declared but never registered, against a really-mounted panel      |
+| `gradient-descent`'s `step` mutates its input, so replay cannot reproduce its script            | Made pure as a prerequisite task with its own test (§4), before any walkthrough uses it                                                          |
+| `nn`'s epoch advances on wall-clock time while playing, so replay un-trains the boundary        | Its script calls `trainEpoch` a fixed number of times inside `enter` rather than depending on Play (§4)                                          |
 | Replay discards a viewer's own exploration on advance                                             | Intended and stated in §4; the alternative (preserving changes) makes a step's prose unable to describe its own scene                             |
 | Seven scripts of prose is the bulk of the work and the easiest place to be glib                   | Prose is reviewed as carefully as the math, §8 fixes what each covers, and §10.3 mechanically rejects "look at the screen" phrasing               |
 | Touching seven panels to add control ids risks regressing scenes that are shipped and working     | Panels gain members, no existing call site changes; the six scenes' existing tests must pass untouched (§10 Regression)                           |
@@ -280,3 +355,30 @@ Shell first, then the two scenes that stress it from opposite ends, then the res
 
 Browser validation before merge, per the standing instruction: every scene's walkthrough walked
 end to end in both themes, plus a deep link loaded cold.
+
+## 13. Revision log
+
+**Revision 2 (2026-09-05)** — spec review found five blocking issues, all confirmed against the
+code:
+
+1. `gradient-descent/state.ts:79`'s `step` mutates its input (`s.path.push`), so replay could
+   not reproduce that scene's script. Now a prerequisite fix (§4), not a workaround.
+2. Clamping an out-of-range step and redirecting a walkthrough-less scene were assigned to the
+   router, which cannot know a length that only exists after `mount()`. Split between router and
+   viz page (§6).
+3. `ResolvedRoute`'s redirect had no target and `createRouter` hardcodes `#/`, so "redirect to
+   the plain scene" was unrepresentable (§6).
+4. The chrome had no mount point: scenes build their own panels and `ui/panel.ts` exposes only
+   `el` and `section()`. Solved with three regions in `viz-page.ts` rather than seven new panel
+   slots (§5).
+5. `WalkthroughInstance` had no `title`, though §5 labelled the start control with it (§3).
+
+Non-blocking findings also applied: the `nn` wall-clock epoch problem (§4), §1.6's "six of
+seven" contradicting §1.7, §10's replay test being an assertion that agrees with itself, the
+registry test needing a really-mounted panel, the prose lint being framed as a lint rather than
+the criterion, and the control-id namespace being distinct from `ui/select.ts`'s internal DOM
+ids.
+
+The reviewer's recommendation to type the control id was taken, which is a better outcome than
+the original: it removes the coupling rather than testing around it, and lets `StepView` drop
+its `focus` member entirely.
