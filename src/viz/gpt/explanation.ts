@@ -28,13 +28,15 @@ const EQUATION_TEX: readonly string[] = [
  */
 export const PRESET_HINTS: Readonly<Record<PresetKey, string>> = {
   tuned:
-    "Parts of speech grouped, far enough apart that content wins: head 2's dot products " +
-    "outcompete head 1's positional bias, which is why head 1 does not read the previous token.",
+    "Parts of speech grouped, far enough apart that content wins inside head 1: its own " +
+    "embedding cross-terms outcompete its own positional term, which is why head 1's strongest " +
+    "key is not the preceding token.",
   collapsed:
     "No information in the embeddings — switch here to see head 1's positional bias on its own.",
   spread:
-    "Eight far-apart points. Because the unembedding is tied, distance from the origin — not " +
-    "only direction — is what becomes a logit, and this preset makes that visible.",
+    "Eight far-apart points. Because the unembedding is tied, a logit is direction times " +
+    "distance: pushing a word further out raises its bar only on the side the final vector " +
+    "points to, and drives it down on the other.",
 };
 
 const PARAGRAPHS: readonly string[] = [
@@ -78,10 +80,12 @@ const PARAGRAPHS: readonly string[] = [
 
   // The §10 property the payoff depends on.
   "Because the unembedding is the embedding matrix transposed, a word's logit is the dot product " +
-    "of its point with the last token's final vector — direction times length. So a bar also " +
-    "grows when its word is dragged further from the origin, not only when it is dragged toward " +
-    "the final vector. That is a real property of weight tying rather than a quirk of this scene, " +
-    "and the spread preset is there to make it obvious.",
+    "of its point with the last token's final vector — direction times length, and the direction " +
+    "half never drops out. So a bar also grows when its word is dragged further from the origin " +
+    "on the same side as the final vector, not only when it is dragged toward that vector; drag " +
+    "it further out the opposite way and the logit goes more negative and the bar shrinks. That " +
+    "is a real property of weight tying rather than a quirk of this scene, and the spread preset " +
+    "is there to make it visible.",
 ];
 
 /** Position 0 reads only itself, so its row has no range to compare and its arc is full width. */

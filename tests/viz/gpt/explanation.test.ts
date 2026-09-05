@@ -59,6 +59,15 @@ describe("the three conclusions the prose exists to prevent", () => {
     expect(text).toContain("further from the origin");
     expect(text).toContain("spread");
   });
+
+  it("keeps the direction half of the magnitude claim, which is false without it", () => {
+    // The logit is x''·e, so dragging a word further out *away* from the final vector shrinks
+    // its bar. An unqualified "further out grows the bar" is wrong over half the plane.
+    const { text } = prose();
+    expect(text).toContain("further from the origin on the same side as the final vector");
+    expect(text).toContain("the bar shrinks");
+    expect(PRESET_HINTS.spread).toContain("only on the side the final vector points to");
+  });
 });
 
 describe("the two simplifications the prose has to own", () => {
@@ -77,6 +86,14 @@ describe("the two simplifications the prose has to own", () => {
 });
 
 describe("PRESET_HINTS", () => {
+  it("blames head 1's own cross-terms for head 1's row, never the other head", () => {
+    // Head 1's row comes from its own W_Q and W_K alone; head 2 cannot reach it. A viewer with
+    // head 1 selected reads this hint beside a row head 2 did not produce.
+    expect(PRESET_HINTS.tuned).toContain("inside head 1");
+    expect(PRESET_HINTS.tuned).toContain("its own positional term");
+    expect(PRESET_HINTS.tuned).not.toContain("head 2");
+  });
+
   it("carries one line for each of the three presets", () => {
     expect(Object.keys(PRESET_HINTS).sort()).toEqual(Object.keys(EMBEDDING_PRESETS).sort());
     for (const hint of Object.values(PRESET_HINTS)) expect(hint.length).toBeGreaterThan(20);
