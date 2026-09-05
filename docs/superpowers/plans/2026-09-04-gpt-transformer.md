@@ -20,13 +20,14 @@
 src/core/math/transformer.ts                      + tests/core/math/transformer.test.ts
 src/viz/gpt/
   layout.ts  state.ts  frame-gpt.ts
+  arrow-head.ts  pass-read.ts                        shared within the scene (see below)
   wall-bands.ts  columns-geometry.ts  columns.ts  column-pick.ts
-  arcs-geometry.ts  arcs.ts  bars.ts
-  floor-embed.ts  residual-path.ts
+  arcs-geometry.ts  arcs.ts
+  bars-geometry.ts  bars.ts
+  floor-embed-geometry.ts  floor-embed.ts
+  residual-path-geometry.ts  residual-path.ts
   panel.ts  panel-readouts.ts  explanation.ts  labels-sync.ts  index.ts
-tests/viz/gpt/    layout, state, frame-gpt, wall-bands, columns-geometry, columns, column-pick,
-                  labels-sync, panel-readouts,
-                  arcs-geometry, arcs, bars, floor-embed, residual-path, panel, explanation, index
+tests/viz/gpt/    one per source module above, plus helpers.ts (the shared test theme)
 src/app/registry.ts, tests/app/registry.test.ts
 README.md, docs/roadmap.md, docs/screenshots/gpt-transformer-{light,dark}.png
 ```
