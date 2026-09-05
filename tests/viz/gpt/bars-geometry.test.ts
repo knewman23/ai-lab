@@ -8,6 +8,7 @@ import {
 } from "../../../src/core/math/transformer";
 import {
   BAR_BUFFER_FLOATS,
+  BAR_MAX,
   barHeight,
   barQuad,
   barX,
@@ -40,15 +41,27 @@ function extent(v: number, height: number) {
 }
 
 describe("barX", () => {
-  it("spaces the eight bars evenly and keeps the row inside the wall", () => {
-    const pitch = barX(1) - barX(0);
-    for (let v = 1; v < VOCAB.length; v++) expect(barX(v) - barX(v - 1)).toBeCloseTo(pitch, 9);
-    // Wider than a bar, so neighbours never touch, and clear of both wall edges.
-    expect(pitch).toBeGreaterThan(0.28);
-    expect(barX(0) - 0.28 / 2).toBeGreaterThan(-WALL_W / 2);
-    expect(barX(VOCAB.length - 1) + 0.28 / 2).toBeLessThan(WALL_W / 2);
+  it("spaces the eight bars 0.7 apart, so the row spans the wall it crowns", () => {
+    // Pinned, not merely "wide enough for a bar": at a 0.5 pitch the eight bars would still fit
+    // inside the wall and still clear each other, but the row would huddle in the middle
+    // instead of crowning the logits band across the wall's width.
+    expect(barX(1) - barX(0)).toBeCloseTo(0.7, 9);
+    for (let v = 1; v < VOCAB.length; v++) expect(barX(v) - barX(v - 1)).toBeCloseTo(0.7, 9);
     // Centred on the wall: the row reads as one block rather than drifting to a side.
     expect(barX(0) + barX(VOCAB.length - 1)).toBeCloseTo(0, 9);
+
+    // The outer edges reach ±2.59: wider than the token columns the row crowns, which end at
+    // ±2.4, and inside the wall's ±3 with a margin so no bar bleeds off it. At a 0.5 pitch the
+    // row would end at 1.89 — inside the wall, but narrower than the columns under it.
+    const outer = barX(VOCAB.length - 1) + 0.28 / 2;
+    expect(outer).toBeCloseTo(2.59, 9);
+    expect(barX(0) - 0.28 / 2).toBeCloseTo(-2.59, 9);
+    expect(outer).toBeGreaterThan(COLUMN_X[4]);
+    const margin = WALL_W / 2 - outer;
+    expect(margin).toBeGreaterThan(0.2);
+    expect(margin).toBeLessThan(0.6);
+    // Wider than a bar, so neighbours never touch.
+    expect(barX(1) - barX(0)).toBeGreaterThan(0.28);
   });
 
   it("throws rather than defaulting outside the vocabulary", () => {
@@ -71,6 +84,8 @@ describe("peak", () => {
 
 describe("barHeight", () => {
   it("is 0.55 * p / max(p), so the tallest bar always fills the band", () => {
+    // 0.55 is the bars' own ceiling, set by the wall's height, not the columns' glyph limit.
+    expect(BAR_MAX).toBe(0.55);
     const max = Math.max(...PROBS);
     expect(barHeight(max, max)).toBeCloseTo(0.55, 9);
     // On `cat-sat` at the tuned preset "the" wins at p = 0.789 and "cat" trails at 0.041.

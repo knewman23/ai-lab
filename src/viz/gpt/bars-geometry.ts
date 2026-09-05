@@ -6,11 +6,20 @@
 
 import { VOCAB } from "../../core/math/transformer";
 import type { Segment, Vec3 } from "../shared/layer";
-import { BAND_Z, columnX, COLUMN_X, GLYPH_MAX } from "./layout";
+import { BAND_Z, columnX, COLUMN_X } from "./layout";
 
 /** How wide each bar is, and how far apart their centres sit. */
 export const BAR_WIDTH = 0.28;
 export const BAR_PITCH = 0.7;
+
+/**
+ * How far the tallest bar rises above the logits band. Its constraint is the wall's height, not
+ * the columns': 4.2 + 0.55 = 4.75 must leave room for the label pill under `WALL_H` = 5.2, which
+ * is why §4 sets `WALL_H` to 5.2 rather than 4.6. Numerically equal to `GLYPH_MAX` today, but
+ * that constant answers a different question — how long an arrow may grow before it reaches the
+ * neighbouring column — so narrowing the column pitch must not silently shorten the bars.
+ */
+export const BAR_MAX = 0.55;
 
 /**
  * How far in front of the wall the bars float: past the band lines' 0.01 and the columns' 0.02,
@@ -56,12 +65,10 @@ export function peak(probabilities: Float64Array): number {
 
 /**
  * How tall the bar for probability `p` stands: relative to the row's own peak, so the tallest
- * always fills the band whatever the temperature has done to the distribution. The ceiling is
- * the glyphs' — the top of the tallest bar is 4.75, inside the wall's 5.2 with room for the
- * label pill above it.
+ * always fills the band whatever the temperature has done to the distribution.
  */
 export function barHeight(p: number, max: number): number {
-  return (GLYPH_MAX * p) / max;
+  return (BAR_MAX * p) / max;
 }
 
 /**
