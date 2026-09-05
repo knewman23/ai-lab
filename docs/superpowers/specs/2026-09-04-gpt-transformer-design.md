@@ -485,21 +485,28 @@ New:
 ```
 src/core/math/transformer.ts        vocab, presets, sequences, constants, forward, probabilities
 src/viz/gpt/index.ts                assembly, drag, click-to-select, update/resize/dispose
-src/viz/gpt/state.ts                GptState, derived, setters
-src/viz/gpt/layout.ts               constants, floorFromEmbed / embedFromFloor, glyph math
-src/viz/gpt/wall-bands.ts           band lines + focus dimming
-src/viz/gpt/columns.ts              columns, vector glyphs, selection
-src/viz/gpt/column-pick.ts          five column pick targets + click discrimination
-src/viz/gpt/arcs.ts                 ribbon meshes
-src/viz/gpt/arcs-geometry.ts        pure Bézier + triangle-strip math
-src/viz/gpt/bars.ts                 probability bars
-src/viz/gpt/floor-embed.ts          floor, vocab spheres, unembedding rays
-src/viz/gpt/residual-path.ts        the selected token's arrow chain on the floor
-src/viz/gpt/panel.ts                controls
-src/viz/gpt/panel-readouts.ts       the §7 table
-src/viz/gpt/labels-sync.ts          label overlay sync
-src/viz/gpt/explanation.ts          prose
+src/viz/gpt/scene-build.ts          builds the drawn units and unwinds on a partial failure
+src/viz/gpt/state.ts                GptState, setters, pass(s) and derived(s)
+src/viz/gpt/layout.ts               constants, floorFromEmbed / embedFromFloor, glyph math, bandForStage
 src/viz/gpt/frame-gpt.ts            camera framing
+src/viz/gpt/arrow-head.ts           arrowhead trig, shared by the columns and the residual path
+src/viz/gpt/pass-read.ts            the throwing 2-vector read out of a Forward
+src/viz/gpt/wall-bands.ts           band lines + focus dimming
+src/viz/gpt/columns{,-geometry}.ts  columns, vector glyphs, selection
+src/viz/gpt/column-pick.ts          five column pick targets + click discrimination
+src/viz/gpt/arcs{,-geometry}.ts     ribbons; the geometry module also owns the row arithmetic
+src/viz/gpt/bars{,-geometry}.ts     probability bars
+src/viz/gpt/floor-embed{,-geometry}.ts   floor, vocab spheres and their pick volumes, unembedding rays
+src/viz/gpt/residual-path{,-geometry}.ts the selected token's arrow chain on the floor
+src/viz/gpt/panel.ts                controls
+src/viz/gpt/panel-controls.ts       the §6 option tables and typed widget wrappers
+src/viz/gpt/panel-readouts.ts       the §7 table
+src/viz/gpt/explanation.ts          all user-facing copy
+src/viz/gpt/labels-sync.ts          label overlay sync
+
+Every drawn unit is a pure `*-geometry.ts` owning the spec-bearing arithmetic (it may import
+`Forward` and other types) plus a Three.js wrapper that is wiring only. That convention was
+settled during the build, after this list was first written.
 ```
 
 Changed:
