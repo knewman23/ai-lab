@@ -15,7 +15,9 @@ import { frameWall } from "./frame-wall";
 import { syncLabels } from "./labels-sync";
 import { layoutGraph, type Positions, WALL_H, WALL_OPACITY, WALL_W, wallPoint } from "./layout";
 import { createNodes } from "./nodes";
-import { createBpPanel, type BpPanel } from "./panel";
+import { createBpPanel, type BpControlId, type BpPanel } from "./panel";
+import { createWalkthrough } from "../shared/walkthrough";
+import { BP_STEPS, BP_WALKTHROUGH_TITLE } from "./walkthrough";
 import {
   type BpState,
   derived,
@@ -225,7 +227,24 @@ function mount(host: VizHost): VizInstance {
   // is complete and the loop can idle until the visitor acts.
   apply(state, "edit");
 
+  const walkthrough = createWalkthrough<BpState, BpControlId>({
+    title: BP_WALKTHROUGH_TITLE,
+    steps: BP_STEPS,
+    initial: initialState,
+    // "edit" rather than "step": a step lands a whole configuration at once, so the
+    // reveal animation for a single pass step would be the wrong reading of it.
+    apply: (next) => {
+      apply(next, "edit");
+    },
+    focus: (id) => panel?.focus(id),
+    frame: () => {
+      goHome();
+    },
+  });
+
   return {
+    walkthrough,
+
     update(dt: number): boolean {
       // Damping keeps the camera moving for a moment after the pointer stops.
       const moved = kit.controls.update(dt);

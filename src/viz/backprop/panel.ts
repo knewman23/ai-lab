@@ -3,6 +3,7 @@ import { createButton } from "../../ui/button";
 import { createPanel } from "../../ui/panel";
 import { createSelect } from "../../ui/select";
 import { createToggle, type Toggle } from "../../ui/toggle";
+import { createControlFocus } from "../shared/control-focus";
 import { createExplanation, passLine } from "./explanation";
 import { createLeafSliders, type LeafSliders } from "./panel-leaves";
 import { createBpReadouts, type BpReadouts } from "./panel-readouts";
@@ -25,9 +26,30 @@ const SHOW_KEYS: readonly { key: ShowKey; label: string }[] = [
   { key: "edgeDerivs", label: "Edge derivatives" },
 ];
 
+/**
+ * The scene's own name for each control a walkthrough step may point at. A union rather than an
+ * open string, so a step naming a control this panel does not register is a compile error.
+ * `leaves` is the whole section: its sliders are rebuilt whenever the graph changes.
+ */
+export type BpControlId =
+  | "graph"
+  | "leaves"
+  | "step"
+  | "play"
+  | "resetPass"
+  | "reset"
+  | "resetView"
+  | "showValues"
+  | "showGrads"
+  | "showEdgeDerivs";
+
 export interface BpPanel {
   el: HTMLElement;
+  /** Exhaustive by construction: a union member with no element fails to compile. */
+  readonly controls: Readonly<Record<BpControlId, HTMLElement>>;
   render(state: BpState, d: Derived): void;
+  /** Outlines one control, or clears the outline. */
+  focus(id: BpControlId | undefined): void;
   dispose(): void;
 }
 
@@ -85,6 +107,29 @@ export function createBpPanel(host: HTMLElement, handlers: BpPanelHandlers): BpP
 
   const readoutSection = panel.section("Readouts");
   const explanation = createExplanation(panel.el);
+  // Marked so the shell can collapse it while a walkthrough's step card, which occupies the
+  // same place in the panel, is showing.
+  explanation.el.dataset.role = "explanation";
+
+  const toggleFor = (key: ShowKey): HTMLElement => {
+    const toggle = toggles.get(key);
+    if (!toggle) throw new Error(`backprop panel: the "${key}" toggle was never built`);
+    return toggle.el;
+  };
+
+  const controls: Readonly<Record<BpControlId, HTMLElement>> = {
+    graph: graphSelect.el,
+    leaves: leavesSection,
+    step: stepBtn.el,
+    play: playBtn.el,
+    resetPass: resetPassBtn.el,
+    reset: resetBtn.el,
+    resetView: resetViewBtn.el,
+    showValues: toggleFor("values"),
+    showGrads: toggleFor("grads"),
+    showEdgeDerivs: toggleFor("edgeDerivs"),
+  };
+  const focus = createControlFocus(controls);
 
   // The leaf sliders and readout rows depend on the graph, so both are rebuilt when it changes.
   let graphKey: GraphKey | null = null;
@@ -122,6 +167,8 @@ export function createBpPanel(host: HTMLElement, handlers: BpPanelHandlers): BpP
 
   return {
     el: panel.el,
+    controls,
+    focus,
     render,
     dispose(): void {
       host.replaceChildren();
