@@ -361,19 +361,32 @@ input[type="range"]::-moz-range-track {
 
 /* ---------- walkthrough mode ---------- */
 
-/* The step card takes the explanation's place rather than sitting beside it. */
-.wt-active .panel-section[data-role="explanation"] {
+/* The step card takes the explanation's place rather than sitting beside it. The marker is on
+   whatever element the panel registered — a section, or the `.explain` block every scene builds
+   its prose into — so the rule matches the attribute rather than either element's class. */
+.wt-active [data-role="explanation"] {
   display: none;
 }
 
+/*
+ * Sticky, so Exit stays reachable once the step card has been scrolled into view. The panel is
+ * the scroll container and carries its own 20px padding, so the strip has to bleed out into that
+ * padding — otherwise the controls scroll visibly through the gap above the banner.
+ */
 .wt-banner:not(:empty) {
+  position: sticky;
+  /* Offsets the negative margin below: sticky pins the margin box, so -20px puts the
+     banner's own edge flush with the top of the panel's scrollport rather than 20px into it. */
+  top: -20px;
+  z-index: 2;
+  margin: -20px -20px 20px;
+  padding: 20px 20px 14px;
+  background: var(--card);
+  border-bottom: 1px solid var(--line);
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 20px;
-  padding-bottom: 14px;
-  border-bottom: 1px solid var(--line);
 }
 
 .wt-progress {

@@ -5,6 +5,7 @@ import { GD_STEPS, GD_WALKTHROUGH_TITLE } from "../../../src/viz/gradient-descen
 import { createWalkthrough } from "../../../src/viz/shared/walkthrough";
 import {
   initialState,
+  setLr,
   setOptimizer,
   setSurface,
   step,
@@ -162,16 +163,43 @@ describe("the gradient descent walkthrough", () => {
     expect(signs.slice(1).every((sign, i) => sign === -signs[i]!)).toBe(true);
   });
 
-  it("pins the state at the Rosenbrock step, still inside the valley", () => {
+  it("pins the state at the Rosenbrock step, dropped into the valley and crawling", () => {
     const state = stepAt(5).enter(stateBefore(5));
 
     expect(state.surface).toBe("rosenbrock");
-    expect(state.optimizer).toBe("adam");
+    expect(state.optimizer).toBe("sgd");
     expect(state.lr).toBe(0.001);
-    expect(state.steps).toBe(40);
+    expect(state.steps).toBe(80);
     expect(state.status).toBe("ok");
-    // Adam on this surface runs along the valley floor rather than leaving the domain.
-    expect(state.path.size).toBe(41);
+    expect(state.path.size).toBe(81);
+
+    // What the prose claims: the run drops towards the valley floor y = x² within a few steps,
+    // and then moves far less per step than it did on the way in.
+    const trail = state.path.toArray();
+    const gapAt = (i: number): number => {
+      const point = trail[i];
+      if (point === undefined) throw new Error(`the trail has no point ${i}`);
+      const [x, y] = point;
+      return Math.abs(y - x * x);
+    };
+    expect(gapAt(0)).toBeGreaterThan(0.2);
+    expect(gapAt(trail.length - 1)).toBeLessThan(gapAt(0) / 4);
+
+    const travelled = (from: number, to: number): number => {
+      const a = trail[from];
+      const b = trail[to];
+      if (a === undefined || b === undefined) throw new Error("the trail is shorter than expected");
+      return Math.hypot(b[0] - a[0], b[1] - a[1]);
+    };
+    expect(travelled(0, 10)).toBeGreaterThan(travelled(trail.length - 11, trail.length - 1));
+  });
+
+  it("leaves the domain at the raised rate the Rosenbrock step names", () => {
+    const state = stepAt(5).enter(stateBefore(5));
+    let raised = setLr(state, 0.005);
+    for (let i = 0; i < 10; i += 1) raised = step(raised);
+
+    expect(raised.status).toBe("left-domain");
   });
 
   it("switching to adam from the ravine step keeps the ball where SGD left it", () => {

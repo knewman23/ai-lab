@@ -307,6 +307,11 @@ function walkingViz(prose: readonly string[]): {
     const panel = createPanel();
     panel.section("Setup");
     panel.section("What you are seeing", { role: "explanation" });
+    // The shape every real scene has: prose in a plain `.explain` block, marked in place.
+    const explain = document.createElement("div");
+    explain.className = "explain";
+    explain.dataset.role = "explanation";
+    panel.el.append(explain);
     vizHost.panel.append(panel.el);
     return {
       ...fakeInstance(),
@@ -361,8 +366,9 @@ describe("createVizPage and walkthrough mode", () => {
     await page.enter(scene.entry, 1);
 
     const wrapper = main.querySelector(".panel-host");
-    const explanation = main.querySelector('[data-role="explanation"]');
-    expect(wrapper?.contains(explanation ?? null)).toBe(true);
+    const marked = [...main.querySelectorAll('[data-role="explanation"]')];
+    expect(marked).toHaveLength(2);
+    expect(marked.every((el) => wrapper?.contains(el) === true)).toBe(true);
     expect(wrapper?.classList.contains("wt-active")).toBe(false);
 
     stepButton(main, "Walk me through it").click();

@@ -19,7 +19,7 @@ export const GD_WALKTHROUGH_TITLE = "Walk me through it";
 /** Presses of Step each stepping step performs. */
 const BOWL_STEPS = 6;
 const RAVINE_STEPS = 12;
-const VALLEY_STEPS = 40;
+const VALLEY_STEPS = 80;
 
 /** Where step 2 places the ball: off-centre in the bowl, so the gradient is large and readable. */
 const BOWL_START: readonly [number, number] = [-2.2, 1.4];
@@ -70,19 +70,21 @@ export const GD_STEPS: readonly Step<GdState, GdControlId>[] = [
   {
     prose:
       "The elongated bowl is the same idea with one axis ten times steeper. At its default rate " +
-      "SGD's narrow axis flips sign on every step, so the trail crosses the valley instead of " +
-      "running down it, while the wide axis crawls. Switch the Optimizer to adam and press Step " +
-      "again from the same point: per-parameter scaling shrinks the flip and lengthens the crawl.",
+      "SGD's narrow axis flips sign on every step — the trail crosses the valley rather than " +
+      "running down it — while the wide axis shrinks by a fifth each time. Switch the Optimizer " +
+      "to adam and press Step again from the same point: it scales each parameter by its own " +
+      "recent gradient size, so both axes move at about the same rate and the crossing stops.",
     enter: (s) => advance(setOptimizer(setSurface(s, "elongated"), "sgd"), RAVINE_STEPS),
     focus: "optimizer",
   },
   {
     prose:
-      "Rosenbrock's valley is curved, so no single direction stays right for long, and its " +
-      "default learning rate is a hundred times smaller than the bowl's for that reason. Adam " +
-      "runs the floor of the valley here. Raise the learning rate a little and watch how few " +
-      "steps it takes to leave the valley altogether.",
-    enter: (s) => advance(setOptimizer(setSurface(s, "rosenbrock"), "adam"), VALLEY_STEPS),
+      "Rosenbrock's gradients run two orders of magnitude larger than the bowl's, which is why " +
+      "this surface starts a hundred times slower. From here the run drops into the narrow " +
+      "valley within a few steps and then crawls along its curved floor, which is the whole " +
+      "difficulty of the shape. Nudge the learning rate up towards 0.005 and the next few steps " +
+      "leave the domain instead.",
+    enter: (s) => advance(setOptimizer(setSurface(s, "rosenbrock"), "sgd"), VALLEY_STEPS),
     focus: "lr",
   },
 ];
