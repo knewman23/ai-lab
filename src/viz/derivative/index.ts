@@ -11,7 +11,9 @@ import { createAxes } from "./axes";
 import { createCurves } from "./curves";
 import { frameVertical } from "./frame-vertical";
 import { createTangentSecant } from "./lines";
-import { createDxPanel, type DxPanel } from "./panel";
+import { createDxPanel, type DxControlId, type DxPanel } from "./panel";
+import { createWalkthrough } from "../shared/walkthrough";
+import { DX_STEPS, DX_WALKTHROUGH_TITLE } from "./walkthrough";
 import { createPoints } from "./points";
 import {
   derived,
@@ -215,7 +217,20 @@ function mount(host: VizHost): VizInstance {
 
   apply(state);
 
+  const walkthrough = createWalkthrough<DxState, DxControlId>({
+    title: DX_WALKTHROUGH_TITLE,
+    steps: DX_STEPS,
+    initial: initialState,
+    apply,
+    focus: (id) => panel?.focus(id),
+    frame: () => {
+      goHome();
+    },
+  });
+
   return {
+    walkthrough,
+
     update(dt: number): boolean {
       // Damping keeps the camera moving for a moment after the pointer stops.
       const moved = kit.controls.update(dt);

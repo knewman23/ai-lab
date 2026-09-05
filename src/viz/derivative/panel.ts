@@ -5,6 +5,7 @@ import { createReadout, fmt } from "../../ui/readout";
 import { createSelect } from "../../ui/select";
 import { createLogSlider } from "../../ui/slider";
 import { createToggle } from "../../ui/toggle";
+import { createControlFocus } from "../shared/control-focus";
 import { createExplanation, derivativeText } from "./explanation";
 import { H_RANGE, MAX_ZOOM, type DxState, type ShowKey, type derived } from "./state";
 
@@ -24,9 +25,28 @@ const SHOW_KEYS: readonly { key: ShowKey; label: string }[] = [
   { key: "derivative", label: "Derivative curve" },
 ];
 
+/**
+ * The scene's own name for each control a walkthrough step may point at. A union rather than an
+ * open string, so a step naming a control this panel does not register is a compile error.
+ */
+export type DxControlId =
+  | "fn"
+  | "h"
+  | "zoomIn"
+  | "resetZoom"
+  | "reset"
+  | "resetView"
+  | "showTangent"
+  | "showSecant"
+  | "showDerivative";
+
 export interface DxPanel {
   el: HTMLElement;
+  /** Exhaustive by construction: a union member with no element fails to compile. */
+  readonly controls: Readonly<Record<DxControlId, HTMLElement>>;
   render(state: DxState, d: ReturnType<typeof derived>): void;
+  /** Outlines one control, or clears the outline. */
+  focus(id: DxControlId | undefined): void;
   dispose(): void;
 }
 
@@ -102,7 +122,29 @@ export function createDxPanel(host: HTMLElement, handlers: DxPanelHandlers): DxP
   panel.el.append(windowNote, zoomNote);
 
   const explanation = createExplanation();
+  // Marked so the shell can collapse it while a walkthrough's step card, which occupies the
+  // same place in the panel, is showing.
+  explanation.el.dataset.role = "explanation";
   panel.el.append(explanation.el);
+
+  const toggleFor = (key: ShowKey): HTMLElement => {
+    const toggle = toggles.get(key);
+    if (!toggle) throw new Error(`derivative panel: the "${key}" toggle was never built`);
+    return toggle.el;
+  };
+
+  const controls: Readonly<Record<DxControlId, HTMLElement>> = {
+    fn: fnSelect.el,
+    h: hSlider.el,
+    zoomIn: zoomInBtn.el,
+    resetZoom: resetZoomBtn.el,
+    reset: resetBtn.el,
+    resetView: resetViewBtn.el,
+    showTangent: toggleFor("tangent"),
+    showSecant: toggleFor("secant"),
+    showDerivative: toggleFor("derivative"),
+  };
+  const focus = createControlFocus(controls);
 
   function render(state: DxState, d: ReturnType<typeof derived>): void {
     if (fnSelect.value !== state.fn) fnSelect.value = state.fn;
@@ -142,6 +184,8 @@ export function createDxPanel(host: HTMLElement, handlers: DxPanelHandlers): DxP
 
   return {
     el: panel.el,
+    controls,
+    focus,
     render,
     dispose(): void {
       host.replaceChildren();
