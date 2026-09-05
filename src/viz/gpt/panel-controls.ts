@@ -6,7 +6,7 @@
 
 import { SEQUENCES, VOCAB } from "../../core/math/transformer";
 import { createSelect, type Select, type SelectOption } from "../../ui/select";
-import { createToggle, type Toggle } from "../../ui/toggle";
+import { initialState } from "./state";
 import type { HeadKey, PresetKey, SentenceKey, StageKey } from "./state";
 
 /** An option list whose values are one of a scene key union, so the panel needs no cast. */
@@ -38,10 +38,14 @@ export const PRESET_OPTIONS: Options<PresetKey> = PRESET_KEYS.map((value) => ({
   title: value,
 }));
 
-export const QUERY_OPTIONS: Options<string> = queryTitles("cat-sat").map((title, i) => ({
-  value: String(i),
-  title,
-}));
+/**
+ * The query positions at the opening sentence. `render` retitles them when the sentence changes,
+ * and `retitle` throws unless the new sentence has as many positions — which holds because every
+ * entry in `SEQUENCES` is five tokens, and is the same five `COLUMN_X` draws.
+ */
+export const QUERY_OPTIONS: Options<string> = queryTitles(initialState().sentence).map(
+  (title, i) => ({ value: String(i), title }),
+);
 
 export const HEAD_OPTIONS: Options<HeadKey> = [
   { value: "head1", title: "head 1" },
@@ -69,12 +73,6 @@ export function keyedSelect<K extends string>(
 ): Select {
   return createSelect({ label, options, value, onChange: (v) => fire(v as K) });
 }
-
-export const labelledToggle = (
-  label: string,
-  checked: boolean,
-  fire: (on: boolean) => void,
-): Toggle => createToggle({ label, checked, onChange: fire });
 
 /** Rewrites a select's option titles in place: the query labels change with the sentence. */
 export function retitle(select: Select, titles: readonly string[]): void {

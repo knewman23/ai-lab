@@ -9,12 +9,11 @@ import { createEquation } from "../../ui/equation";
 import { createPanel } from "../../ui/panel";
 import { createReadout, proseNum, type Readout } from "../../ui/readout";
 import { createLogSlider } from "../../ui/slider";
-import type { Toggle } from "../../ui/toggle";
+import { createToggle, type Toggle } from "../../ui/toggle";
 import { createGptExplanation, PRESET_HINTS } from "./explanation";
 import {
   HEAD_OPTIONS,
   keyedSelect,
-  labelledToggle,
   PRESET_OPTIONS,
   QUERY_OPTIONS,
   queryTitles,
@@ -113,13 +112,21 @@ export function createGptPanel(host: HTMLElement, handlers: GptPanelHandlers): G
   });
   panel.section("Stage").append(stage.el, temperature.el);
 
-  const positional = labelledToggle("Positional encoding", init.positional, (on) =>
-    handlers.onPositional(on),
-  );
-  const causal = labelledToggle("Causal mask", init.causal, (on) => handlers.onCausal(on));
-  const residual = labelledToggle("Residual path", init.residualPath, (on) =>
-    handlers.onResidualPath(on),
-  );
+  const positional = createToggle({
+    label: "Positional encoding",
+    checked: init.positional,
+    onChange: (on) => handlers.onPositional(on),
+  });
+  const causal = createToggle({
+    label: "Causal mask",
+    checked: init.causal,
+    onChange: (on) => handlers.onCausal(on),
+  });
+  const residual = createToggle({
+    label: "Residual path",
+    checked: init.residualPath,
+    onChange: (on) => handlers.onResidualPath(on),
+  });
   panel.section("Show").append(positional.el, causal.el, residual.el);
 
   const resetView = createButton({ label: "Reset view", onClick: () => handlers.onResetView() });

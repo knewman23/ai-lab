@@ -1,9 +1,19 @@
 /**
- * The prose under the GPT panel. Three things this scene shows are true, visible and misleading
- * if left unsaid — head 1 is not the previous-token head its rotation suggests (§3.4), the block
- * predicts the token it just read (§3.7), and a tied unembedding rewards distance as well as
- * direction (§10) — so the copy is written with the same care as the math, and the five topics
- * §7 lists appear in the order it lists them.
+ * All of the scene's user-facing copy, and the renderer for the panel's share of it: the five §7
+ * topics and the block's three rules, the per-preset hints under the embeddings select, and the
+ * caveats `panel-readouts.ts` prints under the numbers. Written down together because they make
+ * one argument and have to agree — the `tuned` hint once blamed head 2 for a row head 1 computes
+ * alone, while the paragraph below it had the mechanism right.
+ *
+ * Copy only. Nothing here computes anything the scene draws; it quotes `BLEND`, which
+ * `arcs-geometry.ts` derives and sizes the ribbons from, so the prose cannot name a coefficient
+ * the model no longer has.
+ *
+ * Three things this scene shows are true, visible and misleading if left unsaid — head 1 is not
+ * the previous-token head its rotation suggests (§3.4), the block predicts the token it just read
+ * (§3.7), and a tied unembedding rewards distance in one direction and punishes it in the other
+ * (§10) — so the copy is written with the same care as the math, and the five topics §7 lists
+ * appear in the order it lists them.
  */
 
 import { W_O, W_V } from "../../core/math/transformer";

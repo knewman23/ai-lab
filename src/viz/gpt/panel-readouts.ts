@@ -144,7 +144,11 @@ const ROWS: Readonly<Record<StageKey, (s: GptState, d: Derived) => ReadoutRow[]>
     ]),
 };
 
-/** The blend caveat when both heads are shown, plus the single-key one at query 0. */
+/**
+ * The blend caveat when both heads are shown, plus the single-key one at query 0. Head 1's row
+ * answers for whichever head is on display: both heads run over the same positions under the same
+ * mask, so `forward` gives every head's row `query + 1` entries, or all of them when uncausal.
+ */
 function note(s: GptState, d: Derived, blended: string): string {
   const single = weightRow(pick(d.pass.heads, 0, "head"), s).length === 1;
   return [s.head === "both" ? blended : "", single ? SINGLE_KEY : ""]
