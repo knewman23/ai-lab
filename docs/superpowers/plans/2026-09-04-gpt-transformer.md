@@ -175,6 +175,8 @@ git show --stat HEAD
 
 - [ ] **Step 3: Run the full suite.** Run: `rtk proxy pnpm vitest run`. Expected: PASS, no `it.each([])` error.
 
+- [ ] **Step 3a: Look at the `collapsed` preset specifically.** Its eight words sit on a floor circle of radius 0.14, about 0.107 apart — so the visible 0.09 spheres already overlap there, and Task 7's 0.19 pick volumes overlap more. Picking stays deterministic (the raycaster returns nearest-first), so this is a legibility question, not a correctness one. If it reads badly, widen that preset's radius; do **not** shrink the pick volumes, which exist because a 0.09 target is too small to grab.
+
 - [ ] **Step 3b: Settle the off-floor `xFinal` (open layout decision, found in Task 5).** The residual path is drawn in embedding coordinates on the floor, but `xFinal` is not bounded by the embedding domain — it is `x + attnOut + mlpOut`, and magnitudes reach 5.63. On `cat-sat` at `tuned` it maps to y = **+0.69**: past the floor's near edge (y ∈ [−6, 0]) and *behind the wall plane at y = 0*, so the hollow ring marking the vector that produces every logit would be occluded. Task 5 drew it at its true position per §5.7 rather than bending the module, which was right.
 
   Decide this **from the render, not from arithmetic** — look at it first, then pick:
