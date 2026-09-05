@@ -333,6 +333,19 @@ describe("gptTransformer.mount", () => {
     viz.dispose();
   });
 
+  it("renders the panel once during mount, before anything has been touched", () => {
+    const { host: h } = host();
+    const viz = gptTransformer.mount(h);
+
+    // The panel seeds its widgets from `initialState()` rather than from the state it is
+    // handed, so a mount that never rendered would show correct controls only by coincidence
+    // and stale ones the moment anything restores a state. The readout is the tell: it has no
+    // seeded content at all, so text in it means `render` ran.
+    expect(readout(h.panel).trim()).not.toBe("");
+
+    viz.dispose();
+  });
+
   it("focuses the same stage on every unit that dims", () => {
     const { host: h } = host();
     const viz = gptTransformer.mount(h);
