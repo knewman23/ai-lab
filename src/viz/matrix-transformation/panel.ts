@@ -5,6 +5,7 @@ import { createReadout, fmt } from "../../ui/readout";
 import { createSelect } from "../../ui/select";
 import { createSlider } from "../../ui/slider";
 import { createToggle } from "../../ui/toggle";
+import { createControlFocus } from "../shared/control-focus";
 import { createExplanation } from "./explanation";
 import { createMatrixInput } from "./matrix-input";
 import { PRESETS, PRESET_KEYS, type PresetKey } from "./presets";
@@ -25,9 +26,20 @@ const SHOW_KEYS: readonly { key: ShowKey; label: string }[] = [
   { key: "ghost", label: "Ghost square" },
 ];
 
+/**
+ * The scene's own name for each control a walkthrough step may point at. A union rather than an
+ * open string, so a step naming a control this panel does not register is a compile error.
+ */
+export type MtControlId =
+  "preset" | "matrix" | "animate" | "reset" | "resetView" | "showGrid" | "showEigen" | "showGhost";
+
 export interface MtPanel {
   el: HTMLElement;
+  /** Exhaustive by construction: a union member with no element fails to compile. */
+  readonly controls: Readonly<Record<MtControlId, HTMLElement>>;
   render(state: MtState, d: ReturnType<typeof derived>): void;
+  /** Outlines one control, or clears the outline. */
+  focus(id: MtControlId | undefined): void;
   dispose(): void;
 }
 
@@ -110,7 +122,28 @@ export function createMtPanel(host: HTMLElement, handlers: MtPanelHandlers): MtP
   panel.el.append(note);
 
   const explanation = createExplanation();
+  // Marked so the shell can collapse it while a walkthrough's step card, which occupies the
+  // same place in the panel, is showing.
+  explanation.el.dataset.role = "explanation";
   panel.el.append(explanation.el);
+
+  const toggleFor = (key: ShowKey): HTMLElement => {
+    const toggle = toggles.get(key);
+    if (!toggle) throw new Error(`matrix panel: the "${key}" toggle was never built`);
+    return toggle.el;
+  };
+
+  const controls: Readonly<Record<MtControlId, HTMLElement>> = {
+    preset: preset.el,
+    matrix: matrixInput.el,
+    animate: animate.el,
+    reset: resetBtn.el,
+    resetView: resetViewBtn.el,
+    showGrid: toggleFor("grid"),
+    showEigen: toggleFor("eigen"),
+    showGhost: toggleFor("ghost"),
+  };
+  const focus = createControlFocus(controls);
 
   function render(state: MtState, d: ReturnType<typeof derived>): void {
     if (preset.value !== state.preset) preset.value = state.preset;
@@ -140,6 +173,8 @@ export function createMtPanel(host: HTMLElement, handlers: MtPanelHandlers): MtP
 
   return {
     el: panel.el,
+    controls,
+    focus,
     render,
     dispose(): void {
       host.replaceChildren();
