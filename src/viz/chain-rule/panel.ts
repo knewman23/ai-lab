@@ -7,7 +7,8 @@ import { createSelect } from "../../ui/select";
 import { createLogSlider } from "../../ui/slider";
 import { createToggle, type Toggle } from "../../ui/toggle";
 import { createControlFocus } from "../shared/control-focus";
-import { createExplanation, OVERVIEW } from "./explanation";
+import type { ControlInfo } from "../../ui/info";
+import { CONTROL_INFO, createExplanation, OVERVIEW } from "./explanation";
 import { createChainReadouts } from "./panel-readouts";
 import { DX_DEFAULT, initialState, type ChainState, type Derived, type ShowKey } from "./state";
 
@@ -19,11 +20,11 @@ export interface ChainPanelHandlers {
   onShow(key: ShowKey, on: boolean): void;
 }
 
-const SHOW_KEYS: readonly { key: ShowKey; label: string }[] = [
-  { key: "triangles", label: "Δ triangles" },
-  { key: "secants", label: "Secants" },
-  { key: "tangents", label: "Tangents" },
-  { key: "connectors", label: "Connectors" },
+const SHOW_KEYS: readonly { key: ShowKey; label: string; info: ControlInfo }[] = [
+  { key: "triangles", label: "Δ triangles", info: CONTROL_INFO.showTriangles },
+  { key: "secants", label: "Secants", info: CONTROL_INFO.showSecants },
+  { key: "tangents", label: "Tangents", info: CONTROL_INFO.showTangents },
+  { key: "connectors", label: "Connectors", info: CONTROL_INFO.showConnectors },
 ];
 
 /**
@@ -66,6 +67,7 @@ export function createChainPanel(host: HTMLElement, handlers: ChainPanelHandlers
     options: COMP_KEYS.map((key) => ({ value: key, title: COMPOSITIONS[key].title })),
     value: COMP_KEYS[0],
     onChange: (v) => handlers.onComp(v as CompKey),
+    info: CONTROL_INFO.comp,
   });
   setup.append(compSelect.el);
 
@@ -76,6 +78,7 @@ export function createChainPanel(host: HTMLElement, handlers: ChainPanelHandlers
     value: DX_DEFAULT,
     onChange: (v) => handlers.onDx(v),
     format: (v) => `Δx = ${fmt(v)}`,
+    info: CONTROL_INFO.dx,
   });
   setup.append(dxSlider.el);
 
@@ -97,11 +100,12 @@ export function createChainPanel(host: HTMLElement, handlers: ChainPanelHandlers
   const showSection = panel.section("Show");
   const toggles = new Map<ShowKey, Toggle>();
   const init = initialState().show;
-  for (const { key, label } of SHOW_KEYS) {
+  for (const { key, label, info } of SHOW_KEYS) {
     const toggle = createToggle({
       label,
       checked: init[key],
       onChange: (on) => handlers.onShow(key, on),
+      info,
     });
     toggles.set(key, toggle);
     showSection.append(toggle.el);

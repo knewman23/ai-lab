@@ -2,6 +2,47 @@ import { createEquation } from "../../ui/equation";
 import { formatLr, fmt, proseNum } from "../../ui/readout";
 import type { Derived, NnState } from "./state";
 import type { OverviewSpec } from "../../ui/overview";
+import type { ControlInfo } from "../../ui/info";
+
+/** One entry per control, in the panel's order: what it changes, and what to watch. */
+export const CONTROL_INFO = {
+  dataset: {
+    what:
+      "Swaps the points the network is asked to separate, and restarts training from that " +
+      "dataset's own seed at epoch 0.",
+    why:
+      "None of the three can be split by a straight line, which is the reason for a hidden layer " +
+      "at all. XOR needs a cross, two moons needs a curve and circles needs a ring, and the same " +
+      "network learns all three by moving only its weights.",
+  },
+  lr: {
+    what: "How far every weight moves along its gradient on each epoch.",
+    why:
+      "The knob that decides whether training converges or thrashes. Raise it and the loss falls " +
+      "faster until it starts overshooting and the boundary flails; lower it and progress is " +
+      "steady but slow. It can be changed mid-run without restarting.",
+  },
+  showWeights: {
+    what: "Draws the network itself: a column of units per layer, linked by their weights.",
+    why:
+      "Link thickness is the size of a weight and its colour is the sign, so training is visible " +
+      "as the links reorganising. With the probe on, the columns also show that input's " +
+      "activations layer by layer, which is the chain the output at the end comes from.",
+  },
+  showData: {
+    what: "Draws the training points on the floor, coloured by their true class.",
+    why:
+      "The examples are the only thing the network is fitted to. Accuracy in the training line " +
+      "is the fraction of exactly these points that land on the correct side of the boundary.",
+  },
+  showBoundary: {
+    what: "Shades the floor by what the network predicts at every point, not just where data sits.",
+    why:
+      "This is the function that was learned. Watching it bend from an arbitrary split into the " +
+      "shape of the data is the whole of training, and the pale band running through it is where " +
+      "the network is least certain.",
+  },
+} as const satisfies Readonly<Record<string, ControlInfo>>;
 
 export const OVERVIEW: OverviewSpec = {
   summary: "Learning a boundary that no straight line could have drawn",

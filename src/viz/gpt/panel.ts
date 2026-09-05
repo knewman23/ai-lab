@@ -12,7 +12,7 @@ import { createReadout, proseNum, type Readout } from "../../ui/readout";
 import { createLogSlider } from "../../ui/slider";
 import { createToggle, type Toggle } from "../../ui/toggle";
 import { createControlFocus } from "../shared/control-focus";
-import { createGptExplanation, OVERVIEW, PRESET_HINTS } from "./explanation";
+import { CONTROL_INFO, createGptExplanation, OVERVIEW, PRESET_HINTS } from "./explanation";
 import {
   HEAD_OPTIONS,
   keyedSelect,
@@ -108,11 +108,19 @@ export function createGptPanel(host: HTMLElement, handlers: GptPanelHandlers): G
   panel.el.append(overview.el);
   const init = initialState();
 
-  const sentence = keyedSelect("Sentence", SENTENCE_OPTIONS, init.sentence, (v) =>
-    handlers.onSentence(v),
+  const sentence = keyedSelect(
+    "Sentence",
+    SENTENCE_OPTIONS,
+    init.sentence,
+    (v) => handlers.onSentence(v),
+    CONTROL_INFO.sentence,
   );
-  const preset = keyedSelect("Embeddings", PRESET_OPTIONS, init.preset, (v) =>
-    handlers.onPreset(v),
+  const preset = keyedSelect(
+    "Embeddings",
+    PRESET_OPTIONS,
+    init.preset,
+    (v) => handlers.onPreset(v),
+    CONTROL_INFO.preset,
   );
   const presetHint = document.createElement("p");
   presetHint.className = "hint";
@@ -122,13 +130,29 @@ export function createGptPanel(host: HTMLElement, handlers: GptPanelHandlers): G
   });
   panel.section("Setup").append(sentence.el, preset.el, presetHint, resetEmbeddings.el);
 
-  const query = keyedSelect("Query token", QUERY_OPTIONS, String(init.query), (v) =>
-    handlers.onQuery(Number(v)),
+  const query = keyedSelect(
+    "Query token",
+    QUERY_OPTIONS,
+    String(init.query),
+    (v) => handlers.onQuery(Number(v)),
+    CONTROL_INFO.query,
   );
-  const head = keyedSelect("Head", HEAD_OPTIONS, init.head, (v) => handlers.onHead(v));
+  const head = keyedSelect(
+    "Head",
+    HEAD_OPTIONS,
+    init.head,
+    (v) => handlers.onHead(v),
+    CONTROL_INFO.head,
+  );
   panel.section("Attention").append(query.el, head.el);
 
-  const stage = keyedSelect("Stage", STAGE_OPTIONS, init.stage, (v) => handlers.onStage(v));
+  const stage = keyedSelect(
+    "Stage",
+    STAGE_OPTIONS,
+    init.stage,
+    (v) => handlers.onStage(v),
+    CONTROL_INFO.stage,
+  );
   const temperature = createLogSlider({
     label: "Temperature",
     min: TEMPERATURE_RANGE[0],
@@ -136,6 +160,7 @@ export function createGptPanel(host: HTMLElement, handlers: GptPanelHandlers): G
     value: init.temperature,
     format: proseNum,
     onChange: (v) => handlers.onTemperature(v),
+    info: CONTROL_INFO.temperature,
   });
   panel.section("Stage").append(stage.el, temperature.el);
 
@@ -143,16 +168,19 @@ export function createGptPanel(host: HTMLElement, handlers: GptPanelHandlers): G
     label: "Positional encoding",
     checked: init.positional,
     onChange: (on) => handlers.onPositional(on),
+    info: CONTROL_INFO.positional,
   });
   const causal = createToggle({
     label: "Causal mask",
     checked: init.causal,
     onChange: (on) => handlers.onCausal(on),
+    info: CONTROL_INFO.causal,
   });
   const residual = createToggle({
     label: "Residual path",
     checked: init.residualPath,
     onChange: (on) => handlers.onResidualPath(on),
+    info: CONTROL_INFO.residualPath,
   });
   panel.section("Show").append(positional.el, causal.el, residual.el);
 

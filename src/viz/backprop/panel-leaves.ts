@@ -1,5 +1,6 @@
 import type { Graph, Values } from "../../core/math/autograd";
 import { createSlider, type Slider } from "../../ui/slider";
+import type { ControlInfo } from "../../ui/info";
 
 export interface LeafSliders {
   /** Moves each slider to `leaves` without firing `onLeaf`. */
@@ -13,6 +14,8 @@ export function createLeafSliders(
   section: HTMLElement,
   graph: Graph,
   onLeaf: (id: string, v: number) => void,
+  /** Shared by every leaf: they are all the same kind of thing, a given input. */
+  info?: ControlInfo,
 ): LeafSliders {
   const sliders = new Map<string, Slider>();
   for (const leaf of graph.leaves) {
@@ -23,6 +26,7 @@ export function createLeafSliders(
       step: 0.01,
       value: leaf.start,
       onChange: (v) => onLeaf(leaf.id, v),
+      info,
     });
     sliders.set(leaf.id, slider);
     section.append(slider.el);

@@ -7,7 +7,8 @@ import { createSelect } from "../../ui/select";
 import { createSlider } from "../../ui/slider";
 import { createToggle } from "../../ui/toggle";
 import { createControlFocus } from "../shared/control-focus";
-import { createExplanation, OVERVIEW } from "./explanation";
+import { createInfoButton, type ControlInfo } from "../../ui/info";
+import { CONTROL_INFO, createExplanation, OVERVIEW } from "./explanation";
 import { createMatrixInput } from "./matrix-input";
 import { PRESETS, PRESET_KEYS, type PresetKey } from "./presets";
 import type { MtState, ShowKey, derived } from "./state";
@@ -21,10 +22,10 @@ export interface MtPanelHandlers {
   onShow(key: ShowKey, on: boolean): void;
 }
 
-const SHOW_KEYS: readonly { key: ShowKey; label: string }[] = [
-  { key: "grid", label: "Transformed grid" },
-  { key: "eigen", label: "Eigenvectors" },
-  { key: "ghost", label: "Ghost square" },
+const SHOW_KEYS: readonly { key: ShowKey; label: string; info: ControlInfo }[] = [
+  { key: "grid", label: "Transformed grid", info: CONTROL_INFO.showGrid },
+  { key: "eigen", label: "Eigenvectors", info: CONTROL_INFO.showEigen },
+  { key: "ghost", label: "Ghost square", info: CONTROL_INFO.showGhost },
 ];
 
 /**
@@ -74,6 +75,7 @@ export function createMtPanel(host: HTMLElement, handlers: MtPanelHandlers): MtP
     ],
     value: PRESET_KEYS[0],
     onChange: (v) => handlers.onPreset(v as PresetKey),
+    info: CONTROL_INFO.preset,
   });
   setup.append(preset.el);
 
@@ -92,7 +94,11 @@ export function createMtPanel(host: HTMLElement, handlers: MtPanelHandlers): MtP
   const matrixLabel = document.createElement("span");
   matrixLabel.className = "lbl";
   matrixLabel.textContent = "Matrix";
-  matrixField.append(matrixLabel, matrixInput.el);
+  const matrixRow = document.createElement("div");
+  matrixRow.className = "lbl-row";
+  const matrixInfo = createInfoButton("Matrix", CONTROL_INFO.matrix);
+  matrixRow.append(matrixLabel, matrixInfo.button, matrixInfo.popover);
+  matrixField.append(matrixRow, matrixInput.el);
   setup.append(matrixField);
 
   const animate = createSlider({
@@ -103,6 +109,7 @@ export function createMtPanel(host: HTMLElement, handlers: MtPanelHandlers): MtP
     value: 1,
     onChange: (v) => handlers.onT(v),
     format: (v) => `t = ${v.toFixed(2)}`,
+    info: CONTROL_INFO.animate,
   });
   setup.append(animate.el);
 
@@ -118,11 +125,12 @@ export function createMtPanel(host: HTMLElement, handlers: MtPanelHandlers): MtP
 
   const showSection = panel.section("Show");
   const toggles = new Map<ShowKey, ReturnType<typeof createToggle>>();
-  for (const { key, label } of SHOW_KEYS) {
+  for (const { key, label, info } of SHOW_KEYS) {
     const toggle = createToggle({
       label,
       checked: true,
       onChange: (on) => handlers.onShow(key, on),
+      info,
     });
     toggles.set(key, toggle);
     showSection.append(toggle.el);

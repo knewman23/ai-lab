@@ -7,7 +7,8 @@ import { createSelect } from "../../ui/select";
 import { createLogSlider } from "../../ui/slider";
 import { createToggle } from "../../ui/toggle";
 import { createControlFocus } from "../shared/control-focus";
-import { createExplanation, derivativeText, OVERVIEW } from "./explanation";
+import type { ControlInfo } from "../../ui/info";
+import { CONTROL_INFO, createExplanation, derivativeText, OVERVIEW } from "./explanation";
 import { H_RANGE, MAX_ZOOM, type DxState, type ShowKey, type derived } from "./state";
 
 export interface DxPanelHandlers {
@@ -20,10 +21,10 @@ export interface DxPanelHandlers {
   onShow(key: ShowKey, on: boolean): void;
 }
 
-const SHOW_KEYS: readonly { key: ShowKey; label: string }[] = [
-  { key: "tangent", label: "Tangent" },
-  { key: "secant", label: "Secant" },
-  { key: "derivative", label: "Derivative curve" },
+const SHOW_KEYS: readonly { key: ShowKey; label: string; info: ControlInfo }[] = [
+  { key: "tangent", label: "Tangent", info: CONTROL_INFO.showTangent },
+  { key: "secant", label: "Secant", info: CONTROL_INFO.showSecant },
+  { key: "derivative", label: "Derivative curve", info: CONTROL_INFO.showDerivative },
 ];
 
 /**
@@ -68,6 +69,7 @@ export function createDxPanel(host: HTMLElement, handlers: DxPanelHandlers): DxP
     options: FN_KEYS.map((key) => ({ value: key, title: FNS[key].title })),
     value: FN_KEYS[0],
     onChange: (v) => handlers.onFn(v as FnKey),
+    info: CONTROL_INFO.fn,
   });
   setup.append(fnSelect.el);
 
@@ -78,6 +80,7 @@ export function createDxPanel(host: HTMLElement, handlers: DxPanelHandlers): DxP
     value: 1,
     onChange: (v) => handlers.onH(v),
     format: (v) => fmt(v),
+    info: CONTROL_INFO.h,
   });
   setup.append(hSlider.el);
 
@@ -101,11 +104,12 @@ export function createDxPanel(host: HTMLElement, handlers: DxPanelHandlers): DxP
 
   const showSection = panel.section("Show");
   const toggles = new Map<ShowKey, ReturnType<typeof createToggle>>();
-  for (const { key, label } of SHOW_KEYS) {
+  for (const { key, label, info } of SHOW_KEYS) {
     const toggle = createToggle({
       label,
       checked: true,
       onChange: (on) => handlers.onShow(key, on),
+      info,
     });
     toggles.set(key, toggle);
     showSection.append(toggle.el);

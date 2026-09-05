@@ -21,7 +21,7 @@ export interface LogSliderOptions {
   onChange: (value: number) => void;
   format?: (value: number) => string;
   /** Adds the "what does this do?" button beside the label. */
-  info?: ControlInfo;
+  info?: ControlInfo | undefined;
 }
 
 export interface LogSlider {
@@ -39,7 +39,7 @@ export interface SliderOptions {
   onChange: (value: number) => void;
   format?: (value: number) => string;
   /** Adds the "what does this do?" button beside the label. */
-  info?: ControlInfo;
+  info?: ControlInfo | undefined;
 }
 
 export interface Slider {

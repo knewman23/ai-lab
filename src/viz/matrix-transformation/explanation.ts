@@ -3,6 +3,56 @@ import { createEquation } from "../../ui/equation";
 import { fmt } from "../../ui/readout";
 import type { MtState, derived } from "./state";
 import type { OverviewSpec } from "../../ui/overview";
+import type { ControlInfo } from "../../ui/info";
+
+/** One entry per control, in the panel's order: what it changes, and what to watch. */
+export const CONTROL_INFO = {
+  preset: {
+    what: "Loads a matrix worth looking at, and writes its four numbers into the boxes below.",
+    why:
+      "Each one isolates a property. Reflection has determinant −1: the same area, orientation " +
+      "reversed. Projection has determinant 0, which flattens the plane onto a line and cannot be " +
+      "undone. Rotation has no real eigenvector at all, because every direction turns.",
+  },
+  matrix: {
+    what:
+      "The matrix itself, as four numbers. The left column is where the first basis vector lands " +
+      "and the right column is where the second one lands; entries are held within ±3.",
+    why:
+      "A 2×2 matrix is nothing more than those two destinations, which is why dragging a basis " +
+      "vector in the scene and typing here do the same thing. Everything the panel reports is " +
+      "computed from these four numbers.",
+  },
+  animate: {
+    what:
+      "Slides the transformation between the identity at 0 and the full matrix at 1, blending " +
+      "the two linearly.",
+    why:
+      "It shows the transformation as a motion rather than a jump, which makes a flip visible as " +
+      "the moment the plane passes through being flat. The vectors are only draggable at 1, " +
+      "since anywhere else you would be dragging a partially applied matrix.",
+  },
+  showGrid: {
+    what: "Draws where the whole grid of the plane goes, not just the unit square.",
+    why:
+      "Linear means the grid stays a grid: lines stay straight, parallel lines stay parallel, " +
+      "and the origin stays put. Everything a matrix can do to the plane is visible in what " +
+      "happens to those lines.",
+  },
+  showEigen: {
+    what: "Draws the directions the matrix does not turn, when it has any.",
+    why:
+      "A vector along one of these comes out pointing the same way, scaled by its eigenvalue. " +
+      "Rotations have none — the readout says complex pair — which is the geometric meaning of " +
+      "the characteristic polynomial having no real roots.",
+  },
+  showGhost: {
+    what: "Keeps the original unit square in view alongside the transformed one.",
+    why:
+      "It is what makes the determinant readable: the area of the new shape against the area of " +
+      "the old one, with a sign for whether the plane was turned over.",
+  },
+} as const satisfies Readonly<Record<string, ControlInfo>>;
 
 export const OVERVIEW: OverviewSpec = {
   summary: "What a matrix does to space, read off the two columns it is made of",

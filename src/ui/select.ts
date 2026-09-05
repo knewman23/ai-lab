@@ -12,7 +12,7 @@ export interface SelectOptions {
   value: string;
   onChange: (value: string) => void;
   /** Adds the "what does this do?" button beside the label. */
-  info?: ControlInfo;
+  info?: ControlInfo | undefined;
 }
 
 export interface Select {

@@ -5,7 +5,8 @@ import { createPanel } from "../../ui/panel";
 import { createSelect } from "../../ui/select";
 import { createToggle, type Toggle } from "../../ui/toggle";
 import { createControlFocus } from "../shared/control-focus";
-import { createExplanation, OVERVIEW, passLine } from "./explanation";
+import type { ControlInfo } from "../../ui/info";
+import { CONTROL_INFO, createExplanation, OVERVIEW, passLine } from "./explanation";
 import { createLeafSliders, type LeafSliders } from "./panel-leaves";
 import { createBpReadouts, type BpReadouts } from "./panel-readouts";
 import { initialState, type BpState, type Derived, type ShowKey } from "./state";
@@ -21,10 +22,10 @@ export interface BpPanelHandlers {
   onShow(key: ShowKey, on: boolean): void;
 }
 
-const SHOW_KEYS: readonly { key: ShowKey; label: string }[] = [
-  { key: "values", label: "Value bars" },
-  { key: "grads", label: "Grad bars" },
-  { key: "edgeDerivs", label: "Edge derivatives" },
+const SHOW_KEYS: readonly { key: ShowKey; label: string; info: ControlInfo }[] = [
+  { key: "values", label: "Value bars", info: CONTROL_INFO.showValues },
+  { key: "grads", label: "Grad bars", info: CONTROL_INFO.showGrads },
+  { key: "edgeDerivs", label: "Edge derivatives", info: CONTROL_INFO.showEdgeDerivs },
 ];
 
 /**
@@ -77,6 +78,7 @@ export function createBpPanel(host: HTMLElement, handlers: BpPanelHandlers): BpP
     options: GRAPH_KEYS.map((key) => ({ value: key, title: GRAPHS[key].title })),
     value: GRAPH_KEYS[0],
     onChange: (v) => handlers.onGraph(v as GraphKey),
+    info: CONTROL_INFO.graph,
   });
   panel.section("Setup").append(graphSelect.el);
 
@@ -100,11 +102,12 @@ export function createBpPanel(host: HTMLElement, handlers: BpPanelHandlers): BpP
   const showSection = panel.section("Show");
   const toggles = new Map<ShowKey, Toggle>();
   const init = initialState().show;
-  for (const { key, label } of SHOW_KEYS) {
+  for (const { key, label, info } of SHOW_KEYS) {
     const toggle = createToggle({
       label,
       checked: init[key],
       onChange: (on) => handlers.onShow(key, on),
+      info,
     });
     toggles.set(key, toggle);
     showSection.append(toggle.el);
@@ -145,7 +148,12 @@ export function createBpPanel(host: HTMLElement, handlers: BpPanelHandlers): BpP
     leafSliders?.dispose();
     readouts?.dispose();
     graphKey = key;
-    leafSliders = createLeafSliders(leavesSection, GRAPHS[key], (id, v) => handlers.onLeaf(id, v));
+    leafSliders = createLeafSliders(
+      leavesSection,
+      GRAPHS[key],
+      (id, v) => handlers.onLeaf(id, v),
+      CONTROL_INFO.leaf,
+    );
     readouts = createBpReadouts(readoutSection, GRAPHS[key]);
   }
 

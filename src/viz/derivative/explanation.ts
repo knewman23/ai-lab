@@ -3,6 +3,49 @@ import { createEquation } from "../../ui/equation";
 import { fmt, proseNum } from "../../ui/readout";
 import type { DxState, derived } from "./state";
 import type { OverviewSpec } from "../../ui/overview";
+import type { ControlInfo } from "../../ui/info";
+
+/** One entry per control, in the panel's order: what it changes, and what to watch. */
+export const CONTROL_INFO = {
+  fn: {
+    what:
+      "Swaps the curve. Everything else in the scene is measured on whichever one is chosen, and " +
+      "the point returns to that function's own starting x.",
+    why:
+      "Two of them are here to fail on purpose. |x| has a corner where the left and right slopes " +
+      "disagree, so no tangent exists at x = 0; the square root of |x| has a vertical tangent " +
+      "there instead. Continuous is not the same as differentiable, and those two are the proof.",
+  },
+  h: {
+    what:
+      "The gap between the point and the second point the secant line is drawn through. The " +
+      "secant's slope is the average rate of change across that gap.",
+    why:
+      "Shrinking it is the whole definition of a derivative: the Secant − f′ readout is the gap " +
+      "between the average rate and the instantaneous one, and it goes to zero as h does. Near " +
+      "the right-hand edge h is clipped so the second point stays on the curve, and the panel " +
+      "says so when that happens.",
+  },
+  showTangent: {
+    what: "Draws the line through the point whose slope is the derivative there.",
+    why:
+      "It is the line the secant is converging on. At a corner or a vertical tangent none is " +
+      "drawn at all, which is the scene's way of saying the derivative does not exist there.",
+  },
+  showSecant: {
+    what: "Draws the line through the point and the one h further along the curve.",
+    why:
+      "The tangent is the limit of this line and nothing more. Watching it rotate onto the " +
+      "tangent as h shrinks is the argument the definition makes in symbols.",
+  },
+  showDerivative: {
+    what: "Draws f′ as a curve of its own in the band beneath the main one.",
+    why:
+      "It turns the slope into a height you can read along the whole domain at once. Where the " +
+      "top curve levels off the lower one crosses zero; where the top falls steeply the lower one " +
+      "sits well below its centre line. Values too large for the band are clamped into it.",
+  },
+} as const satisfies Readonly<Record<string, ControlInfo>>;
 
 export const OVERVIEW: OverviewSpec = {
   summary: "Reading how fast something is changing at a single instant",

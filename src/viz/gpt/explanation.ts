@@ -22,6 +22,81 @@ import { fmt } from "../../ui/readout";
 import { BLEND } from "./arcs-geometry";
 import type { PresetKey } from "./state";
 import type { OverviewSpec } from "../../ui/overview";
+import type { ControlInfo } from "../../ui/info";
+
+/** One entry per control, in the panel's order: what it changes, and what to watch. */
+export const CONTROL_INFO = {
+  sentence: {
+    what: "Swaps which five tokens run through the block. The embeddings carry across unchanged.",
+    why:
+      "The embeddings are this scene's independent variable, so changing the sentence while " +
+      "keeping them shows how much of the result is the words and how much is their order. The " +
+      "scrambled option is the same words in an order that means nothing.",
+  },
+  preset: {
+    what: "Replaces all eight word positions on the floor at once, discarding any dragging.",
+    why:
+      "Each preset is a lesson. Tuned spaces the parts of speech far enough apart that content " +
+      "beats position inside head 1. Collapsed puts every word on one point, stripping the " +
+      "content out so head 1's positional bias shows alone. Spread pushes them far apart, which " +
+      "makes weight tying visible in the bars.",
+  },
+  query: {
+    what:
+      "Chooses which position is doing the reading. The arcs fan back from that column to the " +
+      "tokens it attends to, and the readouts follow it.",
+    why:
+      "Attention is one row per position, and this picks the row. Position 0 can only read " +
+      "itself, so its weight is exactly 1 with no range to compare. The logits always come from " +
+      "the last position's final vector, whichever query the arcs are drawing.",
+  },
+  head: {
+    what: "Chooses whose attention row the arcs are sized from: head 1, head 2, or a blend of both.",
+    why:
+      "The two heads lean different ways. Head 1's query is rotated back one radian, which points " +
+      "it at the previous position; head 2 compares content directly. Under both, the arc width " +
+      "is a display blend weighted by each head's real contribution, which the readout spells out.",
+  },
+  stage: {
+    what:
+      "Focuses one stage of the block: it dims the other bands on the wall and prints that " +
+      "stage's own numbers in the readout.",
+    why:
+      "It is how the pipeline is read one step at a time, from embed and position at the bottom " +
+      "up to the logits at the top. Three of the entries — scores, softmax and the weighted sum — " +
+      "all happen on the attention band, so they light the same band and change only the numbers.",
+  },
+  temperature: {
+    what: "Divides the logits before the softmax that turns them into probabilities.",
+    why:
+      "It changes only the last step, never the block: the logits underneath are untouched, and " +
+      "the ordering of the words never changes. Low temperature concentrates the mass on the top " +
+      "word, high temperature flattens the distribution towards uniform.",
+  },
+  positional: {
+    what: "Adds each token's position encoding to its embedding, or leaves it out.",
+    why:
+      "Without it the block has no idea what order the words came in — the two instances of the " +
+      "same word become identical, and attention cannot tell them apart. Turning it off is the " +
+      "cleanest demonstration that attention alone is order-blind.",
+  },
+  causal: {
+    what: "Masks the keys after the query, so a position can only read itself and what came before.",
+    why:
+      "This is what makes the model a next-word predictor rather than a reader of the whole " +
+      "sentence: without it, a position sees the future it is meant to be predicting. Turn it off " +
+      "and the arcs reach forward as well as back.",
+  },
+  residualPath: {
+    what:
+      "Draws the selected token's journey on the floor: the embedding, plus each edit the block " +
+      "adds to it.",
+    why:
+      "A block edits vectors rather than replacing them. The chain of arrows is that running " +
+      "total — attention's contribution, then the MLP's — and it shows how far the final vector " +
+      "actually travels from the one that entered.",
+  },
+} as const satisfies Readonly<Record<string, ControlInfo>>;
 
 export const OVERVIEW: OverviewSpec = {
   summary: "How a language model decides which word comes next",

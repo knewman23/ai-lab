@@ -115,13 +115,10 @@ function hint(el: HTMLElement): string {
 describe("createGptPanel: the §6 controls, in order", () => {
   it("lays the five selects out as sentence, embeddings, query token, head, stage", () => {
     const panel = mount();
-    expect(selects(panel.el).map((s) => s.previousElementSibling?.textContent)).toEqual([
-      "Sentence",
-      "Embeddings",
-      "Query token",
-      "Head",
-      "Stage",
-    ]);
+    // The label now shares a row with its info button, so the label itself is what is read.
+    expect(
+      selects(panel.el).map((s) => s.previousElementSibling?.querySelector(".lbl")?.textContent),
+    ).toEqual(["Sentence", "Embeddings", "Query token", "Head", "Stage"]);
   });
 
   it("names the sentences by the words they spell", () => {

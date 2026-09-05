@@ -3,7 +3,7 @@ export interface ToggleOptions {
   checked: boolean;
   onChange: (checked: boolean) => void;
   /** Adds the "what does this do?" button beside the switch. */
-  info?: ControlInfo;
+  info?: ControlInfo | undefined;
 }
 
 import { createInfoButton, type ControlInfo } from "./info";

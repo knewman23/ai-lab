@@ -5,6 +5,50 @@ import { createEquation } from "../../ui/equation";
 import { proseNum } from "../../ui/readout";
 import type { BpState, Derived } from "./state";
 import type { OverviewSpec } from "../../ui/overview";
+import type { ControlInfo } from "../../ui/info";
+
+/** One entry per control, in the panel's order: what it changes, and what to watch. */
+export const CONTROL_INFO = {
+  graph: {
+    what:
+      "Swaps the expression being differentiated, and restarts the pass at the beginning with " +
+      "that graph's own starting leaves.",
+    why:
+      "Each one isolates a rule. a·b + c shows that adding passes a gradient through unchanged " +
+      "while multiplying hands each input the other's value. L = e·c + e has a node feeding two " +
+      "consumers, whose gradient is the sum of what each hands back. The tanh neuron is the " +
+      "smallest thing with a product, a sum and a nonlinearity together.",
+  },
+  leaf: {
+    what:
+      "A leaf's value: an input the graph is evaluated at, and one of the only numbers here that " +
+      "is given rather than computed.",
+    why:
+      "Move one and every node downstream recomputes, gradients included. These stand in for a " +
+      "model's weights — the numbers training is allowed to change — which is why the gradient " +
+      "with respect to each one is the number the whole backward pass exists to produce.",
+  },
+  showValues: {
+    what: "Draws each node's forward value as a bar.",
+    why:
+      "The forward pass in one glance. Bars appear as the pass reveals each node, so it doubles " +
+      "as a record of how far the computation has got.",
+  },
+  showGrads: {
+    what: "Draws each node's gradient with respect to the output as a bar.",
+    why:
+      "This is the answer the backward pass computes: how much the output moves when that node " +
+      "does. Watch a shared node's bar arrive in two instalments, one per consumer, since until " +
+      "both have run the number shown is a partial sum.",
+  },
+  showEdgeDerivs: {
+    what: "Labels each edge with the local derivative of the node above it with respect to that input.",
+    why:
+      "These are the factors the chain rule multiplies. A leaf's gradient is the product of the " +
+      "labels along the path from it up to the output, which is exactly what the backward pass " +
+      "accumulates one edge at a time.",
+  },
+} as const satisfies Readonly<Record<string, ControlInfo>>;
 
 export const OVERVIEW: OverviewSpec = {
   summary: "How a framework works out which weight to blame for the error",

@@ -7,8 +7,15 @@ import { createSelect } from "../../ui/select";
 import { createLogSlider } from "../../ui/slider";
 import { createToggle, type Toggle } from "../../ui/toggle";
 import { createControlFocus } from "../shared/control-focus";
-import { createNnExplanation, OVERVIEW, probeText, trainingLine } from "./explanation";
+import {
+  CONTROL_INFO,
+  createNnExplanation,
+  OVERVIEW,
+  probeText,
+  trainingLine,
+} from "./explanation";
 import { initialState, LR_RANGE, type Derived, type NnState, type ShowKey } from "./state";
+import type { ControlInfo } from "../../ui/info";
 
 export interface NnPanelHandlers {
   onDataset(key: DatasetKey): void;
@@ -20,10 +27,10 @@ export interface NnPanelHandlers {
   onShow(key: ShowKey, on: boolean): void;
 }
 
-const SHOW_KEYS: readonly { key: ShowKey; label: string }[] = [
-  { key: "weights", label: "Weights" },
-  { key: "data", label: "Data" },
-  { key: "boundary", label: "Boundary" },
+const SHOW_KEYS: readonly { key: ShowKey; label: string; info: ControlInfo }[] = [
+  { key: "weights", label: "Weights", info: CONTROL_INFO.showWeights },
+  { key: "data", label: "Data", info: CONTROL_INFO.showData },
+  { key: "boundary", label: "Boundary", info: CONTROL_INFO.showBoundary },
 ];
 
 /** The one readout row: epoch, loss and accuracy live in the training line instead. */
@@ -79,6 +86,7 @@ export function createNnPanel(host: HTMLElement, handlers: NnPanelHandlers): NnP
     options: DATASET_KEYS.map((key) => ({ value: key, title: DATASETS[key].title })),
     value: init.dataset,
     onChange: (v) => handlers.onDataset(v as DatasetKey),
+    info: CONTROL_INFO.dataset,
   });
   panel.section("Setup").append(datasetSelect.el);
 
@@ -93,6 +101,7 @@ export function createNnPanel(host: HTMLElement, handlers: NnPanelHandlers): NnP
     max: LR_RANGE[1],
     value: init.lr,
     onChange: (v) => handlers.onLr(v),
+    info: CONTROL_INFO.lr,
   });
   const trainingPara = document.createElement("p");
   trainingPara.className = "training-line";
@@ -110,11 +119,12 @@ export function createNnPanel(host: HTMLElement, handlers: NnPanelHandlers): NnP
 
   const showSection = panel.section("Show");
   const toggles = new Map<ShowKey, Toggle>();
-  for (const { key, label } of SHOW_KEYS) {
+  for (const { key, label, info } of SHOW_KEYS) {
     const toggle = createToggle({
       label,
       checked: init.show[key],
       onChange: (on) => handlers.onShow(key, on),
+      info,
     });
     toggles.set(key, toggle);
     showSection.append(toggle.el);

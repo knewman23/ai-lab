@@ -8,6 +8,7 @@ import { SEQUENCES, VOCAB } from "../../core/math/transformer";
 import { createSelect, type Select, type SelectOption } from "../../ui/select";
 import { initialState } from "./state";
 import type { HeadKey, PresetKey, SentenceKey, StageKey } from "./state";
+import type { ControlInfo } from "../../ui/info";
 
 /** An option list whose values are one of a scene key union, so the panel needs no cast. */
 type Options<K extends string> = readonly (SelectOption & { value: K })[];
@@ -70,8 +71,9 @@ export function keyedSelect<K extends string>(
   options: Options<K>,
   value: K,
   fire: (key: K) => void,
+  info?: ControlInfo,
 ): Select {
-  return createSelect({ label, options, value, onChange: (v) => fire(v as K) });
+  return createSelect({ label, options, value, onChange: (v) => fire(v as K), info });
 }
 
 /** Rewrites a select's option titles in place: the query labels change with the sentence. */
