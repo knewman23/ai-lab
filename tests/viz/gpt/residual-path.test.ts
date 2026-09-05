@@ -5,22 +5,21 @@ import {
   forward,
   SEQUENCES,
 } from "../../../src/core/math/transformer";
-import { floorFromEmbed } from "../../../src/viz/gpt/layout";
+import { pathDrawing, STEPS } from "../../../src/viz/gpt/residual-path-geometry";
 import type { Layer, Segment, Vec3 } from "../../../src/viz/shared/layer";
-import { createResidualPath, pathPoints, STEP_LABELS } from "../../../src/viz/gpt/residual-path";
+import { createResidualPath } from "../../../src/viz/gpt/residual-path";
 import { testTheme } from "./helpers";
 
-function pass(sentence: keyof typeof SEQUENCES): Forward {
+function pass(sentence: keyof typeof SEQUENCES, positional = true): Forward {
   return forward({
     embeddings: EMBEDDING_PRESETS.tuned,
     sequence: SEQUENCES[sentence],
-    positional: true,
+    positional,
     causal: true,
   });
 }
 
 const CAT_SAT = pass("cat-sat");
-const SCRAMBLED = pass("scrambled");
 const LAST = SEQUENCES["cat-sat"].length - 1;
 
 function make() {
@@ -42,137 +41,54 @@ function drawn(layer: Layer): Segment[] {
   return out;
 }
 
-/** An arrow is drawn shaft first, so its first segment is the whole of the arrow's reach. */
-function shaft(layer: Layer): Segment {
-  const first = drawn(layer)[0];
-  if (first === undefined) throw new Error("the layer drew no arrow");
-  return first;
-}
-
-function length2([a, b]: Segment): number {
-  return Math.hypot(b[0] - a[0], b[1] - a[1]);
-}
-
-/** One 2-vector out of a pass, as the floor point that stands for it. */
-function floorAt(f: Forward, rows: readonly Float64Array[], i: number): readonly [number, number] {
-  const row = rows[i];
-  if (row === undefined) throw new Error(`no vector at ${i}`);
-  return floorFromEmbed([row[0]!, row[1]!]);
+function expectSegments(layer: Layer, want: readonly Segment[]): void {
+  const got = drawn(layer);
+  expect(got).toHaveLength(want.length);
+  for (let i = 0; i < want.length; i++) {
+    for (const end of [0, 1] as const) {
+      for (let j = 0; j < 3; j++) expect(got[i]![end][j]).toBeCloseTo(want[i]![end][j]!, 5);
+    }
+  }
 }
 
 describe("createResidualPath", () => {
-  it("chains three arrows through embedding, x, xResid and xFinal", () => {
+  it("draws each step into its own layer, and the ring into its own", () => {
     const { path } = make();
-    const embedding = floorFromEmbed([
-      CAT_SAT.x[LAST]![0]! - CAT_SAT.pe[LAST]![0]!,
-      CAT_SAT.x[LAST]![1]! - CAT_SAT.pe[LAST]![1]!,
-    ]);
-    const x = floorAt(CAT_SAT, CAT_SAT.x, LAST);
-    const resid = floorAt(CAT_SAT, CAT_SAT.xResid, LAST);
-    const final = floorAt(CAT_SAT, CAT_SAT.xFinal, LAST);
-
-    const close = (p: Vec3, q: readonly [number, number]): void => {
-      expect(p[0]).toBeCloseTo(q[0], 5);
-      expect(p[1]).toBeCloseTo(q[1], 5);
-    };
-    const position = shaft(path.layers.position);
-    close(position[0], embedding);
-    close(position[1], x);
-    const attention = shaft(path.layers.attention);
-    close(attention[0], x);
-    close(attention[1], resid);
-    const mlp = shaft(path.layers.mlp);
-    close(mlp[0], resid);
-    close(mlp[1], final);
+    const { arrows, ring } = pathDrawing(CAT_SAT, LAST);
+    for (let s = 0; s < STEPS.length; s++) expectSegments(path.layers[STEPS[s]!], arrows[s]!);
+    expectSegments(path.layers.ring, ring);
     path.dispose();
   });
 
-  it("colours the three steps --soft, --accent and --ink, and names them", () => {
+  it("redraws when the query moves", () => {
+    const { path } = make();
+    path.set(CAT_SAT, 1);
+    const { arrows } = pathDrawing(CAT_SAT, 1);
+    expectSegments(path.layers.attention, arrows[1]!);
+    path.dispose();
+  });
+
+  it("hides a step with nothing to draw rather than drawing zero vertices", () => {
+    const { path } = make();
+    expect(path.layers.position.object.visible).toBe(true);
+    // With positional encoding off the embedding *is* x, so the position step has no reach.
+    path.set(pass("cat-sat", false), LAST);
+    expect(drawn(path.layers.position)).toHaveLength(0);
+    expect(path.layers.position.object.visible).toBe(false);
+    expect(path.layers.attention.object.visible).toBe(true);
+    path.dispose();
+  });
+
+  it("colours the three steps --soft, --accent and --ink, and the ring with the last", () => {
     const { path, theme } = make();
     expect(path.layers.position.material.color.equals(theme.soft)).toBe(true);
     expect(path.layers.attention.material.color.equals(theme.accent)).toBe(true);
     expect(path.layers.mlp.material.color.equals(theme.ink)).toBe(true);
-    expect(STEP_LABELS).toEqual(["+ position", "+ attention", "+ MLP"]);
+    expect(path.layers.ring.material.color.equals(theme.ink)).toBe(true);
     path.dispose();
   });
 
-  it("draws the arrows at true relative length, so the MLP step can be the longer one", () => {
-    const { path } = make();
-    const ratio = (f: Forward): number => {
-      path.set(f, LAST);
-      return length2(shaft(path.layers.mlp)) / length2(shaft(path.layers.attention));
-    };
-    // |mlpOut| / |attnOut| at the last position: 0.46 on `cat-sat`, 1.47 on `scrambled`. A pair
-    // normalised to always read long-then-short would report the same number for both.
-    expect(ratio(CAT_SAT)).toBeCloseTo(0.46, 2);
-    expect(ratio(SCRAMBLED)).toBeCloseTo(1.47, 2);
-    path.dispose();
-  });
-
-  it("scales the floor arrows by the floor scale, not by a normalisation", () => {
-    const { path } = make();
-    const attnOut = CAT_SAT.attnOut[LAST]!;
-    // The attention step *is* attnOut, drawn 1.4 floor units per embedding unit.
-    expect(length2(shaft(path.layers.attention))).toBeCloseTo(
-      1.4 * Math.hypot(attnOut[0]!, attnOut[1]!),
-      5,
-    );
-    path.dispose();
-  });
-
-  it("marks xFinal with a hollow ring", () => {
-    const { path } = make();
-    const final = floorAt(CAT_SAT, CAT_SAT.xFinal, LAST);
-    const ring = drawn(path.layers.ring);
-    expect(ring.length).toBeGreaterThan(8);
-    const radii = ring.map(([a]) => Math.hypot(a[0] - final[0], a[1] - final[1]));
-    // Every vertex the same distance from the centre, and a visible distance at that: a ring,
-    // not a disc and not a dot.
-    for (const r of radii) expect(r).toBeCloseTo(0.14, 4);
-    // Closed: the last segment returns to where the first began.
-    expect(ring.at(-1)![1][0]).toBeCloseTo(ring[0]![0][0], 5);
-    expect(ring.at(-1)![1][1]).toBeCloseTo(ring[0]![0][1], 5);
-    path.dispose();
-  });
-
-  it("gives every arrow a head, and draws nothing at all for a step of zero length", () => {
-    const { path } = make();
-    // Shaft plus two barbs plus the closing base.
-    expect(drawn(path.layers.attention)).toHaveLength(4);
-    const flat = forward({
-      embeddings: EMBEDDING_PRESETS.tuned,
-      sequence: SEQUENCES["cat-sat"],
-      positional: false,
-      causal: true,
-    });
-    path.set(flat, LAST);
-    // With positional encoding off the embedding *is* x, so the position step has no reach.
-    expect(drawn(path.layers.position)).toHaveLength(0);
-    expect(path.layers.position.object.visible).toBe(false);
-    path.dispose();
-  });
-
-  it("lays the whole path on the floor plane z = 0", () => {
-    const { path } = make();
-    for (const layer of Object.values(path.layers)) {
-      for (const [a, b] of drawn(layer)) {
-        expect(Math.abs(a[2])).toBeLessThan(0.05);
-        expect(Math.abs(b[2])).toBeLessThan(0.05);
-      }
-    }
-    path.dispose();
-  });
-
-  it("exposes the four floor points the labels hang off", () => {
-    const { path } = make();
-    const points = pathPoints(CAT_SAT, LAST);
-    expect(points).toHaveLength(4);
-    expect(points[1]![0]).toBeCloseTo(shaft(path.layers.position)[1][0], 5);
-    expect(points[3]![1]).toBeCloseTo(shaft(path.layers.mlp)[1][1], 5);
-    path.dispose();
-  });
-
-  it("throws rather than defaulting when the pass has no such position", () => {
+  it("lets the geometry's guards through rather than drawing a broken chain", () => {
     const { path } = make();
     expect(() => path.set(CAT_SAT, 9)).toThrow(/position 9/);
     path.dispose();

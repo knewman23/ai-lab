@@ -7,9 +7,9 @@ import {
   SEQUENCES,
   VOCAB,
 } from "../../../src/core/math/transformer";
-import { COLUMN_X, WALL_H, WALL_W } from "../../../src/viz/gpt/layout";
+import { BAR_BUFFER_FLOATS, leaderSegment, writeBars } from "../../../src/viz/gpt/bars-geometry";
 import type { Layer, Segment, Vec3 } from "../../../src/viz/shared/layer";
-import { barX, createBars } from "../../../src/viz/gpt/bars";
+import { createBars } from "../../../src/viz/gpt/bars";
 import { testTheme } from "./helpers";
 
 const PASS = forward({
@@ -27,34 +27,6 @@ function make() {
   return { bars, theme, repaint };
 }
 
-interface Extent {
-  readonly minX: number;
-  readonly maxX: number;
-  readonly minZ: number;
-  readonly maxZ: number;
-}
-
-/** The x and z extent of the quad drawn for word `v`. */
-function extent(positions: Float32Array, v: number, verticesPerBar: number): Extent {
-  const xs: number[] = [];
-  const zs: number[] = [];
-  for (let n = v * verticesPerBar; n < (v + 1) * verticesPerBar; n++) {
-    xs.push(positions[n * 3]!);
-    zs.push(positions[n * 3 + 2]!);
-  }
-  return {
-    minX: Math.min(...xs),
-    maxX: Math.max(...xs),
-    minZ: Math.min(...zs),
-    maxZ: Math.max(...zs),
-  };
-}
-
-function extents(bars: ReturnType<typeof createBars>): Extent[] {
-  const per = bars.geometry.drawRange.count / VOCAB.length;
-  return VOCAB.map((_, v) => extent(bars.positions, v, per));
-}
-
 /** The segments a layer is actually drawing. */
 function drawn(layer: Layer): Segment[] {
   const out: Segment[] = [];
@@ -68,99 +40,59 @@ function drawn(layer: Layer): Segment[] {
 }
 
 describe("createBars", () => {
-  it("draws one bar per vocabulary word, in vocabulary order", () => {
+  it("draws exactly what the geometry computes for the distribution", () => {
     const { bars } = make();
-    const boxes = extents(bars);
-    expect(boxes).toHaveLength(VOCAB.length);
-    for (let v = 1; v < boxes.length; v++) {
-      expect(boxes[v]!.minX).toBeGreaterThan(boxes[v - 1]!.maxX);
-    }
-    // `barX` names the same centres the buffer holds, so the labels land on their bars.
-    for (let v = 0; v < boxes.length; v++) {
-      expect((boxes[v]!.minX + boxes[v]!.maxX) / 2).toBeCloseTo(barX(v), 5);
-    }
-    expect(() => barX(VOCAB.length)).toThrow(/bar/);
+    const expected = new Float32Array(BAR_BUFFER_FLOATS);
+    const count = writeBars(expected, PROBS);
+    expect(bars.geometry.drawRange.count).toBe(count);
+    expect([...bars.positions]).toEqual([...expected]);
     bars.dispose();
   });
 
-  it("makes every bar 0.28 wide, evenly pitched, and keeps the row inside the wall", () => {
+  it("rewrites the buffer on a new distribution rather than rebuilding geometry", () => {
     const { bars } = make();
-    const boxes = extents(bars);
-    for (const box of boxes) expect(box.maxX - box.minX).toBeCloseTo(0.28, 5);
-    const pitch = barX(1) - barX(0);
-    for (let v = 1; v < boxes.length; v++) expect(barX(v) - barX(v - 1)).toBeCloseTo(pitch, 5);
-    // A gap between neighbours, and clear of both wall edges.
-    expect(pitch).toBeGreaterThan(0.28);
-    expect(boxes[0]!.minX).toBeGreaterThan(-WALL_W / 2);
-    expect(boxes.at(-1)!.maxX).toBeLessThan(WALL_W / 2);
-    bars.dispose();
-  });
-
-  it("stands the bars on the logits band with the tallest filling it", () => {
-    const { bars } = make();
-    const boxes = extents(bars);
-    for (const box of boxes) expect(box.minZ).toBeCloseTo(4.2, 5);
-    const heights = boxes.map((box) => box.maxZ - box.minZ);
-    // 0.55 * p / max(p): the tallest always fills the band, whatever the distribution.
-    expect(Math.max(...heights)).toBeCloseTo(0.55, 5);
-    expect(Math.max(...boxes.map((box) => box.maxZ))).toBeCloseTo(4.75, 5);
-    expect(4.75).toBeLessThan(WALL_H);
-    bars.dispose();
-  });
-
-  it("takes each height from the probability relative to the largest", () => {
-    const { bars } = make();
-    const max = Math.max(...PROBS);
-    const heights = extents(bars).map((box) => box.maxZ - box.minZ);
-    for (let v = 0; v < heights.length; v++) {
-      expect(heights[v]!).toBeCloseTo((0.55 * PROBS[v]!) / max, 5);
-    }
-    // On `cat-sat` at the tuned preset "the" wins at p = 0.79 and "cat" trails at 0.041.
-    expect(heights[0]!).toBeCloseTo(0.55, 5);
-    expect(heights[1]!).toBeCloseTo(0.0289, 3);
-    bars.dispose();
-  });
-
-  it("rescales when the distribution flattens", () => {
-    const { bars } = make();
+    const before = bars.geometry;
     const uniform = Float64Array.from(VOCAB.map(() => 1 / VOCAB.length));
     bars.set(uniform);
-    for (const box of extents(bars)) expect(box.maxZ - box.minZ).toBeCloseTo(0.55, 5);
+    const expected = new Float32Array(BAR_BUFFER_FLOATS);
+    writeBars(expected, uniform);
+    expect(bars.geometry).toBe(before);
+    expect([...bars.positions]).toEqual([...expected]);
     bars.dispose();
   });
 
-  it("throws rather than defaulting on a distribution of the wrong size or no mass", () => {
+  it("lets the geometry's guards through rather than drawing a broken row", () => {
     const { bars } = make();
-    expect(() => bars.set(Float64Array.from([1, 0]))).toThrow(/bars/);
-    expect(() => bars.set(Float64Array.from(VOCAB.map(() => 0)))).toThrow(/mass/);
+    expect(() => bars.set(Float64Array.from([1, 0]))).toThrow(/probabilities for 8 words/);
+    expect(() => bars.set(Float64Array.from(VOCAB.map(() => 0)))).toThrow(/no mass/);
     bars.dispose();
   });
 
-  it("runs a --soft leader line up from the top of the last token's column", () => {
+  it("runs the leader line the geometry names, in --soft", () => {
     const { bars, theme } = make();
-    const leader = drawn(bars.leader);
-    expect(leader).toHaveLength(1);
-    const [from, to] = leader[0]!;
-    expect(from[0]).toBeCloseTo(COLUMN_X[4], 5);
-    expect(to[0]).toBeCloseTo(COLUMN_X[4], 5);
-    // From the top of the column stem at the MLP band up to the logits band the bars stand on.
-    expect(from[2]).toBeCloseTo(3.4, 5);
-    expect(to[2]).toBeCloseTo(4.2, 5);
+    expect(drawn(bars.leader)).toHaveLength(1);
+    const [from, to] = drawn(bars.leader)[0]!;
+    const [expectedFrom, expectedTo] = leaderSegment();
+    for (let i = 0; i < 3; i++) {
+      expect(from[i]).toBeCloseTo(expectedFrom[i]!, 5);
+      expect(to[i]).toBeCloseTo(expectedTo[i]!, 5);
+    }
+    // `--soft`, never `--line`, which is near-invisible against the translucent wall.
     expect(bars.leader.material.color.equals(theme.soft)).toBe(true);
     bars.dispose();
   });
 
-  it("draws the bars in --accent, double-sided, in front of the wall", () => {
+  it("draws the bars in --accent, double-sided, on one un-negated normal", () => {
     const { bars, theme } = make();
     expect(bars.material.color.equals(theme.accent)).toBe(true);
     expect(bars.material.side).toBe(DoubleSide);
-    for (let n = 0; n < bars.geometry.drawRange.count; n++) {
-      expect(bars.positions[n * 3 + 1]!).toBeLessThan(0);
-    }
     // One normal for the whole buffer, never negated: WebGPU's DoubleSide path already
     // multiplies by faceDirection.
     const normals = bars.geometry.getAttribute("normal");
-    for (let n = 0; n < normals.count; n++) expect(normals.getY(n)).toBe(1);
+    expect(normals.count * 3).toBe(BAR_BUFFER_FLOATS);
+    for (let n = 0; n < normals.count; n++) {
+      expect([normals.getX(n), normals.getY(n), normals.getZ(n)]).toEqual([0, 1, 0]);
+    }
     bars.dispose();
   });
 
@@ -168,6 +100,7 @@ describe("createBars", () => {
     const { theme } = testTheme();
     const bars = createBars(theme);
     // WebGPU warns on a draw with zero vertices, so the row is hidden until the first `set`.
+    expect(bars.geometry.drawRange.count).toBe(0);
     expect(bars.mesh.visible).toBe(false);
     bars.set(PROBS);
     expect(bars.mesh.visible).toBe(true);
