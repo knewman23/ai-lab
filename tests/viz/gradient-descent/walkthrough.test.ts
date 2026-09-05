@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi } from "vitest";
+import { SURFACES, clampToDomain, isInDomain } from "../../../src/core/math/surfaces";
 import { createGdPanel, type GdPanelHandlers } from "../../../src/viz/gradient-descent/panel";
 import { GD_STEPS, GD_WALKTHROUGH_TITLE } from "../../../src/viz/gradient-descent/walkthrough";
 import { createWalkthrough } from "../../../src/viz/shared/walkthrough";
@@ -197,9 +198,27 @@ describe("the gradient descent walkthrough", () => {
   it("leaves the domain at the raised rate the Rosenbrock step names", () => {
     const state = stepAt(5).enter(stateBefore(5));
     let raised = setLr(state, 0.005);
-    for (let i = 0; i < 10; i += 1) raised = step(raised);
+    let presses = 0;
+    while (raised.status === "ok" && presses < 10) {
+      raised = step(raised);
+      presses += 1;
+    }
 
     expect(raised.status).toBe("left-domain");
+    // "within a few presses": the step says so, so the count is pinned rather than left open.
+    expect(presses).toBeLessThanOrEqual(6);
+  });
+
+  it("parks the ball on the surface once it has left the domain", () => {
+    const state = stepAt(5).enter(stateBefore(5));
+    let raised = setLr(state, 0.005);
+    while (raised.status === "ok") raised = step(raised);
+
+    const surface = SURFACES[raised.surface];
+    // What the step's prose promises the viewer will see: the ball at the edge, not in orbit.
+    expect(isInDomain(surface, raised.pos)).toBe(false);
+    const drawn = clampToDomain(surface, raised.pos);
+    expect(isInDomain(surface, drawn)).toBe(true);
   });
 
   it("switching to adam from the ravine step keeps the ball where SGD left it", () => {

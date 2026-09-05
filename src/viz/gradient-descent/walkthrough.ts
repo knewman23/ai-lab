@@ -82,8 +82,9 @@ export const GD_STEPS: readonly Step<GdState, GdControlId>[] = [
       "Rosenbrock's gradients run two orders of magnitude larger than the bowl's, which is why " +
       "this surface starts a hundred times slower. From here the run drops into the narrow " +
       "valley within a few steps and then crawls along its curved floor, which is the whole " +
-      "difficulty of the shape. Nudge the learning rate up towards 0.005 and the next few steps " +
-      "leave the domain instead.",
+      "difficulty of the shape. Nudge the learning rate up towards 0.005 and press Step: within " +
+      "a few presses the update overshoots the valley wall entirely, the ball parks at the edge " +
+      "of the surface and the status reads that it left the domain.",
     enter: (s) => advance(setOptimizer(setSurface(s, "rosenbrock"), "sgd"), VALLEY_STEPS),
     focus: "lr",
   },
